@@ -47,7 +47,7 @@ export function ReportsView({
 
   const SchoolHeader = () => (
     <div className="print-title" style={{ marginBottom: 16 }}>
-      <div style={{ fontFamily: "var(--font-th-serif)", fontSize: 20, fontWeight: 700 }}>โรงเรียนสุขนธีรวิทย์</div>
+      <div style={{ fontFamily: "var(--font-th-serif)", fontSize: 20, fontWeight: 700 }}>โรงเรียนสุคนธีรวิทย์</div>
       <div style={{ fontSize: 16 }}>งานแข่งขันทางวิชาการ ปีการศึกษา {meta.yearBe}</div>
     </div>
   );

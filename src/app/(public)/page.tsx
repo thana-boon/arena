@@ -24,20 +24,6 @@ export default async function HomePage() {
 
   return (
     <div className="stack">
-      <section className="card" style={{ background: "linear-gradient(135deg,#fff 0%,var(--skdw-purple-pale) 100%)" }}>
-        <h1 style={{ fontFamily: "var(--font-en-serif)", fontSize: "var(--text-3xl)", marginBottom: 8 }}>
-          SKDW Arena
-        </h1>
-        <p className="text-lg mb-2">งานแข่งขันทางวิชาการ โรงเรียนสุขนธีรวิทย์</p>
-        <p className="muted mb-4">
-          {year ? `ปีการศึกษา ${year.yearBe}` : "ยังไม่เปิดปีการศึกษา"} · ดูรายการแข่งขัน สมัครเข้าร่วม และติดตามผลได้ที่นี่
-        </p>
-        <div className="row">
-          <Link href="/results" className="btn btn-primary">ดูผลการแข่งขัน</Link>
-          <Link href="/login" className="btn btn-secondary">เข้าสู่ระบบเพื่อสมัคร</Link>
-        </div>
-      </section>
-
       <div className="page-header">
         <h2>รายการแข่งขันที่เปิดประกาศ</h2>
       </div>

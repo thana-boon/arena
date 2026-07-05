@@ -11,6 +11,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/teachers", label: "สิทธิ์ครู", icon: "👤" },
   { href: "/admin/reports", label: "ออกรายงาน", icon: "📄" },
   { href: "/admin/audit", label: "บันทึกการใช้งาน / Log", icon: "📝" },
+  { href: "/admin/backup", label: "สำรอง & กู้คืนข้อมูล", icon: "💾" },
 ];
 
 export const TEACHER_NAV: NavItem[] = [

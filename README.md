@@ -1,6 +1,6 @@
 # SKDW Arena — ระบบจัดการการแข่งขันทางวิชาการ
 
-ระบบรับสมัคร บันทึกผล และประกาศผลการแข่งขันทางวิชาการ โรงเรียนสุขนธีรวิทย์
+ระบบรับสมัคร บันทึกผล และประกาศผลการแข่งขันทางวิชาการ โรงเรียนสุคนธีรวิทย์
 เป็น **standalone service** รันที่ `http://192.168.200.9:5005`
 
 Stack: **Next.js (App Router) + TypeScript · Drizzle ORM + MySQL/MariaDB (XAMPP) · JWT (httpOnly cookie) · PM2**

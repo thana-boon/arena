@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReportBundle } from "@/lib/reportBundle";
 import { formatThaiDate } from "@/lib/domain";
 
@@ -14,6 +14,8 @@ const DOC_LABEL: Record<DocType, string> = {
 export function ReportsBuilder({ yearBe, bundles }: { yearBe: number; bundles: ReportBundle[] }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [docType, setDocType] = useState<DocType>("roster");
+  // สร้างเอกสารพิมพ์เฉพาะตอนกดพิมพ์ — ไม่พรีวิวทันทีตอนติ๊ก (50-70 รายการจะหนักจนค้าง)
+  const [printing, setPrinting] = useState(false);
 
   // จัดกลุ่มตามหมวด (bundles เรียงตามหมวด→ชื่อมาแล้ว)
   const groups = useMemo(() => {
@@ -45,6 +47,18 @@ export function ReportsBuilder({ yearBe, bundles }: { yearBe: number; bundles: R
   }
   const allOn = allIds.length > 0 && allIds.every((id) => selected.has(id));
 
+  // เมื่อกดพิมพ์: mount เอกสารก่อน แล้วค่อยเรียก window.print() ในเฟรมถัดไป
+  useEffect(() => {
+    if (!printing) return;
+    const done = () => setPrinting(false);
+    window.addEventListener("afterprint", done);
+    const t = window.setTimeout(() => window.print(), 100);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("afterprint", done);
+    };
+  }, [printing]);
+
   if (!bundles.length) {
     return (
       <div className="stack">
@@ -61,8 +75,12 @@ export function ReportsBuilder({ yearBe, bundles }: { yearBe: number; bundles: R
           <h1>ออกรายงาน</h1>
           <div className="subtitle">เลือกหมวด/รายการ แล้วพิมพ์เอกสารรวมชุดเดียว · ปีการศึกษา {yearBe}</div>
         </div>
-        <button className="btn btn-primary" disabled={!selectedBundles.length} onClick={() => window.print()}>
-          🖨️ พิมพ์ ({selectedBundles.length})
+        <button
+          className="btn btn-primary"
+          disabled={!selectedBundles.length || printing}
+          onClick={() => setPrinting(true)}
+        >
+          🖨️ {printing ? "กำลังเตรียมเอกสาร…" : `พิมพ์ (${selectedBundles.length})`}
         </button>
       </div>
 
@@ -119,17 +137,33 @@ export function ReportsBuilder({ yearBe, bundles }: { yearBe: number; bundles: R
         })}
       </div>
 
-      {/* พรีวิว/เอกสารสำหรับพิมพ์ */}
+      {/* สรุปรายการที่เลือก (ไม่เรนเดอร์เอกสารเต็มเพื่อไม่ให้หน้าหนัก) */}
       {!selectedBundles.length ? (
         <div className="no-print empty-state card">
           <div className="big">🖨️</div>
-          <p>ยังไม่ได้เลือกรายการ — ติ๊กหมวดหรือรายการด้านบนเพื่อสร้างเอกสาร</p>
+          <p>ยังไม่ได้เลือกรายการ — ติ๊กหมวดหรือรายการด้านบนเพื่อเตรียมพิมพ์</p>
         </div>
       ) : (
-        <div className="card">
-          <div className="no-print alert alert-info">
-            เอกสาร{DOC_LABEL[docType]} · {selectedBundles.length} รายการ (แต่ละรายการขึ้นหน้าใหม่เมื่อพิมพ์)
+        <div className="no-print card">
+          <div className="alert alert-info">
+            เลือกไว้ {selectedBundles.length} รายการ · เอกสาร{DOC_LABEL[docType]} — กด “พิมพ์” เพื่อสร้างเอกสาร
+            (แต่ละรายการขึ้นหน้าใหม่ตอนพิมพ์)
           </div>
+          <ul className="report-summary-list">
+            {selectedBundles.map((b) => (
+              <li key={b.id}>
+                <span className="muted text-sm">{b.groupName}</span>
+                <span style={{ flex: 1 }}>{b.meta.competitionName}</span>
+                <span className="muted text-sm nowrap">{b.rosterCount} ผู้เข้าแข่ง</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* เอกสารสำหรับพิมพ์ — mount เฉพาะตอนกดพิมพ์ แล้วซ่อนบนจอ (แสดงเฉพาะตอนพิมพ์) */}
+      {printing && (
+        <div className="print-only">
           {selectedBundles.map((b) => (
             <ReportSheet key={b.id} bundle={b} docType={docType} />
           ))}
@@ -148,7 +182,7 @@ function ReportSheet({ bundle, docType }: { bundle: ReportBundle; docType: DocTy
   return (
     <section className="report-section">
       <div className="print-title" style={{ marginBottom: 16, textAlign: "center" }}>
-        <div style={{ fontFamily: "var(--font-th-serif)", fontSize: 20, fontWeight: 700 }}>โรงเรียนสุขนธีรวิทย์</div>
+        <div style={{ fontFamily: "var(--font-th-serif)", fontSize: 20, fontWeight: 700 }}>โรงเรียนสุคนธีรวิทย์</div>
         <div style={{ fontSize: 16 }}>งานแข่งขันทางวิชาการ ปีการศึกษา {meta.yearBe}</div>
         <h2 style={{ margin: "8px 0 4px" }}>{DOC_LABEL[docType]}</h2>
         <div>รายการ: {meta.competitionName} ({meta.groupName})</div>

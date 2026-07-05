@@ -4,7 +4,7 @@ import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "SKDW Arena · ระบบจัดการการแข่งขันทางวิชาการ",
-  description: "ระบบรับสมัครและบันทึกผลการแข่งขันทางวิชาการ โรงเรียนสุขนธีรวิทย์",
+  description: "ระบบรับสมัครและบันทึกผลการแข่งขันทางวิชาการ โรงเรียนสุคนธีรวิทย์",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

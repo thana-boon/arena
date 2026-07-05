@@ -1,0 +1,36 @@
+{
+  "name": "skdw-arena",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SKDW Arena - ระบบจัดการการแข่งขันทางวิชาการ โรงเรียนสุขนธีรวิทย์",
+  "scripts": {
+    "dev": "next dev -p 5005",
+    "build": "next build",
+    "start": "next start -p 5005",
+    "lint": "next lint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:setup": "npm run db:migrate && npm run db:seed"
+  },
+  "dependencies": {
+    "next": "15.1.6",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "drizzle-orm": "0.38.3",
+    "mysql2": "3.12.0",
+    "jose": "5.9.6",
+    "bcryptjs": "2.4.3",
+    "zod": "3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.5",
+    "@types/react": "19.0.7",
+    "@types/react-dom": "19.0.3",
+    "@types/bcryptjs": "2.4.6",
+    "typescript": "5.7.3",
+    "drizzle-kit": "0.30.1",
+    "tsx": "4.19.2",
+    "dotenv": "16.4.7"
+  }
+}

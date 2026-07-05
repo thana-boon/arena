@@ -1,0 +1,74 @@
+import { redirect } from "next/navigation";
+import { db } from "@/db";
+import { subjectGroups, competitions, competitionCapacity, criteria, entries } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { getActiveYear } from "@/lib/queries";
+import { canEditCompetition } from "@/lib/permit";
+import { canPickGroup } from "@/lib/groupScope";
+import { parseJsonArray } from "@/lib/domain";
+import type { SessionPayload } from "@/lib/auth/session";
+import { CompetitionForm } from "@/components/CompetitionForm";
+
+/** เนื้อหาหน้าแก้ไขรายการแข่งขัน — ใช้ร่วมกันทั้ง /teacher และ /admin (ต่างกันแค่ปลายทาง returnTo) */
+export async function CompetitionEditBody({
+  id,
+  session,
+  returnTo,
+}: {
+  id: number;
+  session: SessionPayload;
+  returnTo: string;
+}) {
+  const year = await getActiveYear();
+  if (!year) return <div className="alert alert-warning">ยังไม่มีปีการศึกษาที่เปิดใช้งาน</div>;
+
+  const comp = (await db.select().from(competitions).where(eq(competitions.id, id)).limit(1))[0];
+  if (!comp) return <div className="alert alert-error">ไม่พบรายการแข่งขัน</div>;
+  if (!canEditCompetition(session, comp.createdBy)) redirect(returnTo);
+
+  const allGroups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
+  // ครูทั่วไปเลือกได้เฉพาะหมวดตัวเอง (แต่คงหมวดปัจจุบันของรายการไว้ให้เห็นเสมอ); admin เลือกได้ทุกหมวด
+  const isAdmin = session.role === "admin";
+  const groups = isAdmin
+    ? allGroups
+    : allGroups.filter((g) => canPickGroup(session, g.catalogNo) || g.id === comp.subjectGroupId);
+  const caps = await db.select().from(competitionCapacity).where(eq(competitionCapacity.competitionId, id));
+  const crits = await db.select().from(criteria).where(eq(criteria.competitionId, id));
+  crits.sort((a, b) => a.sortOrder - b.sortOrder);
+  const entRows = await db.select({ id: entries.id }).from(entries).where(eq(entries.competitionId, id)).limit(1);
+  const locked = entRows.length > 0;
+
+  const capPerLevel: Record<string, number> = {};
+  for (const c of caps) if (c.classLevel) capPerLevel[c.classLevel] = c.capacity;
+  const teamCap = caps.find((c) => c.classLevel === null)?.capacity ?? 0;
+
+  return (
+    <div className="stack">
+      <div className="page-header">
+        <h1>แก้ไขรายการแข่งขัน</h1>
+        <div className="subtitle">{comp.name}</div>
+      </div>
+      <CompetitionForm
+        groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+        returnTo={returnTo}
+        lockSubjectGroup={!isAdmin}
+        initial={{
+          id: comp.id,
+          name: comp.name,
+          subjectGroupId: comp.subjectGroupId,
+          type: comp.type as "individual" | "team",
+          teamSizeMin: comp.teamSizeMin ?? "",
+          teamSizeMax: comp.teamSizeMax ?? "",
+          allowedClassLevels: parseJsonArray(comp.allowedClassLevels),
+          eventDate: comp.eventDate ?? "",
+          startTime: comp.startTime?.slice(0, 5) ?? "",
+          endTime: comp.endTime?.slice(0, 5) ?? "",
+          capacityPerLevel: capPerLevel,
+          teamCapacity: teamCap,
+          criteria: crits.map((c) => ({ name: c.name, maxScore: Number(c.maxScore) })),
+          locked,
+        }}
+      />
+    </div>
+  );
+}

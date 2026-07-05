@@ -58,7 +58,7 @@ export type RestoreSummary = { table: string; rows: number }[];
 
 export async function restoreDatabase(data: BackupFile): Promise<RestoreSummary> {
   if (!data || data.app !== APP_TAG)
-    throw new Error("ไฟล์สำรองไม่ถูกต้อง (ไม่ใช่ข้อมูลของระบบ SKDW Arena)");
+    throw new Error("ไฟล์สำรองไม่ถูกต้อง (ไม่ใช่ข้อมูลของระบบ Sukhon Arena)");
   if (data.version !== BACKUP_VERSION)
     throw new Error(`เวอร์ชันไฟล์สำรองไม่ตรงกัน (ไฟล์ v${data.version} · ระบบ v${BACKUP_VERSION})`);
   if (!data.tables || typeof data.tables !== "object")

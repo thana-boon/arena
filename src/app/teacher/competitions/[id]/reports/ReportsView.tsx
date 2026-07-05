@@ -47,7 +47,7 @@ export function ReportsView({
 
   const SchoolHeader = () => (
     <div className="print-title" style={{ marginBottom: 16 }}>
-      <div style={{ fontFamily: "var(--font-th-serif)", fontSize: 20, fontWeight: 700 }}>โรงเรียนสุคนธีรวิทย์</div>
+      <div style={{ fontFamily: "var(--font-th-serif)", fontSize: 16, fontWeight: 700 }}>โรงเรียนสุคนธีรวิทย์</div>
       <div style={{ fontSize: 16 }}>งานแข่งขันทางวิชาการ ปีการศึกษา {meta.yearBe}</div>
     </div>
   );
@@ -71,7 +71,7 @@ export function ReportsView({
       <div className="card">
         <SchoolHeader />
         <div className="print-title" style={{ marginBottom: 16 }}>
-          <h2 style={{ marginBottom: 4 }}>
+          <h2 style={{ marginBottom: 4, fontSize: 16 }}>
             {tab === "roster" && "ใบรายชื่อผู้เข้าแข่งขัน"}
             {tab === "scoresheet" && "ใบกรอกคะแนน"}
             {tab === "announce" && "ใบประกาศผลการแข่งขัน"}

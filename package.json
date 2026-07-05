@@ -2,7 +2,7 @@
   "name": "skdw-arena",
   "version": "1.0.0",
   "private": true,
-  "description": "SKDW Arena - ระบบจัดการการแข่งขันทางวิชาการ โรงเรียนสุคนธีรวิทย์",
+  "description": "Sukhon Arena - ระบบจัดการการแข่งขันทางวิชาการ โรงเรียนสุคนธีรวิทย์",
   "scripts": {
     "dev": "next dev -p 5005",
     "build": "next build",

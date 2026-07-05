@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "SKDW Arena · ระบบจัดการการแข่งขันทางวิชาการ",
+  title: "Sukhon Arena · ระบบจัดการการแข่งขันทางวิชาการ",
   description: "ระบบรับสมัครและบันทึกผลการแข่งขันทางวิชาการ โรงเรียนสุคนธีรวิทย์",
 };
 

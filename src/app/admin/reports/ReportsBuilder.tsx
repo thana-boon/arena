@@ -182,9 +182,9 @@ function ReportSheet({ bundle, docType }: { bundle: ReportBundle; docType: DocTy
   return (
     <section className="report-section">
       <div className="print-title" style={{ marginBottom: 16, textAlign: "center" }}>
-        <div style={{ fontFamily: "var(--font-th-serif)", fontSize: 20, fontWeight: 700 }}>โรงเรียนสุคนธีรวิทย์</div>
+        <div style={{ fontFamily: "var(--font-th-serif)", fontSize: 16, fontWeight: 700 }}>โรงเรียนสุคนธีรวิทย์</div>
         <div style={{ fontSize: 16 }}>งานแข่งขันทางวิชาการ ปีการศึกษา {meta.yearBe}</div>
-        <h2 style={{ margin: "8px 0 4px" }}>{DOC_LABEL[docType]}</h2>
+        <h2 style={{ margin: "8px 0 4px", fontSize: 16 }}>{DOC_LABEL[docType]}</h2>
         <div>รายการ: {meta.competitionName} ({meta.groupName})</div>
         {timeStr && <div className="text-sm">{timeStr}</div>}
       </div>

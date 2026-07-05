@@ -1,4 +1,4 @@
--- ===== SKDW Arena — สร้าง database + user =====
+-- ===== Sukhon Arena — สร้าง database + user =====
 -- รันด้วย root:  mysql -u root -p < scripts/setup-db.sql
 -- (หรือ copy ไปวางใน phpMyAdmin > SQL)
 

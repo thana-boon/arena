@@ -1,5 +1,5 @@
 /**
- * โลโก้แบรนด์ SKDW Arena — เป้าธนูที่ขยับตลอดเวลา (วงนอกหมุน + จุดกลางเต้น + ลูกศรขยับ)
+ * โลโก้แบรนด์ Sukhon Arena — เป้าธนูที่ขยับตลอดเวลา (วงนอกหมุน + จุดกลางเต้น + ลูกศรขยับ)
  * ทั้งหมดเป็น CSS animation ล้วน (ดู .brand-logo ใน globals.css) จึงใช้ใน server component ได้
  */
 export function BrandLogo({ size = 30 }: { size?: number }) {

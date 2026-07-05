@@ -3,6 +3,7 @@ import { Sidebar, BottomNav, type NavItem } from "./Nav";
 import { LogoutButton } from "./LogoutButton";
 import { RouteTransition } from "./RouteTransition";
 import { BrandLogo } from "./BrandLogo";
+import { Wordmark } from "./Wordmark";
 import type { SessionPayload, Role } from "@/lib/auth/session";
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -28,7 +29,7 @@ export function AppShell({
       <header className="navbar">
         <Link href="/" className="brand">
           <BrandLogo />
-          SKDW <span className="dot">Arena</span>
+          <Wordmark />
         </Link>
         <div className="spacer" />
         <div className="nav-user">

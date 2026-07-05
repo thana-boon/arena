@@ -1,5 +1,5 @@
 /* ============================================================
-   SKDW Arena — Global Styles (ตาม SKDW-CI.md v1.1)
+   Sukhon Arena — Global Styles (ตาม SKDW-CI.md v1.1)
    ============================================================ */
 
 /* ---------- Tokens ---------- */
@@ -707,9 +707,23 @@ p {
 .navbar .brand .dot {
   color: var(--skdw-gold);
 }
+/* ตัว K ในโลโก้ "SuKhon" — สีทองพลิกตัวไปมาตลอดเวลา */
+.wordmark-k {
+  display: inline-block;
+  color: var(--skdw-gold);
+  transform-origin: center;
+  animation: wordmarkKFlip 2.6s ease-in-out infinite;
+}
+@keyframes wordmarkKFlip {
+  0%, 100% { transform: rotateY(0deg); }
+  50% { transform: rotateY(180deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wordmark-k { animation: none; }
+}
 .navbar .brand-sub {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: var(--text-md);
   line-height: 1.2;
   padding-left: var(--space-4);
   border-left: 1px solid rgba(255, 255, 255, 0.28);

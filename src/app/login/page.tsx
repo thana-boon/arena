@@ -11,7 +11,8 @@ export default async function LoginPage() {
       <div className="auth-card">
         <div className="text-center mb-4">
           <div style={{ fontFamily: "var(--font-en-serif)", fontSize: 28, fontWeight: 700, color: "var(--skdw-purple)" }}>
-            SKDW <span style={{ color: "var(--skdw-gold-dark)" }}>Arena</span>
+            Su<span className="wordmark-k" style={{ color: "var(--skdw-gold-dark)" }}>K</span>hon{" "}
+            <span style={{ color: "var(--skdw-gold-dark)" }}>Arena</span>
           </div>
           <div className="muted text-sm">ระบบจัดการการแข่งขันทางวิชาการ</div>
         </div>

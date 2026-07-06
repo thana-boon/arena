@@ -125,7 +125,9 @@ export async function registerEntry(args: RegisterArgs): Promise<number> {
   }
 
   // ===== กติกา 5: atomic capacity + insert ใน transaction เดียว =====
-  const capLevel = isTeam ? null : args.members[0].classLevel;
+  // ทีม หรือ เดี่ยวแบบรวมทุกชั้น → นับกับ pool เดียว (class_level = null)
+  const combined = comp.capacityMode === "combined";
+  const capLevel = isTeam || combined ? null : args.members[0].classLevel;
 
   const entryId = await db.transaction(async (tx) => {
     // หา capacity row
@@ -187,7 +189,8 @@ export async function withdrawEntry(entryId: number): Promise<void> {
 
     const members = await tx.select().from(entryMembers).where(eq(entryMembers.entryId, entryId));
     const comp = (await tx.select().from(competitions).where(eq(competitions.id, entry.competitionId)).limit(1))[0];
-    const capLevel = comp?.type === "team" ? null : members[0]?.classLevelSnapshot ?? null;
+    const capLevel =
+      comp?.type === "team" || comp?.capacityMode === "combined" ? null : members[0]?.classLevelSnapshot ?? null;
 
     await tx.update(entries).set({ status: "withdrawn" }).where(eq(entries.id, entryId));
 

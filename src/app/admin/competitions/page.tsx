@@ -1,15 +1,18 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/guards";
 import { getActiveYear } from "@/lib/queries";
-import { listCompetitions } from "@/lib/listings";
+import { listCompetitions, getCompetitionsSummary } from "@/lib/listings";
 import { CompetitionsTable } from "@/components/CompetitionsTable";
+import { CompetitionsSummary } from "@/components/CompetitionsSummary";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminCompetitions() {
   const session = await requireAdmin();
   const year = await getActiveYear();
-  const comps = year ? await listCompetitions(year.id) : [];
+  const [comps, summary] = year
+    ? await Promise.all([listCompetitions(year.id), getCompetitionsSummary(year.id)])
+    : [[], null];
 
   return (
     <div className="stack">
@@ -23,7 +26,10 @@ export default async function AdminCompetitions() {
       {!year ? (
         <div className="alert alert-warning">ยังไม่มีปีการศึกษาที่เปิดใช้งาน</div>
       ) : (
-        <CompetitionsTable comps={comps} myCode={session.code} role="admin" basePath="/admin/competitions" canPublish />
+        <>
+          {summary && <CompetitionsSummary summary={summary} />}
+          <CompetitionsTable comps={comps} myCode={session.code} role="admin" basePath="/admin/competitions" canPublish />
+        </>
       )}
     </div>
   );

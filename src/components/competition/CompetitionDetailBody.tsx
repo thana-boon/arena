@@ -56,7 +56,16 @@ export async function CompetitionDetailBody({
       <div className="card">
         <div className="card-header" style={{ padding: 0, border: "none", marginBottom: 12 }}>ที่นั่ง</div>
         <div className="row">
-          {comp.type === "individual" ? (
+          {comp.type === "individual" && comp.capacityMode === "combined" ? (
+            (() => {
+              const c = caps.find((x) => x.classLevel === null);
+              return (
+                <div className="badge badge-purple" style={{ fontSize: "var(--text-sm)", padding: "6px 12px" }}>
+                  รวมทุกชั้น ({levels.join(", ")}): {c?.registeredCount ?? 0}/{c?.capacity ?? 0}
+                </div>
+              );
+            })()
+          ) : comp.type === "individual" ? (
             levels.map((lv) => {
               const c = caps.find((x) => x.classLevel === lv);
               return (

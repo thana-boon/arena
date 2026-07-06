@@ -46,6 +46,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             ? {}
             : {
                 type: body.type,
+                capacityMode: body.type === "individual" ? body.capacityMode ?? "per_level" : "per_level",
                 teamSizeMin: body.type === "team" ? body.teamSizeMin ?? null : null,
                 teamSizeMax: body.type === "team" ? body.teamSizeMax ?? null : null,
                 allowedClassLevels: JSON.stringify(body.allowedClassLevels),
@@ -56,7 +57,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       if (!locked) {
         // rebuild capacity + criteria
         await tx.delete(competitionCapacity).where(eq(competitionCapacity.competitionId, id));
-        if (body.type === "individual") {
+        if (body.type === "individual" && body.capacityMode !== "combined") {
           for (const lv of body.allowedClassLevels) {
             await tx.insert(competitionCapacity).values({
               competitionId: id, classLevel: lv, capacity: body.capacityPerLevel?.[lv] ?? 0, registeredCount: 0,
@@ -64,7 +65,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           }
         } else {
           await tx.insert(competitionCapacity).values({
-            competitionId: id, classLevel: null, capacity: body.teamCapacity ?? 0, registeredCount: 0,
+            competitionId: id, classLevel: null,
+            capacity: (body.type === "team" ? body.teamCapacity : body.combinedCapacity) ?? 0, registeredCount: 0,
           });
         }
         await tx.delete(criteria).where(eq(criteria.competitionId, id));
@@ -75,9 +77,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         // มีคนลงแล้ว → อัปเดตได้เฉพาะจำนวนรับ (ห้ามต่ำกว่าที่ลงไปแล้ว)
         for (const row of capRows) {
           const newCap =
-            comp.type === "individual" && row.classLevel
-              ? body.capacityPerLevel?.[row.classLevel]
-              : body.teamCapacity;
+            comp.type === "team"
+              ? body.teamCapacity
+              : comp.capacityMode === "combined"
+                ? body.combinedCapacity // เดี่ยวแบบรวม → row เดียว (class_level = null)
+                : row.classLevel
+                  ? body.capacityPerLevel?.[row.classLevel]
+                  : undefined;
           if (newCap != null && newCap >= row.registeredCount) {
             await tx.update(competitionCapacity).set({ capacity: newCap }).where(eq(competitionCapacity.id, row.id));
           }

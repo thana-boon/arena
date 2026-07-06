@@ -1,0 +1,1 @@
+ALTER TABLE `competitions` ADD `capacity_mode` varchar(16) DEFAULT 'per_level' NOT NULL;

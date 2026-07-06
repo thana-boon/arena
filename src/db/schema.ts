@@ -84,6 +84,9 @@ export const competitions = mysqlTable(
     subjectGroupId: int("subject_group_id").notNull(),
     name: varchar("name", { length: 255 }).notNull(),
     type: varchar("type", { length: 16 }).notNull(), // 'individual' | 'team'
+    // โควตาของประเภทเดี่ยว: 'per_level' = แยกโควตาตามระดับชั้น | 'combined' = รวมทุกชั้นเป็นก้อนเดียว
+    // (ประเภททีมเป็น pool เดียวเสมอ ไม่ใช้ค่านี้)
+    capacityMode: varchar("capacity_mode", { length: 16 }).notNull().default("per_level"),
     teamSizeMin: int("team_size_min"),
     teamSizeMax: int("team_size_max"),
     allowedClassLevels: text("allowed_class_levels").notNull().default("[]"), // json array

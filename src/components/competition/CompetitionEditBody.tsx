@@ -41,6 +41,9 @@ export async function CompetitionEditBody({
   const capPerLevel: Record<string, number> = {};
   for (const c of caps) if (c.classLevel) capPerLevel[c.classLevel] = c.capacity;
   const teamCap = caps.find((c) => c.classLevel === null)?.capacity ?? 0;
+  const capacityMode = comp.capacityMode === "combined" ? "combined" : "per_level";
+  // เดี่ยวแบบรวม เก็บโควตาไว้ที่ row เดียว (class_level = null) เหมือนทีม
+  const combinedCapacity = capacityMode === "combined" ? teamCap : 0;
 
   return (
     <div className="stack">
@@ -63,7 +66,9 @@ export async function CompetitionEditBody({
           eventDate: comp.eventDate ?? "",
           startTime: comp.startTime?.slice(0, 5) ?? "",
           endTime: comp.endTime?.slice(0, 5) ?? "",
+          capacityMode,
           capacityPerLevel: capPerLevel,
+          combinedCapacity,
           teamCapacity: teamCap,
           criteria: crits.map((c) => ({ name: c.name, maxScore: Number(c.maxScore) })),
           locked,

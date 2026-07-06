@@ -38,7 +38,9 @@ export type CompFormInitial = {
   eventDate: string;
   startTime: string;
   endTime: string;
+  capacityMode: "per_level" | "combined";
   capacityPerLevel: Record<string, number>;
+  combinedCapacity: number;
   teamCapacity: number;
   criteria: { name: string; maxScore: number | "" }[];
   locked?: boolean; // มีคนลงแล้ว
@@ -103,7 +105,9 @@ export function CompetitionForm({
       eventDate: f.eventDate || null,
       startTime: startTime ? `${startTime}:00` : null,
       endTime: endTime ? `${endTime}:00` : null,
+      capacityMode: f.type === "individual" ? f.capacityMode : "per_level",
       capacityPerLevel: f.capacityPerLevel,
+      combinedCapacity: f.combinedCapacity,
       teamCapacity: f.teamCapacity,
       criteria: f.criteria.map((c) => ({ name: c.name, maxScore: Number(c.maxScore) })),
     };
@@ -175,19 +179,41 @@ export function CompetitionForm({
         </div>
 
         <div>
-          <label className="form-label">จำนวนรับ {f.type === "team" ? "(จำนวนทีม)" : "(ต่อระดับชั้น)"}</label>
+          <label className="form-label">จำนวนรับ {f.type === "team" ? "(จำนวนทีม)" : ""}</label>
           {f.type === "team" ? (
             <input type="number" min={0} className="form-input" style={{ width: 160 }} value={f.teamCapacity} onChange={(e) => set("teamCapacity", Number(e.target.value))} />
           ) : (
-            <div className="grid-3">
-              {f.allowedClassLevels.map((lv) => (
-                <div key={lv} className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">{lv}</label>
-                  <input type="number" min={0} className="form-input" value={f.capacityPerLevel[lv] ?? 0} onChange={(e) => setCap(lv, Number(e.target.value))} />
+            <>
+              <div className="row" style={{ gap: 16, marginBottom: 12 }}>
+                <label className="form-check">
+                  <input type="radio" name="capMode" checked={f.capacityMode === "per_level"} disabled={locked} onChange={() => set("capacityMode", "per_level")} />
+                  <span>แยกตามระดับชั้น</span>
+                </label>
+                <label className="form-check">
+                  <input type="radio" name="capMode" checked={f.capacityMode === "combined"} disabled={locked} onChange={() => set("capacityMode", "combined")} />
+                  <span>รวมทุกระดับชั้น</span>
+                </label>
+              </div>
+              {f.capacityMode === "combined" ? (
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">จำนวนรับรวมทุกระดับชั้น</label>
+                  <input type="number" min={0} className="form-input" style={{ width: 160 }} value={f.combinedCapacity} onChange={(e) => set("combinedCapacity", Number(e.target.value))} />
+                  <span className="form-hint">
+                    {f.allowedClassLevels.length ? `${f.allowedClassLevels.join(" + ")} รวมกันไม่เกินจำนวนนี้` : "เลือกระดับชั้นก่อน"}
+                  </span>
                 </div>
-              ))}
-              {!f.allowedClassLevels.length && <div className="muted text-sm">เลือกระดับชั้นก่อน</div>}
-            </div>
+              ) : (
+                <div className="grid-3">
+                  {f.allowedClassLevels.map((lv) => (
+                    <div key={lv} className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">{lv}</label>
+                      <input type="number" min={0} className="form-input" value={f.capacityPerLevel[lv] ?? 0} onChange={(e) => setCap(lv, Number(e.target.value))} />
+                    </div>
+                  ))}
+                  {!f.allowedClassLevels.length && <div className="muted text-sm">เลือกระดับชั้นก่อน</div>}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

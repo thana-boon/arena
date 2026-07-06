@@ -4,8 +4,8 @@
  */
 export function Wordmark() {
   return (
-    <>
+    <span className="wordmark">
       Su<span className="wordmark-k">K</span>hon <span className="dot">Arena</span>
-    </>
+    </span>
   );
 }

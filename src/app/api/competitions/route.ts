@@ -25,6 +25,7 @@ export async function POST(req: Request) {
         subjectGroupId: body.subjectGroupId,
         name: body.name.trim(),
         type: body.type,
+        capacityMode: body.type === "individual" ? body.capacityMode ?? "per_level" : "per_level",
         teamSizeMin: body.type === "team" ? body.teamSizeMin ?? null : null,
         teamSizeMax: body.type === "team" ? body.teamSizeMax ?? null : null,
         allowedClassLevels: JSON.stringify(body.allowedClassLevels),
@@ -37,7 +38,8 @@ export async function POST(req: Request) {
       const compId = res.insertId;
 
       // capacity
-      if (body.type === "individual") {
+      if (body.type === "individual" && body.capacityMode !== "combined") {
+        // แยกโควตาตามระดับชั้น → 1 แถวต่อชั้น
         for (const lv of body.allowedClassLevels) {
           await tx.insert(competitionCapacity).values({
             competitionId: compId,
@@ -47,10 +49,11 @@ export async function POST(req: Request) {
           });
         }
       } else {
+        // ทีม หรือ เดี่ยวแบบรวมทุกชั้น → pool เดียว (class_level = null)
         await tx.insert(competitionCapacity).values({
           competitionId: compId,
           classLevel: null,
-          capacity: body.teamCapacity ?? 0,
+          capacity: (body.type === "team" ? body.teamCapacity : body.combinedCapacity) ?? 0,
           registeredCount: 0,
         });
       }

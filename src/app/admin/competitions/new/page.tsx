@@ -31,7 +31,9 @@ export default async function AdminNewCompetition() {
           eventDate: "",
           startTime: "",
           endTime: "",
+          capacityMode: "per_level",
           capacityPerLevel: {},
+          combinedCapacity: 0,
           teamCapacity: 0,
           criteria: [{ name: "", maxScore: "" }],
         }}

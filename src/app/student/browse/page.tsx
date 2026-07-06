@@ -37,11 +37,13 @@ export default async function BrowsePage() {
   const data: BrowseComp[] = eligible.map((c) => {
     const cRows = caps.filter((x) => x.competitionId === c.id);
     let capacity = 0, registered = 0;
-    if (c.type === "individual") {
+    if (c.type === "individual" && c.capacityMode !== "combined") {
+      // แยกตามระดับชั้น → ดูโควตาของชั้นตัวเอง
       const row = cRows.find((r) => r.classLevel === myLevel);
       capacity = row?.capacity ?? 0;
       registered = row?.registeredCount ?? 0;
     } else {
+      // ทีม หรือ เดี่ยวแบบรวมทุกชั้น → pool เดียว (class_level = null)
       const row = cRows.find((r) => r.classLevel === null);
       capacity = row?.capacity ?? 0;
       registered = row?.registeredCount ?? 0;

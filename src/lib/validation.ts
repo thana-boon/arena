@@ -17,8 +17,10 @@ export const competitionInput = z
     eventDate: z.string().nullable().optional(),
     startTime: z.string().nullable().optional(),
     endTime: z.string().nullable().optional(),
-    // เดี่ยว: ที่นั่งต่อระดับ; ทีม: จำนวนทีมเดียว
+    // เดี่ยว: 'per_level' ที่นั่งต่อระดับ (capacityPerLevel) | 'combined' รวมทุกชั้น (combinedCapacity)
+    capacityMode: z.enum(["per_level", "combined"]).optional(),
     capacityPerLevel: z.record(z.string(), z.number().int().min(0)).optional(),
+    combinedCapacity: z.number().int().min(0).optional(),
     teamCapacity: z.number().int().min(0).optional(),
     criteria: z.array(criterionInput).min(1, "ต้องมีเกณฑ์การให้คะแนนอย่างน้อย 1 ข้อ"),
   })

@@ -231,7 +231,8 @@ export function BrowseRegister({
                   <div className="mt-4">
                     <StudentPicker
                       excludeCodes={members.map((m) => m.studentCode)}
-                      onPick={(s) => setMembers((prev) => (prev.some((x) => x.studentCode === s.studentCode) ? prev : [...prev, s]))}
+                      remaining={(c.teamSizeMax ?? 99) - members.length}
+                      onPick={(s) => setMembers((prev) => (prev.length >= (c.teamSizeMax ?? 99) || prev.some((x) => x.studentCode === s.studentCode) ? prev : [...prev, s]))}
                     />
                   </div>
                 )}

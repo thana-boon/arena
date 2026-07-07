@@ -97,7 +97,8 @@ export function RosterManager({
           {members.length < maxMembers && (
             <div className="mt-4">
               <StudentPicker excludeCodes={members.map((m) => m.studentCode)} levels={allowedLevels}
-                onPick={(s) => setMembers((prev) => (prev.some((x) => x.studentCode === s.studentCode) ? prev : [...prev, s]))} />
+                remaining={maxMembers - members.length}
+                onPick={(s) => setMembers((prev) => (prev.length >= maxMembers || prev.some((x) => x.studentCode === s.studentCode) ? prev : [...prev, s]))} />
             </div>
           )}
           {canOverride && (

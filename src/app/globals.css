@@ -1187,3 +1187,109 @@ p {
 .report-select-item:hover {
   background: var(--skdw-bg);
 }
+
+/* ---------- Student picker (ค้นหา + เลือกทั้งห้อง) ---------- */
+.sp-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--skdw-bg);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+}
+.sp-tab {
+  border: none;
+  background: transparent;
+  color: var(--skdw-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.sp-tab.on {
+  background: #fff;
+  color: var(--skdw-purple);
+  box-shadow: var(--shadow-sm);
+}
+.sp-combo {
+  position: relative;
+}
+.sp-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--skdw-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md, 0 8px 24px rgba(26, 26, 46, 0.12));
+}
+.sp-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 8px 12px;
+  cursor: pointer;
+  border-top: 0.5px solid var(--skdw-border);
+}
+.sp-opt:first-child {
+  border-top: none;
+}
+.sp-opt.active,
+.sp-opt:hover {
+  background: var(--skdw-purple-pale);
+}
+.sp-opt .sp-code {
+  font-size: var(--text-xs);
+  color: var(--skdw-muted);
+  font-variant-numeric: tabular-nums;
+}
+.sp-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--skdw-muted);
+  font-size: var(--text-sm);
+}
+.sp-roomlist {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--skdw-border);
+  border-radius: var(--radius-sm);
+}
+.sp-roomrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 8px 12px;
+  border-top: 0.5px solid var(--skdw-border);
+  cursor: pointer;
+}
+.sp-roomrow:first-child {
+  border-top: none;
+}
+.sp-roomrow:hover:not(.disabled) {
+  background: var(--skdw-purple-pale);
+}
+.sp-roomrow.disabled {
+  color: var(--skdw-muted);
+  cursor: not-allowed;
+}
+.sp-roomrow input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--skdw-purple);
+  flex-shrink: 0;
+}
+.sp-roomrow .sp-added {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--skdw-purple);
+  font-weight: 600;
+}

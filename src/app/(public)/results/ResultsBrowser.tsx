@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
+import { Icon } from "@/components/Icon";
 import type { Medal } from "@/lib/domain";
 
 type Member = { studentCode: string; name: string; classLevel: string; classRoom: string };
@@ -77,7 +78,7 @@ export function ResultsBrowser({
 
       {!filtered.length ? (
         <div className="empty-state card">
-          <div className="big">🔍</div>
+          <Icon name="search" size={44} className="empty-ico" />
           <p>ไม่พบรายการที่ค้นหา</p>
         </div>
       ) : (

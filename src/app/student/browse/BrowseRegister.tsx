@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { Icon } from "@/components/Icon";
 import { StudentPicker, type PickedStudent } from "@/components/StudentPicker";
 import { formatThaiDate } from "@/lib/domain";
 
@@ -115,7 +116,7 @@ export function BrowseRegister({
   if (!comps.length) {
     return (
       <div className="empty-state card">
-        <div className="big">🔍</div>
+        <Icon name="search" size={44} className="empty-ico" />
         <p>ยังไม่มีรายการแข่งขันที่เปิดรับระดับชั้นของคุณ</p>
       </div>
     );
@@ -136,7 +137,7 @@ export function BrowseRegister({
               onClick={() => { setGroupId(g.id); setMsg(null); }}
             >
               <div className="row between mb-2">
-                <span className="badge badge-purple">📚 หมวดวิชา</span>
+                <span className="badge badge-purple"><Icon name="book" size={13} /> หมวดวิชา</span>
                 {g.registered > 0 && <span className="badge badge-success">ลงแล้ว {g.registered}</span>}
               </div>
               <h3 style={{ margin: "4px 0" }}>{g.name}</h3>
@@ -158,7 +159,7 @@ export function BrowseRegister({
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setGroupId(null); setMsg(null); }}>
           ← เลือกหมวดอื่น
         </button>
-        <span className="badge badge-purple">📚 {currentGroupName}</span>
+        <span className="badge badge-purple"><Icon name="book" size={13} /> {currentGroupName}</span>
       </div>
       {shownComps.map((c) => {
         const full = c.registered >= c.capacity;

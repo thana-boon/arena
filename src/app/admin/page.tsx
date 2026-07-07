@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon } from "@/components/Icon";
 import { db } from "@/db";
 import { competitions, entries, entryMembers } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
@@ -72,15 +73,15 @@ export default async function AdminDashboard() {
 
           <div className="grid-3 mt-4 stagger">
             <Link href="/admin/competitions" className="card">
-              <h3>🏆 จัดการรายการแข่งขัน</h3>
+              <h3><Icon name="trophy" size={22} /> จัดการรายการแข่งขัน</h3>
               <p className="muted text-sm mb-0">ดู/เผยแพร่/แก้ไขรายการทั้งหมด</p>
             </Link>
             <Link href="/admin/settings" className="card">
-              <h3>⚙️ ตั้งค่าการรับสมัคร</h3>
+              <h3><Icon name="settings" size={22} /> ตั้งค่าการรับสมัคร</h3>
               <p className="muted text-sm mb-0">เปิด-ปิด, ช่วงเวลา, เกณฑ์เหรียญ</p>
             </Link>
             <Link href="/admin/teachers" className="card">
-              <h3>👤 สิทธิ์ครู</h3>
+              <h3><Icon name="user" size={22} /> สิทธิ์ครู</h3>
               <p className="muted text-sm mb-0">มอบสิทธิ์ admin / ผู้บันทึกผล</p>
             </Link>
           </div>

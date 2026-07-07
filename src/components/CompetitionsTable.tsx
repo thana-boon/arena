@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { Icon } from "@/components/Icon";
 import type { CompListItem } from "@/lib/listings";
 import type { Role } from "@/lib/auth/session";
 import { formatThaiDate } from "@/lib/domain";
@@ -70,10 +71,10 @@ export function CompetitionsTable({
   if (!comps.length) {
     return (
       <div className="empty-state card">
-        <div className="big">🏆</div>
+        <Icon name="trophy" size={44} className="empty-ico" />
         <p>ยังไม่มีรายการแข่งขัน</p>
         <p className="text-sm">เริ่มสร้างรายการแรกเพื่อเปิดรับสมัคร</p>
-        <Link href={`${basePath}/new`} className="btn btn-primary mt-4">+ สร้างรายการ</Link>
+        <Link href={`${basePath}/new`} className="btn btn-primary mt-4"><Icon name="plus" size={18} /> สร้างรายการ</Link>
       </div>
     );
   }

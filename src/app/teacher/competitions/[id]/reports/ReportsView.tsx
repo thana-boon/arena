@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { Icon } from "@/components/Icon";
 import type { RosterEntry } from "@/lib/roster";
 import { formatThaiDate } from "@/lib/domain";
 
@@ -59,7 +60,7 @@ export function ReportsView({
           <h1>เอกสาร / รายงาน</h1>
           <div className="subtitle">{meta.competitionName}</div>
         </div>
-        <button className="btn btn-primary" onClick={() => window.print()}>🖨️ พิมพ์ (Ctrl+P)</button>
+        <button className="btn btn-primary" onClick={() => window.print()}><Icon name="printer" size={18} /> พิมพ์ (Ctrl+P)</button>
       </div>
 
       <div className="no-print auth-tabs" style={{ maxWidth: 520 }}>

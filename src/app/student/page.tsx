@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon } from "@/components/Icon";
 import { requireRole } from "@/lib/auth/guards";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { getStudentEntries } from "@/lib/student";
@@ -37,8 +38,8 @@ export default async function StudentDashboard() {
           <div className="text-xs muted">จากทั้งหมด {max} รายการ</div>
         </div>
         <Link href="/student/browse" className="stat-card" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-          <div style={{ fontSize: 28 }}>📝</div>
-          <div style={{ fontWeight: 600, color: "var(--skdw-purple)" }}>
+          <Icon name="clipboard" size={28} style={{ color: "var(--skdw-purple)" }} />
+          <div style={{ fontWeight: 600, color: "var(--skdw-purple)", marginTop: 4 }}>
             {setting.registrationOpen ? "เลือกลงทะเบียน" : "ดูรายการแข่งขัน"}
           </div>
         </Link>
@@ -47,7 +48,7 @@ export default async function StudentDashboard() {
       <h2 className="mt-4">รายการที่ลงทะเบียน</h2>
       {!entries.length ? (
         <div className="empty-state card">
-          <div className="big">📋</div>
+          <Icon name="clipboard" size={44} className="empty-ico" />
           <p>ยังไม่มีรายการที่ลงทะเบียน</p>
           {setting.registrationOpen && <Link href="/student/browse" className="btn btn-primary mt-4">เลือกลงทะเบียน</Link>}
         </div>

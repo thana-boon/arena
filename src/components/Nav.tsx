@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Icon, type IconName } from "@/components/Icon";
 
-export type NavItem = { href: string; label: string; icon: string };
+export type NavItem = { href: string; label: string; icon: IconName };
 
 export function Sidebar({ items, section }: { items: NavItem[]; section?: string }) {
   const path = usePathname();
@@ -13,7 +14,9 @@ export function Sidebar({ items, section }: { items: NavItem[]; section?: string
         const active = path === it.href || (it.href !== "/" && path.startsWith(it.href + "/"));
         return (
           <Link key={it.href} href={it.href} className={`sidebar-item${active ? " active" : ""}`}>
-            <span className="ico">{it.icon}</span>
+            <span className="ico">
+              <Icon name={it.icon} size={20} />
+            </span>
             <span>{it.label}</span>
           </Link>
         );
@@ -30,7 +33,9 @@ export function BottomNav({ items }: { items: NavItem[] }) {
         const active = path === it.href || (it.href !== "/" && path.startsWith(it.href + "/"));
         return (
           <Link key={it.href} href={it.href} className={active ? "active" : ""}>
-            <span className="ico">{it.icon}</span>
+            <span className="ico">
+              <Icon name={it.icon} size={22} />
+            </span>
             <span>{it.label}</span>
           </Link>
         );

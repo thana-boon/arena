@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon } from "@/components/Icon";
 import { db } from "@/db";
 import { competitions, criteria, subjectGroups } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -47,7 +48,7 @@ export async function CompetitionDetailBody({
           </div>
         </div>
         <div className="row">
-          <Link href={`${basePath}/${id}/reports`} className="btn btn-ghost">🖨️ เอกสาร</Link>
+          <Link href={`${basePath}/${id}/reports`} className="btn btn-ghost"><Icon name="printer" size={18} /> เอกสาร</Link>
           <Link href={`${basePath}/${id}/edit`} className="btn btn-secondary">แก้ไข</Link>
           {canScore(session) && <Link href={`${scoreBasePath}/${id}`} className="btn btn-primary">บันทึกผล</Link>}
         </div>

@@ -26,4 +26,7 @@ npm-debug.log*
 .vscode/
 .idea/
 
+# Claude Code — เครื่องมือ dev ฝั่ง local ไม่เกี่ยวกับ runtime ของเว็บ
+.claude/
+
 # drizzle journal meta ok to commit, but keep local snapshots out if desired

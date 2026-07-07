@@ -1,3 +1,4 @@
+import { Icon } from "@/components/Icon";
 import { db } from "@/db";
 import { competitions, subjectGroups } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -13,7 +14,7 @@ export default async function ResultsPage() {
   if (!year) {
     return (
       <div className="empty-state card">
-        <div className="big">📊</div>
+        <Icon name="chart" size={44} className="empty-ico" />
         <p>ยังไม่เปิดปีการศึกษา</p>
       </div>
     );

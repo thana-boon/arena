@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
+import { Icon } from "@/components/Icon";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
@@ -57,21 +58,21 @@ export function BackupRestore() {
 
       {/* สำรองข้อมูล */}
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>📦 สำรองข้อมูล (Backup)</h3>
+        <h3 style={{ marginTop: 0 }}><Icon name="package" size={22} /> สำรองข้อมูล (Backup)</h3>
         <p className="muted">
           ดาวน์โหลดข้อมูลทั้งหมด (ปีการศึกษา, หมวดวิชา, รายการแข่งขัน, การลงทะเบียน, คะแนน, สิทธิ์ครู ฯลฯ)
           เป็นไฟล์ JSON ไฟล์เดียว เก็บไว้เป็นสำเนาสำรอง
         </p>
         <a className="btn btn-primary" href={`${BASE_PATH}/api/admin/backup`} download>
-          ⬇️ ดาวน์โหลดไฟล์สำรอง
+          <Icon name="download" size={18} /> ดาวน์โหลดไฟล์สำรอง
         </a>
       </div>
 
       {/* กู้คืนข้อมูล */}
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>♻️ กู้คืนข้อมูล (Restore)</h3>
+        <h3 style={{ marginTop: 0 }}><Icon name="restore" size={22} /> กู้คืนข้อมูล (Restore)</h3>
         <div className="alert alert-warning">
-          ⚠️ การกู้คืนจะ<strong>ลบข้อมูลปัจจุบันทั้งหมด</strong>แล้วเขียนทับด้วยไฟล์สำรอง —
+          <Icon name="warning" size={16} /> การกู้คืนจะ<strong>ลบข้อมูลปัจจุบันทั้งหมด</strong>แล้วเขียนทับด้วยไฟล์สำรอง —
           ควรดาวน์โหลดไฟล์สำรองล่าสุดไว้ก่อนทุกครั้ง
         </div>
 

@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/auth/guards";
+import { Icon } from "@/components/Icon";
 import { db } from "@/db";
 import { auditLog } from "@/db/schema";
 import { desc } from "drizzle-orm";
@@ -31,7 +32,7 @@ export default async function AuditPage() {
         <div className="subtitle">การกระทำสำคัญ 300 รายการล่าสุด</div>
       </div>
       {!logs.length ? (
-        <div className="empty-state card"><div className="big">📝</div><p>ยังไม่มีบันทึก</p></div>
+        <div className="empty-state card"><Icon name="log" size={44} className="empty-ico" /><p>ยังไม่มีบันทึก</p></div>
       ) : (
         <div className="table-wrap">
           <table className="table">

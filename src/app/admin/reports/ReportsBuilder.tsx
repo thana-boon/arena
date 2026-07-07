@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { Icon } from "@/components/Icon";
 import type { ReportBundle } from "@/lib/reportBundle";
 import { formatThaiDate } from "@/lib/domain";
 
@@ -80,7 +81,7 @@ export function ReportsBuilder({ yearBe, bundles }: { yearBe: number; bundles: R
           disabled={!selectedBundles.length || printing}
           onClick={() => setPrinting(true)}
         >
-          🖨️ {printing ? "กำลังเตรียมเอกสาร…" : `พิมพ์ (${selectedBundles.length})`}
+          <Icon name="printer" size={18} /> {printing ? "กำลังเตรียมเอกสาร…" : `พิมพ์ (${selectedBundles.length})`}
         </button>
       </div>
 
@@ -121,7 +122,7 @@ export function ReportsBuilder({ yearBe, bundles }: { yearBe: number; bundles: R
                   ref={(el) => { if (el) el.indeterminate = someOn; }}
                   onChange={(e) => setMany(ids, e.target.checked)}
                 />
-                <span>📚 {g.name}</span>
+                <span><Icon name="book" size={16} /> {g.name}</span>
                 <span className="muted text-sm" style={{ fontWeight: 400 }}>({g.items.length} รายการ)</span>
               </label>
               {g.items.map((b) => (
@@ -140,7 +141,7 @@ export function ReportsBuilder({ yearBe, bundles }: { yearBe: number; bundles: R
       {/* สรุปรายการที่เลือก (ไม่เรนเดอร์เอกสารเต็มเพื่อไม่ให้หน้าหนัก) */}
       {!selectedBundles.length ? (
         <div className="no-print empty-state card">
-          <div className="big">🖨️</div>
+          <Icon name="printer" size={44} className="empty-ico" />
           <p>ยังไม่ได้เลือกรายการ — ติ๊กหมวดหรือรายการด้านบนเพื่อเตรียมพิมพ์</p>
         </div>
       ) : (

@@ -2,6 +2,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
+import { Icon } from "@/components/Icon";
 import { decideMedal, scorePercent, MEDAL_LABEL, MEDAL_BADGE_CLASS } from "@/lib/domain";
 import type { RosterEntry } from "@/lib/roster";
 
@@ -93,7 +94,7 @@ export function ScoringGrid({
   }
 
   if (!roster.length) {
-    return <div className="empty-state card"><div className="big">📋</div><p>ยังไม่มีผู้ลงทะเบียนให้บันทึกคะแนน</p></div>;
+    return <div className="empty-state card"><Icon name="clipboard" size={44} className="empty-ico" /><p>ยังไม่มีผู้ลงทะเบียนให้บันทึกคะแนน</p></div>;
   }
 
   return (

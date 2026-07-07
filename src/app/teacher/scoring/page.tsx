@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon } from "@/components/Icon";
 import { requireRecorderOrAdmin } from "@/lib/auth/guards";
 import { getActiveYear } from "@/lib/queries";
 import { listCompetitions } from "@/lib/listings";
@@ -17,7 +18,7 @@ export default async function ScoringList() {
         <div className="subtitle">เลือกรายการเพื่อบันทึกคะแนนและประกาศผล</div>
       </div>
       {!comps.length ? (
-        <div className="empty-state card"><div className="big">✏️</div><p>ยังไม่มีรายการแข่งขัน</p></div>
+        <div className="empty-state card"><Icon name="pencil" size={44} className="empty-ico" /><p>ยังไม่มีรายการแข่งขัน</p></div>
       ) : (
         <div className="table-wrap">
           <table className="table">

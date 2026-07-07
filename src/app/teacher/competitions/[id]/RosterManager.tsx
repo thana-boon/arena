@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { Icon } from "@/components/Icon";
 import { StudentPicker, type PickedStudent } from "@/components/StudentPicker";
 import type { RosterEntry } from "@/lib/roster";
 
@@ -115,7 +116,7 @@ export function RosterManager({
       )}
 
       {!roster.length ? (
-        <div className="empty-state"><div className="big">📋</div><p>ยังไม่มีผู้ลงทะเบียน</p></div>
+        <div className="empty-state"><Icon name="clipboard" size={44} className="empty-ico" /><p>ยังไม่มีผู้ลงทะเบียน</p></div>
       ) : (
         <div className="table-wrap">
           <table className="table">

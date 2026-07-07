@@ -84,6 +84,40 @@
 * {
   box-sizing: border-box;
 }
+
+/* ---------- Icons (SVG แทน emoji — stroke สม่ำเสมอ, ปรับสีตาม currentColor) ---------- */
+.icon {
+  display: inline-block;
+  vertical-align: -0.18em; /* จัดให้อยู่ระดับ baseline ของข้อความ */
+  flex-shrink: 0;
+}
+/* ในหัวข้อ: ไอคอนใช้สีม่วงหลัก + เว้นระยะจากข้อความ */
+h1 > .icon,
+h2 > .icon,
+h3 > .icon,
+h4 > .icon {
+  margin-right: var(--space-2);
+  color: var(--skdw-purple);
+}
+/* ใน badge: ไอคอนเล็ก ชิดข้อความ สืบทอดสี badge */
+.badge > .icon {
+  margin-right: 4px;
+  vertical-align: -0.15em;
+}
+/* ใน btn/sidebar (flex + gap อยู่แล้ว) ไม่ต้องเว้น margin เพิ่ม */
+.btn > .icon,
+.sidebar-item .ico .icon,
+.bottom-nav .ico .icon {
+  vertical-align: middle;
+  margin: 0;
+}
+/* ไอคอนประจำ empty-state — ใหญ่ จาง ตรงกลาง แทน .big เดิม */
+.empty-state .empty-ico {
+  display: block;
+  margin: 0 auto var(--space-3);
+  color: var(--skdw-purple-light);
+  opacity: 0.55;
+}
 html,
 body {
   margin: 0;

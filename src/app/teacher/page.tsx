@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon } from "@/components/Icon";
 import { requireStaff } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { competitions } from "@/db/schema";
@@ -40,8 +41,8 @@ export default async function TeacherHome() {
           <div className="value">{total}</div>
         </div>
         <Link href="/teacher/competitions/new" className="stat-card" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-          <div style={{ fontSize: 28 }}>➕</div>
-          <div style={{ fontWeight: 600, color: "var(--skdw-purple)" }}>สร้างรายการแข่งขัน</div>
+          <Icon name="plus" size={28} style={{ color: "var(--skdw-purple)" }} />
+          <div style={{ fontWeight: 600, color: "var(--skdw-purple)", marginTop: 4 }}>สร้างรายการแข่งขัน</div>
         </Link>
       </div>
 

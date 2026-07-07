@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon } from "@/components/Icon";
 import { db } from "@/db";
 import { competitions, subjectGroups } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -30,7 +31,7 @@ export default async function HomePage() {
 
       {!comps.length ? (
         <div className="empty-state card">
-          <div className="big">🏆</div>
+          <Icon name="trophy" size={44} className="empty-ico" />
           <p>ยังไม่มีรายการแข่งขันที่ประกาศ</p>
           <p className="text-sm">โปรดกลับมาตรวจสอบอีกครั้งในภายหลัง</p>
         </div>

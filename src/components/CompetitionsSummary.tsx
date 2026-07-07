@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { Icon } from "@/components/Icon";
 import type { CompetitionsSummary as Summary } from "@/lib/listings";
 
 // สรุปยอดรวม: รายการที่เปิด / ที่นั่ง / นักเรียน — ดูความเพียงพอรายชั้น (ตารางอยู่ใน popup)
@@ -48,7 +49,7 @@ export function CompetitionsSummary({ summary }: { summary: Summary }) {
       {levels.length > 0 && (
         <div className="row">
           <button className="btn btn-secondary" onClick={() => setOpen(true)}>
-            📊 ดูความเพียงพอรายชั้น
+            <Icon name="chart" size={18} /> ดูความเพียงพอรายชั้น
             {shortLevels > 0 && (
               <span className="badge badge-warning" style={{ marginLeft: 8 }}>
                 {shortLevels} ชั้นที่นั่งไม่พอ

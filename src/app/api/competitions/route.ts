@@ -1,11 +1,13 @@
 import { db } from "@/db";
-import { competitions, competitionCapacity, criteria } from "@/db/schema";
+import { competitions, competitionCapacity, criteria, timeSlots } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
 import { getActiveYear } from "@/lib/queries";
 import { competitionInput } from "@/lib/validation";
 import { isGroupAllowed } from "@/lib/groupScope";
 import { logAudit } from "@/lib/audit";
+import { UNLIMITED_CAPACITY } from "@/lib/domain";
 
 // POST: สร้างรายการแข่งขัน (teacher/recorder/admin) — default ไม่เผยแพร่
 export async function POST(req: Request) {
@@ -19,6 +21,12 @@ export async function POST(req: Request) {
     if (!(await isGroupAllowed(s, year.id, body.subjectGroupId)))
       return fail("เลือกได้เฉพาะหมวดวิชาของท่านเท่านั้น", 403);
 
+    // ช่วงเวลาต้องเป็น slot ของปีปัจจุบัน — เซิร์ฟเวอร์คัดลอกเวลาเริ่ม/สิ้นสุดจาก slot เอง
+    const slot = (
+      await db.select().from(timeSlots).where(and(eq(timeSlots.id, body.timeSlotId), eq(timeSlots.yearId, year.id))).limit(1)
+    )[0];
+    if (!slot) return fail("ช่วงเวลาแข่งขันไม่ถูกต้อง กรุณาเลือกใหม่");
+
     const newId = await db.transaction(async (tx) => {
       const [res] = await tx.insert(competitions).values({
         yearId: year.id,
@@ -29,9 +37,10 @@ export async function POST(req: Request) {
         teamSizeMin: body.type === "team" ? body.teamSizeMin ?? null : null,
         teamSizeMax: body.type === "team" ? body.teamSizeMax ?? null : null,
         allowedClassLevels: JSON.stringify(body.allowedClassLevels),
+        timeSlotId: slot.id,
         eventDate: body.eventDate || null,
-        startTime: body.startTime || null,
-        endTime: body.endTime || null,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
         isPublished: false,
         createdBy: s.code,
       });
@@ -44,7 +53,7 @@ export async function POST(req: Request) {
           await tx.insert(competitionCapacity).values({
             competitionId: compId,
             classLevel: lv,
-            capacity: body.capacityPerLevel?.[lv] ?? 0,
+            capacity: body.capacityPerLevel?.[lv] ?? UNLIMITED_CAPACITY,
             registeredCount: 0,
           });
         }
@@ -53,7 +62,7 @@ export async function POST(req: Request) {
         await tx.insert(competitionCapacity).values({
           competitionId: compId,
           classLevel: null,
-          capacity: (body.type === "team" ? body.teamCapacity : body.combinedCapacity) ?? 0,
+          capacity: (body.type === "team" ? body.teamCapacity : body.combinedCapacity) ?? UNLIMITED_CAPACITY,
           registeredCount: 0,
         });
       }

@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "@/db";
 import { competitions, criteria, entries, entryMembers, scores, competitionCapacity } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { decideMedal, scorePercent, type Medal, parseJsonArray } from "@/lib/domain";
+import { decideMedal, scorePercent, type Medal, parseJsonArray, UNLIMITED_CAPACITY, isUnlimited } from "@/lib/domain";
 
 export type EntryResult = {
   entryId: number;
@@ -106,7 +106,8 @@ export async function getCapacitySummary(competitionId: number) {
     .select()
     .from(competitionCapacity)
     .where(eq(competitionCapacity.competitionId, competitionId));
-  const capacity = rows.reduce((s, r) => s + r.capacity, 0);
+  // มีแถวใดไม่จำกัด → ทั้งรายการถือว่าไม่จำกัด (-1)
+  const capacity = rows.some((r) => isUnlimited(r.capacity)) ? UNLIMITED_CAPACITY : rows.reduce((s, r) => s + r.capacity, 0);
   const registered = rows.reduce((s, r) => s + r.registeredCount, 0);
   return { capacity, registered, rows };
 }

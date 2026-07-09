@@ -2,7 +2,7 @@ import { requireStaff } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { subjectGroups } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { getActiveYear } from "@/lib/queries";
+import { getActiveYear, getTimeSlots } from "@/lib/queries";
 import { canPickGroup } from "@/lib/groupScope";
 import { CompetitionForm } from "@/components/CompetitionForm";
 
@@ -13,6 +13,7 @@ export default async function NewCompetition() {
   const year = await getActiveYear();
   if (!year) return <div className="alert alert-warning">ยังไม่มีปีการศึกษาที่เปิดใช้งาน</div>;
   const allGroups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
+  const slots = await getTimeSlots(year.id);
   // ครูทั่วไปเลือกได้เฉพาะหมวดตัวเอง; admin เลือกได้ทุกหมวด
   const isAdmin = session.role === "admin";
   const groups = allGroups.filter((g) => canPickGroup(session, g.catalogNo));
@@ -30,6 +31,7 @@ export default async function NewCompetition() {
       </div>
       <CompetitionForm
         groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+        slots={slots.map((s) => ({ id: s.id, label: s.label, startTime: s.startTime, endTime: s.endTime }))}
         lockSubjectGroup={!isAdmin}
         initial={{
           name: "",
@@ -38,10 +40,10 @@ export default async function NewCompetition() {
           teamSizeMin: "",
           teamSizeMax: "",
           allowedClassLevels: [],
+          timeSlotId: "",
           eventDate: "",
-          startTime: "",
-          endTime: "",
           capacityMode: "per_level",
+          unlimited: true,
           capacityPerLevel: {},
           combinedCapacity: 0,
           teamCapacity: 0,

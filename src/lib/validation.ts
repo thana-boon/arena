@@ -14,14 +14,15 @@ export const competitionInput = z
     teamSizeMin: z.number().int().positive().nullable().optional(),
     teamSizeMax: z.number().int().positive().nullable().optional(),
     allowedClassLevels: z.array(z.enum(CLASS_LEVELS)).min(1, "เลือกระดับชั้นอย่างน้อย 1 ระดับ"),
+    // ช่วงเวลาแข่งขัน — บังคับเลือกจาก time_slots (เซิร์ฟเวอร์ resolve เป็น start/end time เอง)
+    timeSlotId: z.number().int().positive("กรุณาเลือกช่วงเวลาแข่งขัน"),
     eventDate: z.string().nullable().optional(),
-    startTime: z.string().nullable().optional(),
-    endTime: z.string().nullable().optional(),
     // เดี่ยว: 'per_level' ที่นั่งต่อระดับ (capacityPerLevel) | 'combined' รวมทุกชั้น (combinedCapacity)
+    // จำนวนรับ: ค่า -1 = ไม่จำกัดจำนวน (ค่า default)
     capacityMode: z.enum(["per_level", "combined"]).optional(),
-    capacityPerLevel: z.record(z.string(), z.number().int().min(0)).optional(),
-    combinedCapacity: z.number().int().min(0).optional(),
-    teamCapacity: z.number().int().min(0).optional(),
+    capacityPerLevel: z.record(z.string(), z.number().int().min(-1)).optional(),
+    combinedCapacity: z.number().int().min(-1).optional(),
+    teamCapacity: z.number().int().min(-1).optional(),
     criteria: z.array(criterionInput).min(1, "ต้องมีเกณฑ์การให้คะแนนอย่างน้อย 1 ข้อ"),
   })
   .superRefine((v, ctx) => {
@@ -31,8 +32,6 @@ export const competitionInput = z
       else if (v.teamSizeMin > v.teamSizeMax)
         ctx.addIssue({ code: "custom", message: "จำนวนสมาชิกต่ำสุดต้องไม่เกินสูงสุด", path: ["teamSizeMin"] });
     }
-    if (v.startTime && v.endTime && v.startTime >= v.endTime)
-      ctx.addIssue({ code: "custom", message: "เวลาเริ่มต้องก่อนเวลาสิ้นสุด", path: ["endTime"] });
   });
 
 export type CompetitionInput = z.infer<typeof competitionInput>;

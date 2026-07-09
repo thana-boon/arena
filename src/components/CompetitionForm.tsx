@@ -2,30 +2,9 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
-import { CLASS_LEVELS } from "@/lib/domain";
+import { CLASS_LEVELS, UNLIMITED_CAPACITY, formatSlot } from "@/lib/domain";
 
-/** รับได้ทั้ง "13:20", "13.20", "1320", "830" → คืนรูปแบบ "HH:MM" (คืน "" ถ้าว่าง/ไม่ถูกต้อง) */
-function normalizeTime(raw: string): string {
-  const s = raw.trim();
-  if (!s) return "";
-  const cleaned = s.replace(/[.．：]/g, ":");
-  let h: string, m: string;
-  if (cleaned.includes(":")) {
-    [h, m = "0"] = cleaned.split(":");
-  } else {
-    const digits = cleaned.replace(/\D/g, "");
-    if (!digits) return "";
-    if (digits.length <= 2) { h = digits; m = "0"; }
-    else { h = digits.slice(0, digits.length - 2); m = digits.slice(-2); }
-  }
-  let hh = parseInt(h, 10);
-  let mm = parseInt(m, 10);
-  if (isNaN(hh)) return "";
-  if (isNaN(mm)) mm = 0;
-  if (hh > 23) hh = 23;
-  if (mm > 59) mm = 59;
-  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
-}
+export type SlotOption = { id: number; label: string; startTime: string; endTime: string };
 
 export type CompFormInitial = {
   id?: number;
@@ -35,10 +14,11 @@ export type CompFormInitial = {
   teamSizeMin: number | "";
   teamSizeMax: number | "";
   allowedClassLevels: string[];
+  timeSlotId: number | "";
   eventDate: string;
-  startTime: string;
-  endTime: string;
   capacityMode: "per_level" | "combined";
+  /** รับนักเรียนแบบไม่จำกัดจำนวน (ค่า default) */
+  unlimited: boolean;
   capacityPerLevel: Record<string, number>;
   combinedCapacity: number;
   teamCapacity: number;
@@ -48,11 +28,13 @@ export type CompFormInitial = {
 
 export function CompetitionForm({
   groups,
+  slots,
   initial,
   returnTo = "/teacher/competitions",
   lockSubjectGroup = false,
 }: {
   groups: { id: number; name: string }[];
+  slots: SlotOption[];
   initial: CompFormInitial;
   /** ปลายทางหลังบันทึกสำเร็จ (admin ใช้ /admin/competitions เพื่อคงแถบเมนู admin) */
   returnTo?: string;
@@ -92,9 +74,12 @@ export function CompetitionForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
+    if (!f.timeSlotId) return setMsg({ type: "error", text: "กรุณาเลือกช่วงเวลาแข่งขัน" });
     setBusy(true);
-    const startTime = normalizeTime(f.startTime);
-    const endTime = normalizeTime(f.endTime);
+    // จำนวนรับ: ไม่จำกัด → -1 ทุกช่อง; จำกัด → ใช้ค่าที่กรอก (ช่องว่าง = 0)
+    const capacityPerLevel = Object.fromEntries(
+      f.allowedClassLevels.map((lv) => [lv, f.unlimited ? UNLIMITED_CAPACITY : f.capacityPerLevel[lv] ?? 0])
+    );
     const payload = {
       name: f.name,
       subjectGroupId: Number(f.subjectGroupId),
@@ -102,13 +87,12 @@ export function CompetitionForm({
       teamSizeMin: f.type === "team" && f.teamSizeMin !== "" ? Number(f.teamSizeMin) : null,
       teamSizeMax: f.type === "team" && f.teamSizeMax !== "" ? Number(f.teamSizeMax) : null,
       allowedClassLevels: f.allowedClassLevels,
+      timeSlotId: Number(f.timeSlotId),
       eventDate: f.eventDate || null,
-      startTime: startTime ? `${startTime}:00` : null,
-      endTime: endTime ? `${endTime}:00` : null,
       capacityMode: f.type === "individual" ? f.capacityMode : "per_level",
-      capacityPerLevel: f.capacityPerLevel,
-      combinedCapacity: f.combinedCapacity,
-      teamCapacity: f.teamCapacity,
+      capacityPerLevel,
+      combinedCapacity: f.unlimited ? UNLIMITED_CAPACITY : f.combinedCapacity,
+      teamCapacity: f.unlimited ? UNLIMITED_CAPACITY : f.teamCapacity,
       criteria: f.criteria.map((c) => ({ name: c.name, maxScore: Number(c.maxScore) })),
     };
     const res = initial.id
@@ -180,7 +164,14 @@ export function CompetitionForm({
 
         <div>
           <label className="form-label">จำนวนรับ {f.type === "team" ? "(จำนวนทีม)" : ""}</label>
-          {f.type === "team" ? (
+          <label className="form-check" style={{ marginBottom: 12 }}>
+            <input type="checkbox" checked={f.unlimited} onChange={(e) => set("unlimited", e.target.checked)} />
+            <span>รับไม่จำกัดจำนวน</span>
+          </label>
+
+          {f.unlimited ? (
+            <div className="form-hint">รับนักเรียนได้ไม่จำกัดจำนวน — เอาเครื่องหมายถูกออกเพื่อกำหนดจำนวนที่นั่ง</div>
+          ) : f.type === "team" ? (
             <input type="number" min={0} className="form-input" style={{ width: 160 }} value={f.teamCapacity} onChange={(e) => set("teamCapacity", Number(e.target.value))} />
           ) : (
             <>
@@ -224,26 +215,18 @@ export function CompetitionForm({
             <label className="form-label">วันที่แข่ง</label>
             <input type="date" lang="th" className="form-input" value={f.eventDate} onChange={(e) => set("eventDate", e.target.value)} />
           </div>
-          <div className="row" style={{ alignItems: "flex-end", gap: 8 }}>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">เริ่ม</label>
-              <input
-                type="text" inputMode="numeric" className="form-input" style={{ width: 100 }}
-                placeholder="13:20" maxLength={5} value={f.startTime}
-                onChange={(e) => set("startTime", e.target.value)}
-                onBlur={(e) => set("startTime", normalizeTime(e.target.value))}
-              />
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">ถึง</label>
-              <input
-                type="text" inputMode="numeric" className="form-input" style={{ width: 100 }}
-                placeholder="15:30" maxLength={5} value={f.endTime}
-                onChange={(e) => set("endTime", e.target.value)}
-                onBlur={(e) => set("endTime", normalizeTime(e.target.value))}
-              />
-            </div>
-            <span className="form-hint" style={{ marginBottom: 8 }}>รูปแบบ 24 ชม. เช่น 13:20</span>
+          <div className="form-group">
+            <label className="form-label">ช่วงเวลาแข่งขัน</label>
+            {slots.length ? (
+              <select className="form-select" value={f.timeSlotId} onChange={(e) => set("timeSlotId", e.target.value === "" ? "" : Number(e.target.value))}>
+                <option value="">— เลือกช่วงเวลา —</option>
+                {slots.map((sl) => (
+                  <option key={sl.id} value={sl.id}>{formatSlot(sl.label, sl.startTime, sl.endTime)}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="form-hint">ยังไม่มีช่วงเวลา — ผู้ดูแลระบบต้องเพิ่มช่วงเวลาที่เมนู “ช่วงเวลาแข่งขัน” ก่อน</div>
+            )}
           </div>
         </div>
       </div>

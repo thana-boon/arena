@@ -8,12 +8,12 @@ export type NavItem = { href: string; label: string; icon: IconName };
 export function Sidebar({ items, section }: { items: NavItem[]; section?: string }) {
   const path = usePathname();
   return (
-    <nav className="sidebar">
-      {section && <div className="sidebar-section">{section}</div>}
+    <nav className="side-nav">
+      {section && <div className="side-section">{section}</div>}
       {items.map((it) => {
         const active = path === it.href || (it.href !== "/" && path.startsWith(it.href + "/"));
         return (
-          <Link key={it.href} href={it.href} className={`sidebar-item${active ? " active" : ""}`}>
+          <Link key={it.href} href={it.href} className={`side-item${active ? " active" : ""}`} aria-current={active ? "page" : undefined}>
             <span className="ico">
               <Icon name={it.icon} size={20} />
             </span>

@@ -69,6 +69,22 @@ async function main() {
   }
   console.log(`  • หมวดวิชา: ${groupNames.join(", ")}`);
 
+  // ---- ช่วงเวลาแข่งขัน (time slot) ----
+  const slotDefs = [
+    { label: "ช่วงเช้า", startTime: "09:00:00", endTime: "12:00:00" },
+    { label: "ช่วงบ่าย", startTime: "13:00:00", endTime: "16:00:00" },
+  ];
+  const existingSlots = await db.select().from(schema.timeSlots).where(eq(schema.timeSlots.yearId, yearId));
+  const slotIdByLabel: Record<string, number> = {};
+  for (const s of existingSlots) slotIdByLabel[s.label] = s.id;
+  for (let i = 0; i < slotDefs.length; i++) {
+    if (!slotIdByLabel[slotDefs[i].label]) {
+      const [r] = await db.insert(schema.timeSlots).values({ yearId, sortOrder: i, ...slotDefs[i] });
+      slotIdByLabel[slotDefs[i].label] = r.insertId;
+    }
+  }
+  console.log(`  • ช่วงเวลา: ${slotDefs.map((s) => s.label).join(", ")}`);
+
   // ---- ตัวอย่างรายการแข่งขัน (1 เดี่ยว + 1 ทีม) ----
   const existingComps = await db.select().from(schema.competitions).where(eq(schema.competitions.yearId, yearId));
   if (!existingComps.length) {
@@ -79,9 +95,10 @@ async function main() {
       name: "คัดลายมือ ระดับ ม.ต้น",
       type: "individual",
       allowedClassLevels: JSON.stringify(["ม.1", "ม.2", "ม.3"]),
+      timeSlotId: slotIdByLabel["ช่วงเช้า"],
       eventDate: "2026-08-15",
       startTime: "09:00:00",
-      endTime: "11:00:00",
+      endTime: "12:00:00",
       isPublished: false,
       createdBy: "seed",
     });
@@ -108,9 +125,10 @@ async function main() {
       teamSizeMin: 2,
       teamSizeMax: 3,
       allowedClassLevels: JSON.stringify(["ม.4", "ม.5", "ม.6"]),
+      timeSlotId: slotIdByLabel["ช่วงบ่าย"],
       eventDate: "2026-08-15",
       startTime: "13:00:00",
-      endTime: "15:00:00",
+      endTime: "16:00:00",
       isPublished: false,
       createdBy: "seed",
     });

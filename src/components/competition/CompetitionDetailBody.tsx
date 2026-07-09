@@ -3,7 +3,7 @@ import { Icon } from "@/components/Icon";
 import { db } from "@/db";
 import { competitions, criteria, subjectGroups } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { parseJsonArray, formatThaiDate } from "@/lib/domain";
+import { parseJsonArray, formatThaiDate, formatSeats } from "@/lib/domain";
 import { canScore, canViewCompetition } from "@/lib/permit";
 import { getRoster, getCapacityRows } from "@/lib/roster";
 import type { SessionPayload } from "@/lib/auth/session";
@@ -62,7 +62,7 @@ export async function CompetitionDetailBody({
               const c = caps.find((x) => x.classLevel === null);
               return (
                 <div className="badge badge-purple" style={{ fontSize: "var(--text-sm)", padding: "6px 12px" }}>
-                  รวมทุกชั้น ({levels.join(", ")}): {c?.registeredCount ?? 0}/{c?.capacity ?? 0}
+                  รวมทุกชั้น ({levels.join(", ")}): {formatSeats(c?.registeredCount ?? 0, c?.capacity)}
                 </div>
               );
             })()
@@ -71,13 +71,13 @@ export async function CompetitionDetailBody({
               const c = caps.find((x) => x.classLevel === lv);
               return (
                 <div key={lv} className="badge badge-purple" style={{ fontSize: "var(--text-sm)", padding: "6px 12px" }}>
-                  {lv}: {c?.registeredCount ?? 0}/{c?.capacity ?? 0}
+                  {lv}: {formatSeats(c?.registeredCount ?? 0, c?.capacity)}
                 </div>
               );
             })
           ) : (
             <div className="badge badge-purple" style={{ fontSize: "var(--text-sm)", padding: "6px 12px" }}>
-              ทีม: {caps[0]?.registeredCount ?? 0}/{caps[0]?.capacity ?? 0}
+              ทีม: {formatSeats(caps[0]?.registeredCount ?? 0, caps[0]?.capacity)}
             </div>
           )}
         </div>

@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "@/db";
 import { competitions, subjectGroups, competitionCapacity, entries } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { parseJsonArray, CLASS_LEVELS } from "@/lib/domain";
+import { parseJsonArray, CLASS_LEVELS, UNLIMITED_CAPACITY, isUnlimited } from "@/lib/domain";
 import { listStudents } from "@/lib/external/student-api";
 
 export type CompListItem = {
@@ -51,7 +51,8 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
       endTime: c.endTime,
       isPublished: c.isPublished,
       createdBy: c.createdBy,
-      capacity: cRows.reduce((s, r) => s + r.capacity, 0),
+      // ถ้ามีแถวใดไม่จำกัด → ทั้งรายการถือว่าไม่จำกัด (ไม่รวมเป็นตัวเลข)
+      capacity: cRows.some((r) => isUnlimited(r.capacity)) ? UNLIMITED_CAPACITY : cRows.reduce((s, r) => s + r.capacity, 0),
       registered: cRows.reduce((s, r) => s + r.registeredCount, 0),
       activeEntries: ents.filter((e) => e.competitionId === c.id).length,
     };
@@ -99,12 +100,14 @@ export async function getCompetitionsSummary(yearId: number): Promise<Competitio
   let totalSeats = 0;
   let totalRegistered = 0;
   for (const cap of caps) {
-    totalSeats += cap.capacity;
+    // ไม่จำกัดจำนวน (capacity < 0) นับเป็น 0 ที่นั่งในสรุป เพื่อไม่ให้ยอดรวมเพี้ยน
+    const seats = isUnlimited(cap.capacity) ? 0 : cap.capacity;
+    totalSeats += seats;
     totalRegistered += cap.registeredCount;
     if (cap.classLevel) {
       // โควตาแยกชั้น (เดี่ยว per_level)
       const v = bump(cap.classLevel);
-      v.seats += cap.capacity;
+      v.seats += seats;
       v.registered += cap.registeredCount;
     } else {
       // โควตา pool (ทีม / เดี่ยวรวมชั้น) — ใช้ร่วมทุกชั้นที่รายการนี้รับ
@@ -112,8 +115,8 @@ export async function getCompetitionsSummary(yearId: number): Promise<Competitio
       const allowed = comp ? parseJsonArray(comp.allowedClassLevels) : [];
       for (const lvl of allowed) {
         const v = bump(lvl);
-        v.seats += cap.capacity;
-        v.sharedSeats += cap.capacity;
+        v.seats += seats;
+        v.sharedSeats += seats;
       }
     }
   }

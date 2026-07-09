@@ -144,13 +144,14 @@ export async function registerEntry(args: RegisterArgs): Promise<number> {
     if (!cap) throw new RegistrationError("ไม่พบข้อมูลที่นั่งของรายการนี้");
 
     // conditional update กัน race — เพิ่ม counter เฉพาะเมื่อยังไม่เต็ม
+    // capacity < 0 = ไม่จำกัดจำนวน → เพิ่มได้เสมอ
     const res = await tx
       .update(competitionCapacity)
       .set({ registeredCount: sql`${competitionCapacity.registeredCount} + 1` })
       .where(
         and(
           eq(competitionCapacity.id, cap.id),
-          sql`${competitionCapacity.registeredCount} < ${competitionCapacity.capacity}`
+          sql`(${competitionCapacity.capacity} < 0 OR ${competitionCapacity.registeredCount} < ${competitionCapacity.capacity})`
         )
       );
     // mysql2: affectedRows

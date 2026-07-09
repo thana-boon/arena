@@ -2,36 +2,44 @@
    Sukhon Arena — Global Styles (ตาม SKDW-CI.md v1.1)
    ============================================================ */
 
-/* ---------- Tokens ---------- */
+/* ---------- Tokens (SchoolOS Design System — premium-institutional) ---------- */
 :root {
   /* Primary palette */
-  --skdw-purple: #5b2d8e;
-  --skdw-purple-light: #7b4db0;
-  --skdw-purple-pale: #f0ebf8;
-  --skdw-gold: #f5c518;
+  --skdw-purple: #5b2d8e;           /* ม่วงหลัก — ปุ่ม/ลิงก์/ไอคอน */
+  --skdw-purple-light: #7a3fc0;     /* ม่วงสว่าง — hover/gradient */
+  --skdw-purple-pale: #f1edf7;      /* ม่วงจางมาก — hover/chip/พื้นรอง */
+  --skdw-gold: #f5c518;             /* ทอง — accent/CTA/active */
   --skdw-gold-dark: #e8b800;
-  --skdw-dark: #1a1a2e;
+  --skdw-gold-ink: #8a6a00;         /* ทองเข้ม — ข้อความบนพื้นทองจาง (คอนทราสต์ผ่าน) */
+  --skdw-dark: #1a1625;             /* ตัวหนังสือหลัก */
   --skdw-white: #ffffff;
-  --skdw-bg: #f8f7f5;
-  --skdw-muted: #888888;
-  --skdw-border: #e8e4f0;
+  --skdw-bg: #faf9fc;               /* พื้นหลังหน้า — ขาวอมม่วงบาง ๆ */
+  --skdw-muted: #6b6478;            /* ข้อความรอง — ผ่าน 4.5:1 บนขาว */
+  --skdw-border: #e6e0f0;           /* เส้นขอบ — ม่วงจางมาก */
+  --skdw-navy: #1e2a5e;             /* น้ำเงินเข้ม — หมวดรอง/ข้อมูล */
 
   /* Semantic */
-  --color-success: #2e7d32;
-  --color-success-bg: #e8f5e9;
-  --color-warning: #e65100;
-  --color-warning-bg: #fff3e0;
-  --color-error: #c62828;
-  --color-error-bg: #ffebee;
-  --color-info: #1565c0;
-  --color-info-bg: #e3f2fd;
+  --color-success: #16a34a;
+  --color-success-bg: #e7f6ec;
+  --color-warning: #b45309;
+  --color-warning-bg: #fdf1e3;
+  --color-error: #dc2626;
+  --color-error-bg: #fdeaea;
+  --color-info: #1e2a5e;
+  --color-info-bg: #e8ebf6;
 
-  /* Fonts */
-  --font-th-serif: "Noto Serif Thai", serif;
-  --font-th-sans: "Sarabun", sans-serif;
-  --font-th-modern: "Noto Sans Thai", sans-serif;
-  --font-en-serif: "Playfair Display", serif;
-  --font-en-sans: "Inter", sans-serif;
+  /* Sidebar (ม่วงเข้มพิเศษ — เป็นเมนูหลักของ app shell) */
+  --sidebar: #341a54;
+  --sidebar-foreground: #f3effa;
+  --sidebar-accent: #4a2873;
+  --sidebar-primary: #f5c518;
+
+  /* Fonts — IBM Plex Sans Thai ทั้งระบบ (ปรับน้ำหนักแทนการเปลี่ยน family) */
+  --font-th-serif: "IBM Plex Sans Thai", sans-serif;
+  --font-th-sans: "IBM Plex Sans Thai", sans-serif;
+  --font-th-modern: "IBM Plex Sans Thai", sans-serif;
+  --font-en-serif: "IBM Plex Sans Thai", sans-serif;
+  --font-en-sans: "IBM Plex Sans Thai", sans-serif;
 
   /* Type scale */
   --text-xs: 11px;
@@ -52,19 +60,19 @@
   --space-12: 48px;
   --space-16: 64px;
 
-  /* Radius */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  /* Radius (จาก --radius: 0.85rem — โค้งมนแบบพรีเมียม) */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 0.85rem;             /* ~13.6px — input/ปุ่ม */
+  --radius-lg: 1.2rem;              /* ~19px — icon chip */
+  --radius-xl: 1.5rem;              /* ~24px — การ์ด/tile */
   --radius-full: 9999px;
 
-  /* Shadow */
-  --shadow-sm: 0 1px 3px rgba(26, 26, 46, 0.08);
-  --shadow-md: 0 4px 12px rgba(26, 26, 46, 0.1);
-  --shadow-lg: 0 8px 24px rgba(26, 26, 46, 0.12);
-  --shadow-xl: 0 16px 40px rgba(26, 26, 46, 0.15);
+  /* Shadow (นุ่ม บาง — premium ไม่ฟุ้ง) */
+  --shadow-sm: 0 1px 2px rgba(26, 22, 37, 0.05);
+  --shadow-md: 0 4px 14px rgba(26, 22, 37, 0.08);
+  --shadow-lg: 0 10px 30px rgba(26, 22, 37, 0.10);
+  --shadow-xl: 0 18px 44px rgba(26, 22, 37, 0.14);
   --shadow-focus: 0 0 0 3px rgba(91, 45, 142, 0.25);
 
   /* Z-index */
@@ -171,10 +179,12 @@ h1,
 h2,
 h3,
 h4 {
-  font-family: var(--font-th-serif), serif;
+  font-family: var(--font-th-serif), sans-serif;
   color: var(--skdw-dark);
   margin: 0 0 var(--space-3);
-  line-height: 1.35;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 h1 {
   font-size: var(--text-2xl);
@@ -199,14 +209,14 @@ p {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   padding: 10px 20px;
   font-family: var(--font-th-sans);
   font-size: var(--text-md);
   font-weight: 500;
   cursor: pointer;
   border: none;
-  transition: background var(--transition-base), transform var(--transition-fast);
+  transition: background var(--transition-base), transform var(--transition-fast), box-shadow var(--transition-base);
   text-decoration: none;
   line-height: 1.2;
 }
@@ -398,8 +408,8 @@ p {
 /* ---------- Cards ---------- */
 .card {
   background: #fff;
-  border-radius: var(--radius-md);
-  border: 0.5px solid var(--skdw-border);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--skdw-border);
   padding: var(--space-6);
   box-shadow: var(--shadow-sm);
 }
@@ -479,8 +489,8 @@ p {
 /* ---------- Tables ---------- */
 .table-wrap {
   overflow-x: auto;
-  border-radius: var(--radius-md);
-  border: 0.5px solid var(--skdw-border);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--skdw-border);
   background: #fff;
 }
 .table {
@@ -613,8 +623,8 @@ p {
 }
 .skeleton-card {
   background: #fff;
-  border-radius: var(--radius-md);
-  border: 0.5px solid var(--skdw-border);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--skdw-border);
   padding: var(--space-6);
   display: flex;
   flex-direction: column;
@@ -741,6 +751,10 @@ p {
 .navbar .brand .dot {
   color: var(--skdw-gold);
 }
+/* "Arena" ในโลโก้ — สีทองเสมอ (ทั้งบน sidebar เข้มและ topbar สว่าง) */
+.wordmark .dot {
+  color: var(--skdw-gold);
+}
 /* ตัว K ในโลโก้ "SuKhon" — สีทองพลิกตัวไปมาตลอดเวลา */
 .wordmark-k {
   display: inline-block;
@@ -838,49 +852,175 @@ p {
   font-size: var(--text-xs);
 }
 
-.app-body {
+/* ===== App shell หลังล็อกอิน: sidebar ม่วงเข้ม + topbar สว่าง ===== */
+.app-shell-nav {
+  min-height: 100vh;
   display: flex;
-  flex: 1;
-  min-height: 0;
 }
 .sidebar {
-  width: 240px;
-  background: #fff;
-  border-right: 0.5px solid var(--skdw-border);
-  padding: var(--space-4) 0;
+  width: 256px;
   flex-shrink: 0;
+  background: var(--sidebar);
+  color: var(--sidebar-foreground);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
 }
-.sidebar-section {
+.side-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-5) var(--space-4);
+  color: #fff;
+  text-decoration: none;
+  font-family: var(--font-en-serif);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+.side-brand:hover {
+  text-decoration: none;
+}
+.side-nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.side-section {
   font-size: var(--text-xs);
-  color: var(--skdw-muted);
-  padding: var(--space-3) var(--space-6) var(--space-1);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  color: rgba(243, 239, 250, 0.5);
+  padding: var(--space-3) var(--space-3) var(--space-1);
 }
-.sidebar-item {
+.side-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 10px var(--space-6);
+  padding: 10px var(--space-3);
+  border-radius: var(--radius-md);
+  color: rgba(243, 239, 250, 0.72);
   font-size: var(--text-md);
+  font-weight: 500;
+  text-decoration: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.side-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  text-decoration: none;
+}
+.side-item.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+/* แถบทองบอกเมนูที่เลือกอยู่ */
+.side-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  border-radius: 3px;
+  background: var(--sidebar-primary);
+}
+.side-item .ico {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.side-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.side-user .avatar {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: var(--sidebar-primary);
+  color: #241b04;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+.side-user .who {
+  min-width: 0;
+  flex: 1;
+  line-height: 1.25;
+}
+.side-user .who .nm {
+  display: block;
+  color: #fff;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.side-user .who .rl {
+  display: block;
+  color: rgba(243, 239, 250, 0.6);
+  font-size: var(--text-xs);
+}
+
+.app-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.topbar {
+  height: 64px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-6);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--skdw-border);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+}
+.topbar .tb-brand {
+  display: none; /* แสดงเฉพาะจอมือถือ (sidebar ถูกซ่อน) */
+  align-items: center;
+  color: var(--skdw-purple);
+  font-family: var(--font-en-serif);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  text-decoration: none;
+}
+.topbar .spacer {
+  flex: 1;
+}
+.topbar .tb-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
   color: var(--skdw-dark);
-  cursor: pointer;
-  transition: background var(--transition-fast);
-  text-decoration: none;
 }
-.sidebar-item:hover {
-  background: var(--skdw-bg);
-  text-decoration: none;
-}
-.sidebar-item.active {
+.topbar .role-chip {
   background: var(--skdw-purple-pale);
   color: var(--skdw-purple);
-  font-weight: 500;
-  border-right: 3px solid var(--skdw-purple);
-}
-.sidebar-item .ico {
-  width: 20px;
-  text-align: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
 
 .main-content {
@@ -939,6 +1079,13 @@ p {
   .sidebar {
     display: none;
   }
+  .topbar {
+    height: 56px;
+    padding: 0 var(--space-4);
+  }
+  .topbar .tb-brand {
+    display: inline-flex;
+  }
   .bottom-nav {
     display: flex;
   }
@@ -988,8 +1135,8 @@ p {
 
 .stat-card {
   background: #fff;
-  border-radius: var(--radius-md);
-  border: 0.5px solid var(--skdw-border);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--skdw-border);
   padding: var(--space-6);
   box-shadow: var(--shadow-sm);
 }
@@ -999,8 +1146,9 @@ p {
 }
 .stat-card .value {
   font-size: var(--text-2xl);
-  font-weight: 700;
+  font-weight: 600;
   font-family: var(--font-en-sans);
+  font-variant-numeric: tabular-nums;
   color: var(--skdw-purple);
 }
 

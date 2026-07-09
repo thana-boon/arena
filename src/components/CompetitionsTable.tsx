@@ -7,7 +7,7 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import { Icon } from "@/components/Icon";
 import type { CompListItem } from "@/lib/listings";
 import type { Role } from "@/lib/auth/session";
-import { formatThaiDate } from "@/lib/domain";
+import { formatThaiDate, isUnlimited } from "@/lib/domain";
 
 export function CompetitionsTable({
   comps,
@@ -128,7 +128,7 @@ export function CompetitionsTable({
                 </td>
                 <td className="text-sm">{c.groupName}</td>
                 <td><span className="badge">{c.type === "team" ? "ทีม" : "เดี่ยว"}</span></td>
-                <td className="num">{c.capacity} / {c.registered}</td>
+                <td className="num">{isUnlimited(c.capacity) ? "ไม่จำกัด" : c.capacity} / {c.registered}</td>
                 <td>
                   {c.isPublished
                     ? <span className="badge badge-success">ประกาศผลแล้ว</span>

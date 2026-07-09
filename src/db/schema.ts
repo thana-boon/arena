@@ -58,6 +58,23 @@ export const subjectGroups = mysqlTable("subject_groups", {
   sortOrder: int("sort_order").notNull().default(0),
 });
 
+// ===== ช่วงเวลาแข่งขัน (time slot) — ต่อปีการศึกษา =====
+// เช่น "ช่วงเช้า" 09:00–12:00 ; รายการแข่งขันต้องเลือกช่วงเวลาจากรายการนี้เท่านั้น
+export const timeSlots = mysqlTable(
+  "time_slots",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    yearId: int("year_id").notNull(),
+    label: varchar("label", { length: 191 }).notNull(), // เช่น "ช่วงเช้า"
+    startTime: time("start_time").notNull(),
+    endTime: time("end_time").notNull(),
+    sortOrder: int("sort_order").notNull().default(0),
+  },
+  (t) => ({
+    byYear: index("slot_year_idx").on(t.yearId),
+  })
+);
+
 // ===== แอดมิน local (ไม่ผ่าน API ภายนอก) =====
 export const adminsLocal = mysqlTable("admins_local", {
   id: int("id").autoincrement().primaryKey(),
@@ -90,8 +107,10 @@ export const competitions = mysqlTable(
     teamSizeMin: int("team_size_min"),
     teamSizeMax: int("team_size_max"),
     allowedClassLevels: text("allowed_class_levels").notNull().default("[]"), // json array
+    // ช่วงเวลาแข่งขัน — อ้างอิง time_slots.id (บังคับเลือกตอนสร้าง; nullable ในสคีมาเพื่อรองรับข้อมูลเดิม)
+    timeSlotId: int("time_slot_id"),
     eventDate: date("event_date", { mode: "string" }),
-    startTime: time("start_time"),
+    startTime: time("start_time"), // snapshot จาก slot ที่เลือก (ใช้ตรวจเวลาแข่งชนกัน + แสดงผล)
     endTime: time("end_time"),
     isPublished: boolean("is_published").notNull().default(false),
     createdBy: varchar("created_by", { length: 64 }).notNull(),
@@ -206,6 +225,7 @@ export const teacherCache = mysqlTable("teacher_cache", {
 export type AcademicYear = typeof academicYears.$inferSelect;
 export type Setting = typeof settings.$inferSelect;
 export type SubjectGroup = typeof subjectGroups.$inferSelect;
+export type TimeSlot = typeof timeSlots.$inferSelect;
 export type SubjectGroupCatalog = typeof subjectGroupCatalog.$inferSelect;
 export type Competition = typeof competitions.$inferSelect;
 export type CompetitionCapacity = typeof competitionCapacity.$inferSelect;

@@ -6,6 +6,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/years", label: "ปีการศึกษา", icon: "calendar" },
   { href: "/admin/settings", label: "ตั้งค่า", icon: "settings" },
   { href: "/admin/groups", label: "หมวดวิชา", icon: "book" },
+  { href: "/admin/timeslots", label: "ช่วงเวลาแข่งขัน", icon: "clock" },
   { href: "/admin/competitions", label: "รายการแข่งขัน", icon: "trophy" },
   { href: "/admin/students", label: "รายชื่อนักเรียน", icon: "graduation" },
   { href: "/admin/teachers", label: "สิทธิ์ครู", icon: "user" },

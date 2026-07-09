@@ -24,24 +24,37 @@ export function AppShell({
   section?: string;
   children: React.ReactNode;
 }) {
+  const initial = (session.name ?? "?").trim().charAt(0) || "?";
   return (
-    <div className="app-shell">
-      <header className="navbar">
-        <Link href="/" className="brand">
+    <div className="app-shell-nav">
+      <aside className="sidebar">
+        <Link href="/" className="side-brand">
           <BrandLogo />
           <Wordmark />
         </Link>
-        <div className="spacer" />
-        <div className="nav-user">
-          <span className="role-chip">{ROLE_LABEL[session.role]}</span>
-          <span className="nowrap">{session.name}</span>
-          <LogoutButton />
-        </div>
-      </header>
-      <div className="app-body">
         <Sidebar items={items} section={section} />
+        <div className="side-user">
+          <span className="avatar" aria-hidden="true">{initial}</span>
+          <span className="who">
+            <span className="nm">{session.name}</span>
+            <span className="rl">{ROLE_LABEL[session.role]}</span>
+          </span>
+        </div>
+      </aside>
+
+      <div className="app-col">
+        <header className="topbar">
+          <Link href="/" className="tb-brand"><Wordmark /></Link>
+          <div className="spacer" />
+          <div className="tb-user">
+            <span className="role-chip">{ROLE_LABEL[session.role]}</span>
+            <span className="nowrap">{session.name}</span>
+            <LogoutButton />
+          </div>
+        </header>
         <main className="main-content"><RouteTransition>{children}</RouteTransition></main>
       </div>
+
       <BottomNav items={items} />
     </div>
   );

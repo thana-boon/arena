@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { competitions, competitionCapacity, criteria, entries, scores } from "@/db/schema";
+import { competitions, competitionCapacity, criteria, entries, scores, timeSlots } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
@@ -7,6 +7,7 @@ import { competitionInput } from "@/lib/validation";
 import { isGroupAllowed } from "@/lib/groupScope";
 import { logAudit } from "@/lib/audit";
 import { canEditCompetition } from "@/lib/permit";
+import { UNLIMITED_CAPACITY, isUnlimited } from "@/lib/domain";
 
 async function hasEntries(compId: number): Promise<boolean> {
   const rows = await db.select({ id: entries.id }).from(entries).where(eq(entries.competitionId, compId)).limit(1);
@@ -28,6 +29,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (body.subjectGroupId !== comp.subjectGroupId && !(await isGroupAllowed(s, comp.yearId, body.subjectGroupId)))
       return fail("เลือกได้เฉพาะหมวดวิชาของท่านเท่านั้น", 403);
 
+    // ช่วงเวลาต้องเป็น slot ของปีเดียวกับรายการ — คัดลอกเวลาเริ่ม/สิ้นสุดจาก slot
+    const slot = (
+      await db.select().from(timeSlots).where(and(eq(timeSlots.id, body.timeSlotId), eq(timeSlots.yearId, comp.yearId))).limit(1)
+    )[0];
+    if (!slot) return fail("ช่วงเวลาแข่งขันไม่ถูกต้อง กรุณาเลือกใหม่");
+
     const locked = await hasEntries(id);
 
     const capRows = await db.select().from(competitionCapacity).where(eq(competitionCapacity.competitionId, id));
@@ -38,9 +45,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         .set({
           name: body.name.trim(),
           subjectGroupId: body.subjectGroupId,
+          timeSlotId: slot.id,
           eventDate: body.eventDate || null,
-          startTime: body.startTime || null,
-          endTime: body.endTime || null,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
           // เปลี่ยนโครงสร้างได้เฉพาะยังไม่มีคนลง
           ...(locked
             ? {}
@@ -60,13 +68,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         if (body.type === "individual" && body.capacityMode !== "combined") {
           for (const lv of body.allowedClassLevels) {
             await tx.insert(competitionCapacity).values({
-              competitionId: id, classLevel: lv, capacity: body.capacityPerLevel?.[lv] ?? 0, registeredCount: 0,
+              competitionId: id, classLevel: lv, capacity: body.capacityPerLevel?.[lv] ?? UNLIMITED_CAPACITY, registeredCount: 0,
             });
           }
         } else {
           await tx.insert(competitionCapacity).values({
             competitionId: id, classLevel: null,
-            capacity: (body.type === "team" ? body.teamCapacity : body.combinedCapacity) ?? 0, registeredCount: 0,
+            capacity: (body.type === "team" ? body.teamCapacity : body.combinedCapacity) ?? UNLIMITED_CAPACITY, registeredCount: 0,
           });
         }
         await tx.delete(criteria).where(eq(criteria.competitionId, id));
@@ -84,7 +92,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                 : row.classLevel
                   ? body.capacityPerLevel?.[row.classLevel]
                   : undefined;
-          if (newCap != null && newCap >= row.registeredCount) {
+          // อัปเดตจำนวนรับได้ถ้าเป็นไม่จำกัด หรือไม่ต่ำกว่าจำนวนที่ลงไปแล้ว
+          if (newCap != null && (isUnlimited(newCap) || newCap >= row.registeredCount)) {
             await tx.update(competitionCapacity).set({ capacity: newCap }).where(eq(competitionCapacity.id, row.id));
           }
         }

@@ -13,12 +13,7 @@ export function LogoutButton() {
     router.refresh();
   }
   return (
-    <button
-      className="btn btn-ghost btn-sm"
-      style={{ color: "#fff", borderColor: "rgba(255,255,255,0.3)" }}
-      onClick={logout}
-      disabled={loading}
-    >
+    <button className="btn btn-ghost btn-sm" onClick={logout} disabled={loading}>
       ออกจากระบบ
     </button>
   );

@@ -2,10 +2,10 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { subjectGroups, competitions, competitionCapacity, criteria, entries } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { getActiveYear } from "@/lib/queries";
+import { getActiveYear, getTimeSlots } from "@/lib/queries";
 import { canEditCompetition } from "@/lib/permit";
 import { canPickGroup } from "@/lib/groupScope";
-import { parseJsonArray } from "@/lib/domain";
+import { parseJsonArray, isUnlimited } from "@/lib/domain";
 import type { SessionPayload } from "@/lib/auth/session";
 import { CompetitionForm } from "@/components/CompetitionForm";
 
@@ -37,10 +37,14 @@ export async function CompetitionEditBody({
   crits.sort((a, b) => a.sortOrder - b.sortOrder);
   const entRows = await db.select({ id: entries.id }).from(entries).where(eq(entries.competitionId, id)).limit(1);
   const locked = entRows.length > 0;
+  const slots = await getTimeSlots(year.id);
 
+  // ไม่จำกัดจำนวน = ทุกแถวโควตาเก็บค่า < 0 ; number field แสดง 0 แทนค่าลบ
+  const unlimited = caps.length > 0 && caps.every((c) => isUnlimited(c.capacity));
+  const clamp = (n: number) => (n < 0 ? 0 : n);
   const capPerLevel: Record<string, number> = {};
-  for (const c of caps) if (c.classLevel) capPerLevel[c.classLevel] = c.capacity;
-  const teamCap = caps.find((c) => c.classLevel === null)?.capacity ?? 0;
+  for (const c of caps) if (c.classLevel) capPerLevel[c.classLevel] = clamp(c.capacity);
+  const teamCap = clamp(caps.find((c) => c.classLevel === null)?.capacity ?? 0);
   const capacityMode = comp.capacityMode === "combined" ? "combined" : "per_level";
   // เดี่ยวแบบรวม เก็บโควตาไว้ที่ row เดียว (class_level = null) เหมือนทีม
   const combinedCapacity = capacityMode === "combined" ? teamCap : 0;
@@ -53,6 +57,7 @@ export async function CompetitionEditBody({
       </div>
       <CompetitionForm
         groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+        slots={slots.map((s) => ({ id: s.id, label: s.label, startTime: s.startTime, endTime: s.endTime }))}
         returnTo={returnTo}
         lockSubjectGroup={!isAdmin}
         initial={{
@@ -63,10 +68,10 @@ export async function CompetitionEditBody({
           teamSizeMin: comp.teamSizeMin ?? "",
           teamSizeMax: comp.teamSizeMax ?? "",
           allowedClassLevels: parseJsonArray(comp.allowedClassLevels),
+          timeSlotId: comp.timeSlotId ?? "",
           eventDate: comp.eventDate ?? "",
-          startTime: comp.startTime?.slice(0, 5) ?? "",
-          endTime: comp.endTime?.slice(0, 5) ?? "",
           capacityMode,
+          unlimited,
           capacityPerLevel: capPerLevel,
           combinedCapacity,
           teamCapacity: teamCap,

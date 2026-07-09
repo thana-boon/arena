@@ -5,7 +5,7 @@ import { api } from "@/lib/client";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Icon } from "@/components/Icon";
 import { StudentPicker, type PickedStudent } from "@/components/StudentPicker";
-import { formatThaiDate } from "@/lib/domain";
+import { formatThaiDate, formatSeats, seatsFull } from "@/lib/domain";
 
 export type BrowseComp = {
   id: number;
@@ -162,7 +162,7 @@ export function BrowseRegister({
         <span className="badge badge-purple"><Icon name="book" size={13} /> {currentGroupName}</span>
       </div>
       {shownComps.map((c) => {
-        const full = c.registered >= c.capacity;
+        const full = seatsFull(c.registered, c.capacity);
         const canRegister = registrationOpen && !c.alreadyRegistered && !full;
         return (
           <div key={c.id} className="card">
@@ -174,7 +174,7 @@ export function BrowseRegister({
                 </div>
                 <h3 style={{ margin: "8px 0 4px" }}>{c.name}</h3>
                 <div className="text-sm muted">
-                  ที่นั่ง {c.registered}/{c.capacity}
+                  ที่นั่ง {formatSeats(c.registered, c.capacity)}
                   {c.eventDate && ` · ${formatThaiDate(c.eventDate)} ${c.startTime?.slice(0, 5)}–${c.endTime?.slice(0, 5)}`}
                 </div>
               </div>

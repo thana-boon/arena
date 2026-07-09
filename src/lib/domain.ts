@@ -102,6 +102,36 @@ export function formatThaiDate(input: string | Date | null | undefined): string 
   return `${d} ${month} ${y + 543}`;
 }
 
+// ===== ความจุ / ที่นั่ง =====
+/** ค่า capacity ที่ถือว่า "ไม่จำกัดจำนวน" (เป็นค่า default ตอนสร้างรายการ) */
+export const UNLIMITED_CAPACITY = -1;
+
+/** true = ที่นั่งไม่จำกัดจำนวน */
+export function isUnlimited(capacity: number | null | undefined): boolean {
+  return capacity != null && capacity < 0;
+}
+
+/** ที่นั่งเต็มหรือยัง (ไม่จำกัด = ไม่มีวันเต็ม) */
+export function seatsFull(registered: number, capacity: number | null | undefined): boolean {
+  return !isUnlimited(capacity) && registered >= (capacity ?? 0);
+}
+
+/** ข้อความแสดงจำนวนรับ เช่น "12/40" หรือ "12/ไม่จำกัด" */
+export function formatSeats(registered: number, capacity: number | null | undefined): string {
+  return `${registered}/${isUnlimited(capacity) ? "ไม่จำกัด" : capacity ?? 0}`;
+}
+
+// ===== ช่วงเวลา (time slot) =====
+/** "09:00:00" → "09:00" (ตัดวินาที) */
+export function hhmm(t: string | null | undefined): string {
+  return t ? t.slice(0, 5) : "";
+}
+
+/** ข้อความช่วงเวลา เช่น "ช่วงเช้า (09:00–12:00)" */
+export function formatSlot(label: string, startTime: string, endTime: string): string {
+  return `${label} (${hhmm(startTime)}–${hhmm(endTime)})`;
+}
+
 export type CompType = "individual" | "team";
 
 export const ROLE_HOME: Record<string, string> = {

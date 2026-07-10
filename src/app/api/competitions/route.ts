@@ -8,6 +8,7 @@ import { competitionInput } from "@/lib/validation";
 import { isGroupAllowed } from "@/lib/groupScope";
 import { logAudit } from "@/lib/audit";
 import { UNLIMITED_CAPACITY } from "@/lib/domain";
+import { findVenueConflicts } from "@/lib/venues";
 
 // POST: สร้างรายการแข่งขัน (teacher/recorder/admin) — default ไม่เผยแพร่
 export async function POST(req: Request) {
@@ -27,24 +28,39 @@ export async function POST(req: Request) {
     )[0];
     if (!slot) return fail("ช่วงเวลาแข่งขันไม่ถูกต้อง กรุณาเลือกใหม่");
 
-    const newId = await db.transaction(async (tx) => {
-      const [res] = await tx.insert(competitions).values({
-        yearId: year.id,
-        subjectGroupId: body.subjectGroupId,
-        name: body.name.trim(),
-        type: body.type,
-        capacityMode: body.type === "individual" ? body.capacityMode ?? "per_level" : "per_level",
-        teamSizeMin: body.type === "team" ? body.teamSizeMin ?? null : null,
-        teamSizeMax: body.type === "team" ? body.teamSizeMax ?? null : null,
-        allowedClassLevels: JSON.stringify(body.allowedClassLevels),
-        timeSlotId: slot.id,
-        eventDate: body.eventDate || null,
+    // ตรวจสถานที่ชนกัน (มี venue + วันที่ครบ และยังไม่ยืนยันใช้ห้องเดียวกัน)
+    if (body.venueId && body.eventDate && !body.forceVenue) {
+      const conflicts = await findVenueConflicts({
+        venueId: body.venueId,
+        eventDate: body.eventDate,
         startTime: slot.startTime,
         endTime: slot.endTime,
-        isPublished: false,
-        createdBy: s.code,
       });
-      const compId = res.insertId;
+      if (conflicts.length) return ok({ venueConflict: true, conflicts });
+    }
+
+    const newId = await db.transaction(async (tx) => {
+      const [res] = await tx
+        .insert(competitions)
+        .values({
+          yearId: year.id,
+          subjectGroupId: body.subjectGroupId,
+          name: body.name.trim(),
+          type: body.type,
+          capacityMode: body.type === "individual" ? body.capacityMode ?? "per_level" : "per_level",
+          teamSizeMin: body.type === "team" ? body.teamSizeMin ?? null : null,
+          teamSizeMax: body.type === "team" ? body.teamSizeMax ?? null : null,
+          allowedClassLevels: JSON.stringify(body.allowedClassLevels),
+          timeSlotId: slot.id,
+          venueId: body.venueId ?? null,
+          eventDate: body.eventDate || null,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          isPublished: false,
+          createdBy: s.code,
+        })
+        .returning({ id: competitions.id });
+      const compId = res.id;
 
       // capacity
       if (body.type === "individual" && body.capacityMode !== "combined") {

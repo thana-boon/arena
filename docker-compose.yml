@@ -1,0 +1,42 @@
+# SKDW Arena — สแตกเดียว: Next.js (3017) + PostgreSQL (5017)
+# รัน:  docker compose up -d --build
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: arena-db
+    environment:
+      POSTGRES_USER: arena
+      POSTGRES_PASSWORD: arena
+      POSTGRES_DB: arena
+      TZ: Asia/Bangkok
+    ports:
+      - "5017:5432" # host 5017 → container 5432
+    volumes:
+      - arena_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arena -d arena"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: arena-app
+    depends_on:
+      db:
+        condition: service_healthy # รอ Postgres พร้อมก่อนค่อย push/seed/start
+    env_file:
+      - .env # โหลด JWT_SECRET, TEACHER_API_*, STUDENT_API_* ฯลฯ จาก .env
+    environment:
+      NODE_ENV: production
+      PORT: "3017"
+      TZ: Asia/Bangkok
+      # ชี้ไปที่ service db ภายในเน็ตเวิร์ก compose (พอร์ตภายในคือ 5432) — override ค่าใน .env
+      DATABASE_URL: postgres://arena:arena@db:5432/arena
+    ports:
+      - "3017:3017"
+    restart: unless-stopped
+
+volumes:
+  arena_pgdata:

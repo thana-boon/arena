@@ -2,9 +2,13 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
-import { CLASS_LEVELS, UNLIMITED_CAPACITY, formatSlot } from "@/lib/domain";
+import { useConfirm } from "@/components/ConfirmDialog";
+import { CLASS_LEVELS, UNLIMITED_CAPACITY, formatSlot, hhmm } from "@/lib/domain";
 
 export type SlotOption = { id: number; label: string; startTime: string; endTime: string };
+export type VenueOption = { id: number; name: string; building: string };
+
+type VenueConflict = { id: number; name: string; startTime: string | null; endTime: string | null };
 
 export type CompFormInitial = {
   id?: number;
@@ -15,6 +19,7 @@ export type CompFormInitial = {
   teamSizeMax: number | "";
   allowedClassLevels: string[];
   timeSlotId: number | "";
+  venueId: number | "";
   eventDate: string;
   capacityMode: "per_level" | "combined";
   /** รับนักเรียนแบบไม่จำกัดจำนวน (ค่า default) */
@@ -29,12 +34,14 @@ export type CompFormInitial = {
 export function CompetitionForm({
   groups,
   slots,
+  venues,
   initial,
   returnTo = "/teacher/competitions",
   lockSubjectGroup = false,
 }: {
   groups: { id: number; name: string }[];
   slots: SlotOption[];
+  venues: VenueOption[];
   initial: CompFormInitial;
   /** ปลายทางหลังบันทึกสำเร็จ (admin ใช้ /admin/competitions เพื่อคงแถบเมนู admin) */
   returnTo?: string;
@@ -42,6 +49,7 @@ export function CompetitionForm({
   lockSubjectGroup?: boolean;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [f, setF] = useState<CompFormInitial>(initial);
   const [msg, setMsg] = useState<{ type: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -88,6 +96,7 @@ export function CompetitionForm({
       teamSizeMax: f.type === "team" && f.teamSizeMax !== "" ? Number(f.teamSizeMax) : null,
       allowedClassLevels: f.allowedClassLevels,
       timeSlotId: Number(f.timeSlotId),
+      venueId: f.venueId === "" ? null : Number(f.venueId),
       eventDate: f.eventDate || null,
       capacityMode: f.type === "individual" ? f.capacityMode : "per_level",
       capacityPerLevel,
@@ -95,9 +104,34 @@ export function CompetitionForm({
       teamCapacity: f.unlimited ? UNLIMITED_CAPACITY : f.teamCapacity,
       criteria: f.criteria.map((c) => ({ name: c.name, maxScore: Number(c.maxScore) })),
     };
-    const res = initial.id
-      ? await api.patch<{ locked: boolean }>(`/api/competitions/${initial.id}`, payload)
-      : await api.post<{ id: number }>("/api/competitions", payload);
+
+    // ยิงคำขอ (force = ยืนยันใช้สถานที่ที่ชนกับรายการอื่น)
+    type Resp = { id?: number; locked?: boolean; venueConflict?: boolean; conflicts?: VenueConflict[] };
+    const send = (force: boolean) => {
+      const body = force ? { ...payload, forceVenue: true } : payload;
+      return initial.id
+        ? api.patch<Resp>(`/api/competitions/${initial.id}`, body)
+        : api.post<Resp>("/api/competitions", body);
+    };
+
+    let res = await send(false);
+    // สถานที่ชนกับรายการก่อนหน้า → ถามยืนยันใช้ห้องเดียวกัน
+    if (res.ok && res.data.venueConflict) {
+      const list = (res.data.conflicts ?? [])
+        .map((c) => `${c.name}${c.startTime && c.endTime ? ` (${hhmm(c.startTime)}–${hhmm(c.endTime)})` : ""}`)
+        .join(", ");
+      const useSame = await confirm({
+        title: "สถานที่ถูกใช้ในช่วงเวลาเดียวกัน",
+        message: `สถานที่นี้มีรายการแข่งขันใช้อยู่ในวัน/เวลาเดียวกัน: ${list} — ต้องการใช้ห้องเดียวกันหรือไม่?`,
+        confirmText: "ใช้ห้องเดียวกัน",
+      });
+      if (!useSame) {
+        setBusy(false);
+        return;
+      }
+      res = await send(true);
+    }
+
     setBusy(false);
     if (!res.ok) return setMsg({ type: "error", text: res.error });
     router.push(returnTo);
@@ -228,6 +262,19 @@ export function CompetitionForm({
               <div className="form-hint">ยังไม่มีช่วงเวลา — ผู้ดูแลระบบต้องเพิ่มช่วงเวลาที่เมนู “ช่วงเวลาแข่งขัน” ก่อน</div>
             )}
           </div>
+        </div>
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label className="form-label">สถานที่แข่งขัน</label>
+          {venues.length ? (
+            <select className="form-select" value={f.venueId} onChange={(e) => set("venueId", e.target.value === "" ? "" : Number(e.target.value))}>
+              <option value="">— ไม่ระบุ —</option>
+              {venues.map((v) => (
+                <option key={v.id} value={v.id}>{v.building ? `${v.building} · ${v.name}` : v.name}</option>
+              ))}
+            </select>
+          ) : (
+            <div className="form-hint">ยังไม่มีสถานที่ — ผู้ดูแลระบบเพิ่มได้ที่เมนู “สถานที่แข่งขัน”</div>
+          )}
         </div>
       </div>
 

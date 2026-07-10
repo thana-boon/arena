@@ -8,6 +8,7 @@ import { isGroupAllowed } from "@/lib/groupScope";
 import { logAudit } from "@/lib/audit";
 import { canEditCompetition } from "@/lib/permit";
 import { UNLIMITED_CAPACITY, isUnlimited } from "@/lib/domain";
+import { findVenueConflicts } from "@/lib/venues";
 
 async function hasEntries(compId: number): Promise<boolean> {
   const rows = await db.select({ id: entries.id }).from(entries).where(eq(entries.competitionId, compId)).limit(1);
@@ -35,6 +36,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     )[0];
     if (!slot) return fail("ช่วงเวลาแข่งขันไม่ถูกต้อง กรุณาเลือกใหม่");
 
+    // ตรวจสถานที่ชนกัน (ยกเว้นตัวเอง) — ถ้ายังไม่ยืนยันใช้ห้องเดียวกัน
+    if (body.venueId && body.eventDate && !body.forceVenue) {
+      const conflicts = await findVenueConflicts({
+        venueId: body.venueId,
+        eventDate: body.eventDate,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        excludeId: id,
+      });
+      if (conflicts.length) return ok({ venueConflict: true, conflicts });
+    }
+
     const locked = await hasEntries(id);
 
     const capRows = await db.select().from(competitionCapacity).where(eq(competitionCapacity.competitionId, id));
@@ -46,6 +59,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           name: body.name.trim(),
           subjectGroupId: body.subjectGroupId,
           timeSlotId: slot.id,
+          venueId: body.venueId ?? null,
           eventDate: body.eventDate || null,
           startTime: slot.startTime,
           endTime: slot.endTime,

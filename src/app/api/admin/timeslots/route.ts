@@ -34,14 +34,17 @@ export async function POST(req: Request) {
     if (!year) return fail("ยังไม่มีปีการศึกษาที่เปิดใช้งาน");
 
     const existing = await getTimeSlots(year.id);
-    const [res] = await db.insert(timeSlots).values({
-      yearId: year.id,
-      label: body.label.trim(),
-      startTime: `${body.startTime}:00`,
-      endTime: `${body.endTime}:00`,
-      sortOrder: existing.length,
-    });
-    await logAudit(s.code, "create_time_slot", { id: res.insertId, label: body.label });
-    return ok({ id: res.insertId });
+    const [res] = await db
+      .insert(timeSlots)
+      .values({
+        yearId: year.id,
+        label: body.label.trim(),
+        startTime: `${body.startTime}:00`,
+        endTime: `${body.endTime}:00`,
+        sortOrder: existing.length,
+      })
+      .returning({ id: timeSlots.id });
+    await logAudit(s.code, "create_time_slot", { id: res.id, label: body.label });
+    return ok({ id: res.id });
   });
 }

@@ -20,7 +20,10 @@ export async function syncSubjectGroupCatalog(): Promise<
     await db
       .insert(subjectGroupCatalog)
       .values({ groupNo: g.id, name: g.name })
-      .onDuplicateKeyUpdate({ set: { name: g.name } });
+      .onConflictDoUpdate({
+        target: subjectGroupCatalog.groupNo,
+        set: { name: g.name, updatedAt: new Date() },
+      });
   }
   return getSubjectGroupCatalog();
 }

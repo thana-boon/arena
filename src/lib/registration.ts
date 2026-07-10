@@ -153,19 +153,22 @@ export async function registerEntry(args: RegisterArgs): Promise<number> {
           eq(competitionCapacity.id, cap.id),
           sql`(${competitionCapacity.capacity} < 0 OR ${competitionCapacity.registeredCount} < ${competitionCapacity.capacity})`
         )
-      );
-    // mysql2: affectedRows
-    const affected = (res as unknown as [{ affectedRows: number }])[0]?.affectedRows ?? 0;
-    if (affected === 0) throw new RegistrationError("ที่นั่งเต็มแล้ว");
+      )
+      .returning({ id: competitionCapacity.id });
+    // นับแถวที่ถูกอัปเดตจริง — ถ้า 0 แปลว่าเงื่อนไข (ยังไม่เต็ม) ไม่ผ่าน
+    if (res.length === 0) throw new RegistrationError("ที่นั่งเต็มแล้ว");
 
-    const [ins] = await tx.insert(entries).values({
-      competitionId: comp.id,
-      teamName: isTeam ? args.teamName?.trim() || null : null,
-      status: "active",
-      createdByRole: args.byRole,
-      createdByCode: args.byCode,
-    });
-    const newEntryId = ins.insertId;
+    const [ins] = await tx
+      .insert(entries)
+      .values({
+        competitionId: comp.id,
+        teamName: isTeam ? args.teamName?.trim() || null : null,
+        status: "active",
+        createdByRole: args.byRole,
+        createdByCode: args.byCode,
+      })
+      .returning({ id: entries.id });
+    const newEntryId = ins.id;
     await tx.insert(entryMembers).values(
       args.members.map((m) => ({
         entryId: newEntryId,

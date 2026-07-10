@@ -1,7 +1,7 @@
 # Sukhon Arena — ระบบจัดการการแข่งขันทางวิชาการ
 
 ระบบรับสมัคร บันทึกผล และประกาศผลการแข่งขันทางวิชาการ โรงเรียนสุคนธีรวิทย์
-เป็น **standalone service** รันที่ `http://192.168.200.9:5005`
+เป็น **standalone service** รันที่ `http://192.168.200.9:3017`
 
 Stack: **Next.js (App Router) + TypeScript · Drizzle ORM + MySQL/MariaDB (XAMPP) · JWT (httpOnly cookie) · PM2**
 ดีไซน์ตาม `SKDW-CI.md`
@@ -63,7 +63,7 @@ npm run db:setup
 
 ```bash
 # โหมดพัฒนา
-npm run dev           # http://localhost:5005
+npm run dev           # http://localhost:3017
 
 # โหมด production
 npm run build
@@ -78,7 +78,7 @@ pm2 start ecosystem.config.js      # หรือ: pm2 start npm --name arena --
 pm2 save
 pm2 startup                        # ตั้งให้รันอัตโนมัติหลังรีบูต
 ```
-เข้าใช้งานที่ `http://192.168.200.9:5005`
+เข้าใช้งานที่ `http://192.168.200.9:3017`
 
 ---
 

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { subjectGroups, competitions, competitionCapacity, criteria, entries } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { getActiveYear, getTimeSlots } from "@/lib/queries";
+import { getActiveYear, getTimeSlots, getVenues } from "@/lib/queries";
 import { canEditCompetition } from "@/lib/permit";
 import { canPickGroup } from "@/lib/groupScope";
 import { parseJsonArray, isUnlimited } from "@/lib/domain";
@@ -38,6 +38,7 @@ export async function CompetitionEditBody({
   const entRows = await db.select({ id: entries.id }).from(entries).where(eq(entries.competitionId, id)).limit(1);
   const locked = entRows.length > 0;
   const slots = await getTimeSlots(year.id);
+  const venues = await getVenues();
 
   // ไม่จำกัดจำนวน = ทุกแถวโควตาเก็บค่า < 0 ; number field แสดง 0 แทนค่าลบ
   const unlimited = caps.length > 0 && caps.every((c) => isUnlimited(c.capacity));
@@ -58,6 +59,7 @@ export async function CompetitionEditBody({
       <CompetitionForm
         groups={groups.map((g) => ({ id: g.id, name: g.name }))}
         slots={slots.map((s) => ({ id: s.id, label: s.label, startTime: s.startTime, endTime: s.endTime }))}
+        venues={venues.map((v) => ({ id: v.id, name: v.name, building: v.building }))}
         returnTo={returnTo}
         lockSubjectGroup={!isAdmin}
         initial={{
@@ -69,6 +71,7 @@ export async function CompetitionEditBody({
           teamSizeMax: comp.teamSizeMax ?? "",
           allowedClassLevels: parseJsonArray(comp.allowedClassLevels),
           timeSlotId: comp.timeSlotId ?? "",
+          venueId: comp.venueId ?? "",
           eventDate: comp.eventDate ?? "",
           capacityMode,
           unlimited,

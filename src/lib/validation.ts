@@ -16,6 +16,9 @@ export const competitionInput = z
     allowedClassLevels: z.array(z.enum(CLASS_LEVELS)).min(1, "เลือกระดับชั้นอย่างน้อย 1 ระดับ"),
     // ช่วงเวลาแข่งขัน — บังคับเลือกจาก time_slots (เซิร์ฟเวอร์ resolve เป็น start/end time เอง)
     timeSlotId: z.number().int().positive("กรุณาเลือกช่วงเวลาแข่งขัน"),
+    // สถานที่แข่งขัน (optional) + flag ยืนยันใช้ห้องเดียวกันเมื่อชนกับรายการอื่น
+    venueId: z.number().int().positive().nullable().optional(),
+    forceVenue: z.boolean().optional(),
     eventDate: z.string().nullable().optional(),
     // เดี่ยว: 'per_level' ที่นั่งต่อระดับ (capacityPerLevel) | 'combined' รวมทุกชั้น (combinedCapacity)
     // จำนวนรับ: ค่า -1 = ไม่จำกัดจำนวน (ค่า default)
@@ -35,3 +38,11 @@ export const competitionInput = z
   });
 
 export type CompetitionInput = z.infer<typeof competitionInput>;
+
+// ===== สถานที่แข่งขัน (venue master data) =====
+export const venueInput = z.object({
+  name: z.string().min(1, "กรุณากรอกชื่อสถานที่").max(191),
+  building: z.string().max(191).optional().default(""),
+  note: z.string().max(255).optional().default(""),
+});
+export type VenueInput = z.infer<typeof venueInput>;

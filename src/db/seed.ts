@@ -1,6 +1,6 @@
 import "dotenv/config";
-import mysql from "mysql2/promise";
-import { drizzle } from "drizzle-orm/mysql2";
+import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import * as schema from "./schema";
@@ -8,8 +8,8 @@ import * as schema from "./schema";
 async function main() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL not set");
-  const connection = await mysql.createConnection({ uri: url });
-  const db = drizzle(connection, { schema, mode: "default" });
+  const pool = new Pool({ connectionString: url });
+  const db = drizzle(pool, { schema });
 
   console.log("🌱 เริ่ม seed ข้อมูลตั้งต้น...");
 
@@ -20,8 +20,11 @@ async function main() {
     yearId = existingYear[0].id;
     console.log("  • ปี 2569 มีอยู่แล้ว");
   } else {
-    const [res] = await db.insert(schema.academicYears).values({ yearBe: 2569, isActive: true });
-    yearId = res.insertId;
+    const [res] = await db
+      .insert(schema.academicYears)
+      .values({ yearBe: 2569, isActive: true })
+      .returning({ id: schema.academicYears.id });
+    yearId = res.id;
     console.log("  • สร้างปีการศึกษา 2569 (active)");
   }
 
@@ -63,8 +66,11 @@ async function main() {
   for (const g of existingGroups) groupIdByName[g.name] = g.id;
   for (let i = 0; i < groupNames.length; i++) {
     if (!groupIdByName[groupNames[i]]) {
-      const [r] = await db.insert(schema.subjectGroups).values({ yearId, name: groupNames[i], sortOrder: i });
-      groupIdByName[groupNames[i]] = r.insertId;
+      const [r] = await db
+        .insert(schema.subjectGroups)
+        .values({ yearId, name: groupNames[i], sortOrder: i })
+        .returning({ id: schema.subjectGroups.id });
+      groupIdByName[groupNames[i]] = r.id;
     }
   }
   console.log(`  • หมวดวิชา: ${groupNames.join(", ")}`);
@@ -79,8 +85,11 @@ async function main() {
   for (const s of existingSlots) slotIdByLabel[s.label] = s.id;
   for (let i = 0; i < slotDefs.length; i++) {
     if (!slotIdByLabel[slotDefs[i].label]) {
-      const [r] = await db.insert(schema.timeSlots).values({ yearId, sortOrder: i, ...slotDefs[i] });
-      slotIdByLabel[slotDefs[i].label] = r.insertId;
+      const [r] = await db
+        .insert(schema.timeSlots)
+        .values({ yearId, sortOrder: i, ...slotDefs[i] })
+        .returning({ id: schema.timeSlots.id });
+      slotIdByLabel[slotDefs[i].label] = r.id;
     }
   }
   console.log(`  • ช่วงเวลา: ${slotDefs.map((s) => s.label).join(", ")}`);
@@ -89,64 +98,70 @@ async function main() {
   const existingComps = await db.select().from(schema.competitions).where(eq(schema.competitions.yearId, yearId));
   if (!existingComps.length) {
     // เดี่ยว: คัดลายมือ ม.ต้น
-    const [c1] = await db.insert(schema.competitions).values({
-      yearId,
-      subjectGroupId: groupIdByName["ภาษาไทย"],
-      name: "คัดลายมือ ระดับ ม.ต้น",
-      type: "individual",
-      allowedClassLevels: JSON.stringify(["ม.1", "ม.2", "ม.3"]),
-      timeSlotId: slotIdByLabel["ช่วงเช้า"],
-      eventDate: "2026-08-15",
-      startTime: "09:00:00",
-      endTime: "12:00:00",
-      isPublished: false,
-      createdBy: "seed",
-    });
+    const [c1] = await db
+      .insert(schema.competitions)
+      .values({
+        yearId,
+        subjectGroupId: groupIdByName["ภาษาไทย"],
+        name: "คัดลายมือ ระดับ ม.ต้น",
+        type: "individual",
+        allowedClassLevels: JSON.stringify(["ม.1", "ม.2", "ม.3"]),
+        timeSlotId: slotIdByLabel["ช่วงเช้า"],
+        eventDate: "2026-08-15",
+        startTime: "09:00:00",
+        endTime: "12:00:00",
+        isPublished: false,
+        createdBy: "seed",
+      })
+      .returning({ id: schema.competitions.id });
     // capacity per level
     for (const lv of ["ม.1", "ม.2", "ม.3"]) {
       await db.insert(schema.competitionCapacity).values({
-        competitionId: c1.insertId,
+        competitionId: c1.id,
         classLevel: lv,
         capacity: 20,
         registeredCount: 0,
       });
     }
     await db.insert(schema.criteria).values([
-      { competitionId: c1.insertId, name: "ความสวยงาม", maxScore: "50.00", sortOrder: 0 },
-      { competitionId: c1.insertId, name: "ความถูกต้อง", maxScore: "50.00", sortOrder: 1 },
+      { competitionId: c1.id, name: "ความสวยงาม", maxScore: "50.00", sortOrder: 0 },
+      { competitionId: c1.id, name: "ความถูกต้อง", maxScore: "50.00", sortOrder: 1 },
     ]);
 
     // ทีม: ตอบปัญหาวิทยาศาสตร์
-    const [c2] = await db.insert(schema.competitions).values({
-      yearId,
-      subjectGroupId: groupIdByName["วิทยาศาสตร์และเทคโนโลยี"],
-      name: "ตอบปัญหาวิทยาศาสตร์ ระดับ ม.ปลาย",
-      type: "team",
-      teamSizeMin: 2,
-      teamSizeMax: 3,
-      allowedClassLevels: JSON.stringify(["ม.4", "ม.5", "ม.6"]),
-      timeSlotId: slotIdByLabel["ช่วงบ่าย"],
-      eventDate: "2026-08-15",
-      startTime: "13:00:00",
-      endTime: "16:00:00",
-      isPublished: false,
-      createdBy: "seed",
-    });
+    const [c2] = await db
+      .insert(schema.competitions)
+      .values({
+        yearId,
+        subjectGroupId: groupIdByName["วิทยาศาสตร์และเทคโนโลยี"],
+        name: "ตอบปัญหาวิทยาศาสตร์ ระดับ ม.ปลาย",
+        type: "team",
+        teamSizeMin: 2,
+        teamSizeMax: 3,
+        allowedClassLevels: JSON.stringify(["ม.4", "ม.5", "ม.6"]),
+        timeSlotId: slotIdByLabel["ช่วงบ่าย"],
+        eventDate: "2026-08-15",
+        startTime: "13:00:00",
+        endTime: "16:00:00",
+        isPublished: false,
+        createdBy: "seed",
+      })
+      .returning({ id: schema.competitions.id });
     await db.insert(schema.competitionCapacity).values({
-      competitionId: c2.insertId,
+      competitionId: c2.id,
       classLevel: null,
       capacity: 12,
       registeredCount: 0,
     });
     await db.insert(schema.criteria).values([
-      { competitionId: c2.insertId, name: "รอบทฤษฎี", maxScore: "60.00", sortOrder: 0 },
-      { competitionId: c2.insertId, name: "รอบปฏิบัติ", maxScore: "40.00", sortOrder: 1 },
+      { competitionId: c2.id, name: "รอบทฤษฎี", maxScore: "60.00", sortOrder: 0 },
+      { competitionId: c2.id, name: "รอบปฏิบัติ", maxScore: "40.00", sortOrder: 1 },
     ]);
     console.log("  • สร้างรายการตัวอย่าง 1 เดี่ยว + 1 ทีม");
   }
 
   console.log("✅ seed เสร็จสมบูรณ์");
-  await connection.end();
+  await pool.end();
   process.exit(0);
 }
 

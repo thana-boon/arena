@@ -1,13 +1,12 @@
 import "server-only";
 import { pool } from "@/db";
-import type { RowDataPacket, QueryOptions } from "mysql2/promise";
 
 /**
  * สำรอง/กู้คืนข้อมูลแบบ logical (JSON) ครอบคลุมทุกตารางของแอป
- * - dump: SELECT * ทุกตาราง โดยให้ค่า date/datetime เป็น string รูปแบบ MySQL (dateStrings)
- *   เพื่อให้กู้คืนกลับได้ตรงเป๊ะ ไม่เพี้ยน timezone
- * - restore: ปิด FK checks → ล้างของเดิม → เขียนใหม่ ในทรานแซกชันเดียว (all-or-nothing)
- * ใช้ JSON แทน mysqldump เพื่อไม่ต้องพึ่ง binary บนเครื่อง production
+ * - dump: SELECT * ทุกตาราง (node-postgres คืน timestamp เป็น Date → JSON.stringify เป็น ISO string)
+ * - restore: ล้างของเดิม → เขียนใหม่ → รีเซ็ต sequence ในทรานแซกชันเดียว (all-or-nothing)
+ *   สคีมาไม่มี FK constraint จริง (ความสัมพันธ์เป็น logical) จึงไม่ต้องปิด FK check
+ * ใช้ JSON แทน pg_dump เพื่อไม่ต้องพึ่ง binary บนเครื่อง production
  */
 
 // ลำดับตาม dependency (พาเรนต์ก่อน) — insert ตามลำดับนี้, delete แบบย้อนกลับ
@@ -28,8 +27,14 @@ const TABLES = [
   "teacher_cache",
 ] as const;
 
+// ตารางที่ไม่มีคอลัมน์ serial "id" (ใช้ natural key เป็น PK) → ไม่ต้องรีเซ็ต sequence
+const NO_SERIAL_ID = new Set<string>(["subject_group_catalog", "teacher_roles", "teacher_cache"]);
+
 export const BACKUP_VERSION = 1;
 const APP_TAG = "skdw-arena";
+
+/** quote identifier ให้ปลอดภัย (ชื่อตาราง/คอลัมน์) */
+const q = (id: string) => `"${id.replace(/"/g, '""')}"`;
 
 export type BackupFile = {
   app: string;
@@ -41,9 +46,7 @@ export type BackupFile = {
 export async function dumpDatabase(): Promise<BackupFile> {
   const tables: Record<string, Record<string, unknown>[]> = {};
   for (const t of TABLES) {
-    // dateStrings: คืน date/datetime เป็น string รูปแบบ MySQL (type ของ mysql2 ยังไม่มี field นี้ จึงต้อง cast)
-    const opts = { sql: "SELECT * FROM ??", values: [t], dateStrings: true } as unknown as QueryOptions;
-    const [rows] = await pool.query<RowDataPacket[]>(opts);
+    const { rows } = await pool.query(`SELECT * FROM ${q(t)}`);
     tables[t] = rows as Record<string, unknown>[];
   }
   return {
@@ -64,32 +67,47 @@ export async function restoreDatabase(data: BackupFile): Promise<RestoreSummary>
   if (!data.tables || typeof data.tables !== "object")
     throw new Error("ไฟล์สำรองไม่มีข้อมูลตาราง");
 
-  const conn = await pool.getConnection();
+  const client = await pool.connect();
   const summary: RestoreSummary = [];
   try {
-    await conn.query("SET FOREIGN_KEY_CHECKS = 0");
-    await conn.beginTransaction();
+    await client.query("BEGIN");
 
     // ล้างข้อมูลเดิม (ย้อนลำดับ dependency)
     for (const t of [...TABLES].reverse()) {
-      await conn.query("DELETE FROM ??", [t]);
+      await client.query(`DELETE FROM ${q(t)}`);
     }
     // เขียนข้อมูลใหม่จากไฟล์สำรอง
     for (const t of TABLES) {
       const rows = data.tables[t] ?? [];
       for (const row of rows) {
-        await conn.query("INSERT INTO ?? SET ?", [t, row]);
+        const cols = Object.keys(row);
+        if (cols.length === 0) continue;
+        const colSql = cols.map(q).join(", ");
+        const placeholders = cols.map((_, i) => `$${i + 1}`).join(", ");
+        const values = cols.map((c) => row[c]);
+        await client.query(`INSERT INTO ${q(t)} (${colSql}) VALUES (${placeholders})`, values);
       }
       summary.push({ table: t, rows: rows.length });
     }
+    // รีเซ็ต sequence ของคอลัมน์ serial id ให้ต่อจาก max(id) เดิม (Postgres ไม่ขยับ sequence เองตอน insert ระบุ id)
+    for (const t of TABLES) {
+      if (NO_SERIAL_ID.has(t)) continue;
+      await client.query(
+        `SELECT setval(
+           pg_get_serial_sequence($1, 'id'),
+           COALESCE((SELECT MAX(id) FROM ${q(t)}), 1),
+           (SELECT MAX(id) FROM ${q(t)}) IS NOT NULL
+         )`,
+        [t]
+      );
+    }
 
-    await conn.commit();
+    await client.query("COMMIT");
     return summary;
   } catch (e) {
-    await conn.rollback();
+    await client.query("ROLLBACK");
     throw e;
   } finally {
-    await conn.query("SET FOREIGN_KEY_CHECKS = 1").catch(() => {});
-    conn.release();
+    client.release();
   }
 }

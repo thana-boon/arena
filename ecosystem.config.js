@@ -4,11 +4,11 @@ module.exports = {
     {
       name: "arena",
       script: "node_modules/next/dist/bin/next",
-      args: "start -p 5005",
+      args: "start -p 3017",
       cwd: __dirname,
       env: {
         NODE_ENV: "production",
-        PORT: "5005",
+        PORT: "3017",
       },
       instances: 1,
       exec_mode: "fork",

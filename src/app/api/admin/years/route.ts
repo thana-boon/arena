@@ -51,9 +51,12 @@ export async function POST(req: Request) {
     const existing = await db.select().from(academicYears).where(eq(academicYears.yearBe, yearBe));
     if (existing.length) return fail("มีปีการศึกษานี้อยู่แล้ว");
 
-    const [res] = await db.insert(academicYears).values({ yearBe, isActive: false });
-    await db.insert(settings).values({ yearId: res.insertId });
+    const [res] = await db
+      .insert(academicYears)
+      .values({ yearBe, isActive: false })
+      .returning({ id: academicYears.id });
+    await db.insert(settings).values({ yearId: res.id });
     await logAudit(s.code, "import_year", { yearBe });
-    return ok({ id: res.insertId });
+    return ok({ id: res.id });
   });
 }

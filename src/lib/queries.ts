@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/db";
-import { academicYears, settings, teacherRoles, timeSlots } from "@/db/schema";
+import { academicYears, settings, teacherRoles, timeSlots, venues } from "@/db/schema";
 import { asc, eq } from "drizzle-orm";
 
 export async function getActiveYear() {
@@ -27,6 +27,11 @@ export async function getTimeSlots(yearId: number) {
     .from(timeSlots)
     .where(eq(timeSlots.yearId, yearId))
     .orderBy(asc(timeSlots.sortOrder), asc(timeSlots.startTime));
+}
+
+/** สถานที่แข่งขันทั้งหมด (master data global) เรียงตามอาคาร → ชื่อ */
+export async function getVenues() {
+  return db.select().from(venues).orderBy(asc(venues.building), asc(venues.name));
 }
 
 /** อ่านสิทธิ์ครูจากตาราง teacher_roles */

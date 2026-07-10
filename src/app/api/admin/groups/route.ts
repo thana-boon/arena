@@ -30,12 +30,15 @@ export async function POST(req: Request) {
       .limit(1);
     if (dup.length) return fail("มีหมวดวิชานี้ในปีการศึกษานี้อยู่แล้ว");
 
-    const [res] = await db.insert(subjectGroups).values({
-      yearId: year.id,
-      catalogNo,
-      name: cat[0].name || `หมวด ${catalogNo}`,
-      sortOrder: catalogNo,
-    });
-    return ok({ id: res.insertId });
+    const [res] = await db
+      .insert(subjectGroups)
+      .values({
+        yearId: year.id,
+        catalogNo,
+        name: cat[0].name || `หมวด ${catalogNo}`,
+        sortOrder: catalogNo,
+      })
+      .returning({ id: subjectGroups.id });
+    return ok({ id: res.id });
   });
 }

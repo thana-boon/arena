@@ -1,9 +1,11 @@
 import type { NextConfig } from "next";
 
-const BASE_PATH = "/arena";
+// subpath ที่จะเสิร์ฟ — ค่าเริ่มต้นว่าง (เข้าที่ root "/" ได้เลย เหมาะกับ dev/Docker ในเครื่อง)
+// prod หลัง reverse proxy: ตั้ง BASE_PATH=/arena ตอน build (proxy forward /arena/... มาที่ port นี้)
+// หมายเหตุ: basePath ถูก bake ตอน build → ต้องกำหนด env ก่อน `next build` ไม่ใช่ตอน runtime
+const BASE_PATH = process.env.BASE_PATH ?? "";
 
 const nextConfig: NextConfig = {
-  // เสิร์ฟภายใต้ subpath /arena (reverse proxy ส่งต่อ path เต็ม /arena/... มาที่ port 3017)
   // basePath จะ prefix ทั้ง route ของเพจและ asset ใน /_next/static ให้อัตโนมัติ
   // แต่ "ไม่" เติมให้ fetch() ที่เขียน path ตรง ๆ → จึง expose ให้ฝั่ง client ผ่าน env นี้
   basePath: BASE_PATH,

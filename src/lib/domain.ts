@@ -23,7 +23,7 @@ export const MEDAL_BADGE_CLASS: Record<Medal, string> = {
   none: "badge",
 };
 
-/** parse json array จาก LONGTEXT อย่างปลอดภัย */
+/** parse json array จากคอลัมน์ text อย่างปลอดภัย */
 export function parseJsonArray(raw: string | null | undefined): string[] {
   if (!raw) return [];
   try {

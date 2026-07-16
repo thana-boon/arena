@@ -46,6 +46,7 @@ export async function POST(req: Request) {
           yearId: year.id,
           subjectGroupId: body.subjectGroupId,
           name: body.name.trim(),
+          description: body.description.trim(),
           type: body.type,
           capacityMode: body.type === "individual" ? body.capacityMode ?? "per_level" : "per_level",
           teamSizeMin: body.type === "team" ? body.teamSizeMin ?? null : null,
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
           startTime: slot.startTime,
           endTime: slot.endTime,
           isPublished: false,
+          visibleToStudents: body.visibleToStudents,
           createdBy: s.code,
         })
         .returning({ id: competitions.id });

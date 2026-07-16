@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { db } from "@/db";
-import { competitions, criteria, entries, scores } from "@/db/schema";
+import { competitions, criteria, entries, scores, subjectGroups } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
+import { canScore } from "@/lib/permit";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -16,13 +17,15 @@ const schema = z.object({
   ),
 });
 
-// บันทึกคะแนน (recorder + admin) — upsert ต่อ (entry, criterion)
+// บันทึกคะแนน (admin/recorder ทุกรายการ; ครูเฉพาะรายการในหมวดตัวเอง) — upsert ต่อ (entry, criterion)
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const s = await apiRequireRole("recorder", "admin");
+    const s = await apiRequireRole("teacher", "recorder", "admin");
     const compId = Number((await params).id);
     const comp = (await db.select().from(competitions).where(eq(competitions.id, compId)).limit(1))[0];
     if (!comp) return fail("ไม่พบรายการแข่งขัน", 404);
+    const group = (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0];
+    if (!canScore(s, comp.createdBy, group?.catalogNo)) return fail("บันทึกคะแนนได้เฉพาะรายการในหมวดของท่าน", 403);
 
     const body = schema.parse(await req.json());
     const crits = await db.select().from(criteria).where(eq(criteria.competitionId, compId));

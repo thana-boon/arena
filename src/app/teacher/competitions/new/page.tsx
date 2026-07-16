@@ -37,8 +37,10 @@ export default async function NewCompetition() {
         lockSubjectGroup={!isAdmin}
         initial={{
           name: "",
+          description: "",
           subjectGroupId: defaultGroupId,
           type: "individual",
+          visibleToStudents: true,
           teamSizeMin: "",
           teamSizeMax: "",
           allowedClassLevels: [],

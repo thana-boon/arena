@@ -53,6 +53,9 @@ export async function registerEntry(args: RegisterArgs): Promise<number> {
   const comp = (await db.select().from(competitions).where(eq(competitions.id, args.competitionId)).limit(1))[0];
   if (!comp) throw new RegistrationError("ไม่พบรายการแข่งขัน", 404);
   if (comp.yearId !== year.id) throw new RegistrationError("รายการนี้ไม่ได้อยู่ในปีการศึกษาปัจจุบัน");
+  // รายการที่ซ่อนจากนักเรียน — ครูเป็นผู้ลงชื่อให้เท่านั้น
+  if (args.byRole === "student" && !comp.visibleToStudents)
+    throw new RegistrationError("รายการนี้ไม่เปิดให้นักเรียนสมัครเอง", 403);
 
   const allowed = parseJsonArray(comp.allowedClassLevels);
   const isTeam = comp.type === "team";

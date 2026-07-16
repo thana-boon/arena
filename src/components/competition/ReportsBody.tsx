@@ -10,7 +10,16 @@ import type { SessionPayload } from "@/lib/auth/session";
 import { ReportsView } from "@/app/teacher/competitions/[id]/reports/ReportsView";
 
 /** เนื้อหาหน้าเอกสาร/รายงาน — ใช้ร่วมกันทั้ง /teacher และ /admin */
-export async function ReportsBody({ id, session }: { id: number; session: SessionPayload }) {
+export async function ReportsBody({
+  id,
+  session,
+  basePath,
+}: {
+  id: number;
+  session: SessionPayload;
+  /** ราก path ของรายการแข่งขันตาม role ที่เข้ามา — ใช้ทำปุ่มย้อนกลับ */
+  basePath: string;
+}) {
   const { year, setting } = await getActiveYearWithSettings();
   const comp = (await db.select().from(competitions).where(eq(competitions.id, id)).limit(1))[0];
   if (!comp) return <div className="alert alert-error">ไม่พบรายการแข่งขัน</div>;
@@ -28,6 +37,7 @@ export async function ReportsBody({ id, session }: { id: number; session: Sessio
 
   return (
     <ReportsView
+      backHref={`${basePath}/${id}`}
       meta={{
         competitionName: comp.name,
         groupName: group?.name ?? "",

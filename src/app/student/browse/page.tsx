@@ -14,7 +14,10 @@ export default async function BrowsePage() {
   if (!year || !setting) return <div className="alert alert-warning">ยังไม่เปิดปีการศึกษา</div>;
 
   const myLevel = session.classLevel ?? "";
-  const comps = await db.select().from(competitions).where(eq(competitions.yearId, year.id));
+  const comps = await db
+    .select()
+    .from(competitions)
+    .where(and(eq(competitions.yearId, year.id), eq(competitions.visibleToStudents, true)));
   const eligible = comps.filter((c) => parseJsonArray(c.allowedClassLevels).includes(myLevel));
 
   const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
@@ -51,6 +54,7 @@ export default async function BrowsePage() {
     return {
       id: c.id,
       name: c.name,
+      description: c.description ?? "",
       type: c.type as "individual" | "team",
       subjectGroupId: c.subjectGroupId,
       groupName: groupName(c.subjectGroupId),

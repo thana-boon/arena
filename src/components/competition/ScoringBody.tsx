@@ -1,15 +1,20 @@
 import { db } from "@/db";
-import { competitions, criteria, scores } from "@/db/schema";
+import { competitions, criteria, scores, subjectGroups } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { getRoster } from "@/lib/roster";
+import { canScore } from "@/lib/permit";
+import type { SessionPayload } from "@/lib/auth/session";
 import { ScoringGrid } from "@/app/teacher/scoring/[id]/ScoringGrid";
 
 /** เนื้อหาหน้าบันทึกผล — ใช้ร่วมกันทั้ง /teacher และ /admin */
-export async function ScoringBody({ id }: { id: number }) {
+export async function ScoringBody({ id, session }: { id: number; session: SessionPayload }) {
   const { setting } = await getActiveYearWithSettings();
   const comp = (await db.select().from(competitions).where(eq(competitions.id, id)).limit(1))[0];
   if (!comp) return <div className="alert alert-error">ไม่พบรายการแข่งขัน</div>;
+  const group = (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0];
+  if (!canScore(session, comp.createdBy, group?.catalogNo))
+    return <div className="alert alert-error">บันทึกคะแนนได้เฉพาะรายการในหมวดของท่าน</div>;
 
   const crits = await db.select().from(criteria).where(eq(criteria.competitionId, id));
   crits.sort((a, b) => a.sortOrder - b.sortOrder);

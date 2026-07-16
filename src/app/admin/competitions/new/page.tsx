@@ -27,8 +27,10 @@ export default async function AdminNewCompetition() {
         returnTo="/admin/competitions"
         initial={{
           name: "",
+          description: "",
           subjectGroupId: "",
           type: "individual",
+          visibleToStudents: true,
           teamSizeMin: "",
           teamSizeMax: "",
           allowedClassLevels: [],

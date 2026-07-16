@@ -31,7 +31,8 @@ export default async function TeacherCompetitions() {
           myCode={session.code}
           role={session.role}
           basePath="/teacher/competitions"
-          canPublish={session.role === "recorder" || session.role === "admin"}
+          // ทุกแถวที่แสดงผ่าน canViewCompetition แล้ว = เป็นรายการในหมวดตัวเอง/ของตัวเอง → ประกาศผลได้
+          canPublish
         />
       )}
     </div>

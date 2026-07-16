@@ -1,15 +1,18 @@
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
-import { requireRecorderOrAdmin } from "@/lib/auth/guards";
+import { requireStaff } from "@/lib/auth/guards";
 import { getActiveYear } from "@/lib/queries";
 import { listCompetitions } from "@/lib/listings";
+import { canScore } from "@/lib/permit";
 
 export const dynamic = "force-dynamic";
 
 export default async function ScoringList() {
-  await requireRecorderOrAdmin();
+  const session = await requireStaff();
   const year = await getActiveYear();
-  const comps = year ? await listCompetitions(year.id) : [];
+  const all = year ? await listCompetitions(year.id) : [];
+  // ครูทั่วไปบันทึกได้เฉพาะรายการในหมวดตัวเอง; admin/recorder เห็นครบทุกรายการ
+  const comps = all.filter((c) => canScore(session, c.createdBy, c.groupCatalogNo));
 
   return (
     <div className="stack">

@@ -17,6 +17,7 @@ export type CompListItem = {
   startTime: string | null;
   endTime: string | null;
   isPublished: boolean;
+  visibleToStudents: boolean;
   createdBy: string;
   capacity: number;
   registered: number;
@@ -50,6 +51,7 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
       startTime: c.startTime,
       endTime: c.endTime,
       isPublished: c.isPublished,
+      visibleToStudents: c.visibleToStudents,
       createdBy: c.createdBy,
       // ถ้ามีแถวใดไม่จำกัด → ทั้งรายการถือว่าไม่จำกัด (ไม่รวมเป็นตัวเลข)
       capacity: cRows.some((r) => isUnlimited(r.capacity)) ? UNLIMITED_CAPACITY : cRows.reduce((s, r) => s + r.capacity, 0),

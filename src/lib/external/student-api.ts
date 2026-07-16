@@ -94,6 +94,26 @@ export async function listClassRooms(classLevel: string): Promise<string[]> {
   });
 }
 
+/**
+ * นักเรียนทั้งห้อง (ทุกหน้า) — ใช้หน้า "การสมัครรายห้อง" ที่ต้องเห็นครบทั้งห้อง
+ * ไม่ใช่แค่ 50 คนแรกเหมือนหน้าค้นหา
+ */
+export async function listStudentsInRoom(
+  classLevel: string,
+  classRoom: string
+): Promise<StudentProfile[]> {
+  const out: StudentProfile[] = [];
+  const limit = 200;
+  let page = 1;
+  for (;;) {
+    const { data, meta } = await listStudents({ class_level: classLevel, class_room: classRoom, page, limit });
+    out.push(...data);
+    if (data.length === 0 || page * limit >= meta.total || page >= 10) break;
+    page++;
+  }
+  return out;
+}
+
 // ===== ปีการศึกษา (จาก Student API — เป็นแหล่งเดียวที่ arena ใช้สร้างปี) =====
 export type ApiAcademicYear = {
   id: number;

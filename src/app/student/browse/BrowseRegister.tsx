@@ -10,6 +10,7 @@ import { formatThaiDate, formatSeats, seatsFull } from "@/lib/domain";
 export type BrowseComp = {
   id: number;
   name: string;
+  description: string;
   type: "individual" | "team";
   subjectGroupId: number;
   groupName: string;
@@ -177,6 +178,9 @@ export function BrowseRegister({
                   ที่นั่ง {formatSeats(c.registered, c.capacity)}
                   {c.eventDate && ` · ${formatThaiDate(c.eventDate)} ${c.startTime?.slice(0, 5)}–${c.endTime?.slice(0, 5)}`}
                 </div>
+                {c.description && (
+                  <p className="text-sm" style={{ margin: "8px 0 0", whiteSpace: "pre-wrap", maxWidth: 560 }}>{c.description}</p>
+                )}
               </div>
               <div style={{ textAlign: "right" }}>
                 {c.alreadyRegistered ? (

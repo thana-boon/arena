@@ -13,8 +13,11 @@ type VenueConflict = { id: number; name: string; startTime: string | null; endTi
 export type CompFormInitial = {
   id?: number;
   name: string;
+  description: string;
   subjectGroupId: number | "";
   type: "individual" | "team";
+  /** นักเรียนเห็นรายการนี้ในหน้าสมัครหรือไม่ (false = ครูลงให้อย่างเดียว) */
+  visibleToStudents: boolean;
   teamSizeMin: number | "";
   teamSizeMax: number | "";
   allowedClassLevels: string[];
@@ -90,8 +93,10 @@ export function CompetitionForm({
     );
     const payload = {
       name: f.name,
+      description: f.description,
       subjectGroupId: Number(f.subjectGroupId),
       type: f.type,
+      visibleToStudents: f.visibleToStudents,
       teamSizeMin: f.type === "team" && f.teamSizeMin !== "" ? Number(f.teamSizeMin) : null,
       teamSizeMax: f.type === "team" && f.teamSizeMax !== "" ? Number(f.teamSizeMax) : null,
       allowedClassLevels: f.allowedClassLevels,
@@ -148,6 +153,18 @@ export function CompetitionForm({
           <label className="form-label">ชื่อรายการแข่งขัน</label>
           <input className="form-input" value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="เช่น คัดลายมือ ระดับ ม.ต้น" />
         </div>
+        <div className="form-group">
+          <label className="form-label">รายละเอียด</label>
+          <textarea
+            className="form-input"
+            rows={4}
+            style={{ resize: "vertical", minHeight: 88 }}
+            value={f.description}
+            onChange={(e) => set("description", e.target.value)}
+            placeholder="เช่น กติกา อุปกรณ์ที่ต้องเตรียม เกณฑ์การตัดสิน (ไม่บังคับ)"
+          />
+          <span className="form-hint">แสดงให้นักเรียนเห็นในหน้าสมัคร · ไม่เกิน 2000 ตัวอักษร</span>
+        </div>
         <div className="grid-2">
           <div className="form-group">
             <label className="form-label">หมวดวิชา</label>
@@ -178,6 +195,18 @@ export function CompetitionForm({
             </div>
           </div>
         )}
+
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label className="form-check">
+            <input type="checkbox" checked={f.visibleToStudents} onChange={(e) => set("visibleToStudents", e.target.checked)} />
+            <span>ให้นักเรียนเห็นรายการนี้</span>
+          </label>
+          <span className="form-hint">
+            {f.visibleToStudents
+              ? "นักเรียนเห็นรายการนี้ในหน้าสมัคร และสมัครเองได้"
+              : "นักเรียนมองไม่เห็นและสมัครเองไม่ได้ — ครูเป็นผู้ลงชื่อให้เท่านั้น"}
+          </span>
+        </div>
       </div>
 
       <div className="card stack">

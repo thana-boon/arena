@@ -134,6 +134,22 @@ export function formatSlot(label: string, startTime: string, endTime: string): s
 
 export type CompType = "individual" | "team";
 
+/** นักเรียน 1 คน + รายการที่สมัครไว้ (หน้า "การสมัครรายห้อง") */
+export type RoomStudent = {
+  studentCode: string;
+  name: string;
+  classLevel: string;
+  classRoom: string;
+  registrations: {
+    entryId: number;
+    competitionId: number;
+    competitionName: string;
+    groupName: string;
+    teamName: string | null;
+    eventDate: string | null;
+  }[];
+};
+
 export const ROLE_HOME: Record<string, string> = {
   student: "/student",
   teacher: "/teacher",

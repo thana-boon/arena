@@ -130,9 +130,12 @@ export function CompetitionsTable({
                 <td><span className="badge">{c.type === "team" ? "ทีม" : "เดี่ยว"}</span></td>
                 <td className="num">{isUnlimited(c.capacity) ? "ไม่จำกัด" : c.capacity} / {c.registered}</td>
                 <td>
-                  {c.isPublished
-                    ? <span className="badge badge-success">ประกาศผลแล้ว</span>
-                    : <span className="badge badge-warning">ยังไม่ประกาศ</span>}
+                  <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
+                    {c.isPublished
+                      ? <span className="badge badge-success">ประกาศผลแล้ว</span>
+                      : <span className="badge badge-warning">ยังไม่ประกาศ</span>}
+                    {!c.visibleToStudents && <span className="badge">ซ่อนจากนักเรียน</span>}
+                  </div>
                 </td>
                 <td className="num">
                   <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>

@@ -57,6 +57,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         .update(competitions)
         .set({
           name: body.name.trim(),
+          description: body.description.trim(),
+          visibleToStudents: body.visibleToStudents,
           subjectGroupId: body.subjectGroupId,
           timeSlotId: slot.id,
           venueId: body.venueId ?? null,

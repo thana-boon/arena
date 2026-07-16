@@ -114,6 +114,7 @@ export const competitions = pgTable(
     yearId: integer("year_id").notNull(),
     subjectGroupId: integer("subject_group_id").notNull(),
     name: varchar("name", { length: 255 }).notNull(),
+    description: text("description").notNull().default(""), // รายละเอียด/กติกาของรายการ (แสดงให้นักเรียนเห็น)
     type: varchar("type", { length: 16 }).notNull(), // 'individual' | 'team'
     // โควตาของประเภทเดี่ยว: 'per_level' = แยกโควตาตามระดับชั้น | 'combined' = รวมทุกชั้นเป็นก้อนเดียว
     // (ประเภททีมเป็น pool เดียวเสมอ ไม่ใช้ค่านี้)
@@ -129,6 +130,8 @@ export const competitions = pgTable(
     startTime: time("start_time"), // snapshot จาก slot ที่เลือก (ใช้ตรวจเวลาแข่งชนกัน + แสดงผล)
     endTime: time("end_time"),
     isPublished: boolean("is_published").notNull().default(false),
+    // false = ครูลงให้อย่างเดียว นักเรียนมองไม่เห็น/สมัครเองไม่ได้
+    visibleToStudents: boolean("visible_to_students").notNull().default(true),
     createdBy: varchar("created_by", { length: 64 }).notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },

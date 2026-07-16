@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import type { RosterEntry } from "@/lib/roster";
 import { formatThaiDate } from "@/lib/domain";
@@ -33,12 +34,15 @@ export function ReportsView({
   fullScore,
   roster,
   results,
+  backHref,
 }: {
   meta: Meta;
   criteria: Crit[];
   fullScore: number;
   roster: RosterEntry[];
   results: ResultRow[];
+  /** ปลายทางปุ่มย้อนกลับ — หน้าจัดการรายการที่เข้ามา (คงบริบท /teacher หรือ /admin) */
+  backHref: string;
 }) {
   const [tab, setTab] = useState<Tab>("roster");
 
@@ -55,6 +59,9 @@ export function ReportsView({
 
   return (
     <div className="stack">
+      <div className="no-print">
+        <Link href={backHref} className="btn btn-ghost btn-sm">← กลับไปหน้ารายการแข่งขัน</Link>
+      </div>
       <div className="no-print row between">
         <div className="page-header" style={{ marginBottom: 0 }}>
           <h1>เอกสาร / รายงาน</h1>

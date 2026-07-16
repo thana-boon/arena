@@ -65,8 +65,10 @@ export async function CompetitionEditBody({
         initial={{
           id: comp.id,
           name: comp.name,
+          description: comp.description ?? "",
           subjectGroupId: comp.subjectGroupId,
           type: comp.type as "individual" | "team",
+          visibleToStudents: comp.visibleToStudents,
           teamSizeMin: comp.teamSizeMin ?? "",
           teamSizeMax: comp.teamSizeMax ?? "",
           allowedClassLevels: parseJsonArray(comp.allowedClassLevels),

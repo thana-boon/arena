@@ -9,8 +9,11 @@ export const criterionInput = z.object({
 export const competitionInput = z
   .object({
     name: z.string().min(1, "กรุณากรอกชื่อรายการ").max(255),
+    description: z.string().max(2000, "รายละเอียดยาวเกินไป (ไม่เกิน 2000 ตัวอักษร)").optional().default(""),
     subjectGroupId: z.number().int().positive("กรุณาเลือกหมวดวิชา"),
     type: z.enum(["individual", "team"]),
+    // นักเรียนเห็นรายการนี้ในหน้าสมัครหรือไม่ (false = ครูลงให้อย่างเดียว)
+    visibleToStudents: z.boolean().optional().default(true),
     teamSizeMin: z.number().int().positive().nullable().optional(),
     teamSizeMax: z.number().int().positive().nullable().optional(),
     allowedClassLevels: z.array(z.enum(CLASS_LEVELS)).min(1, "เลือกระดับชั้นอย่างน้อย 1 ระดับ"),

@@ -1,5 +1,4 @@
 import type { NavItem } from "@/components/Nav";
-import type { Role } from "@/lib/auth/session";
 
 export const ADMIN_NAV: NavItem[] = [
   { href: "/admin", label: "แดชบอร์ด", icon: "dashboard" },
@@ -10,6 +9,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/venues", label: "สถานที่แข่งขัน", icon: "pin" },
   { href: "/admin/competitions", label: "รายการแข่งขัน", icon: "trophy" },
   { href: "/admin/students", label: "รายชื่อนักเรียน", icon: "graduation" },
+  { href: "/admin/class-registrations", label: "การสมัครรายห้อง", icon: "clipboard" },
   { href: "/admin/teachers", label: "สิทธิ์ครู", icon: "user" },
   { href: "/admin/reports", label: "ออกรายงาน", icon: "file" },
   { href: "/admin/audit", label: "บันทึกการใช้งาน / Log", icon: "log" },
@@ -19,18 +19,12 @@ export const ADMIN_NAV: NavItem[] = [
 export const TEACHER_NAV: NavItem[] = [
   { href: "/teacher", label: "หน้าหลัก", icon: "home" },
   { href: "/teacher/competitions", label: "รายการของฉัน", icon: "trophy" },
-];
-
-export const RECORDER_EXTRA: NavItem[] = [
+  // ครูทุกคนบันทึกคะแนนรายการในหมวดตัวเองได้ (admin/recorder ได้ทุกรายการ)
   { href: "/teacher/scoring", label: "บันทึกผล", icon: "pencil" },
+  { href: "/teacher/class-registrations", label: "การสมัครรายห้อง", icon: "graduation" },
 ];
 
 export const STUDENT_NAV: NavItem[] = [
   { href: "/student", label: "แดชบอร์ด", icon: "home" },
   { href: "/student/browse", label: "การสมัคร", icon: "clipboard" },
 ];
-
-export function teacherNav(role: Role): NavItem[] {
-  if (role === "recorder" || role === "admin") return [...TEACHER_NAV, ...RECORDER_EXTRA];
-  return TEACHER_NAV;
-}

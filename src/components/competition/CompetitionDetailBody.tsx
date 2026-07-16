@@ -50,9 +50,22 @@ export async function CompetitionDetailBody({
         <div className="row">
           <Link href={`${basePath}/${id}/reports`} className="btn btn-ghost"><Icon name="printer" size={18} /> เอกสาร</Link>
           <Link href={`${basePath}/${id}/edit`} className="btn btn-secondary">แก้ไข</Link>
-          {canScore(session) && <Link href={`${scoreBasePath}/${id}`} className="btn btn-primary">บันทึกผล</Link>}
+          {canScore(session, comp.createdBy, group?.catalogNo) && (
+            <Link href={`${scoreBasePath}/${id}`} className="btn btn-primary">บันทึกผล</Link>
+          )}
         </div>
       </div>
+
+      {!comp.visibleToStudents && (
+        <div className="alert alert-warning">รายการนี้ซ่อนจากนักเรียน — นักเรียนมองไม่เห็นและสมัครเองไม่ได้ ครูเป็นผู้ลงชื่อให้เท่านั้น</div>
+      )}
+
+      {comp.description && (
+        <div className="card">
+          <div className="card-header" style={{ padding: 0, border: "none", marginBottom: 12 }}>รายละเอียด</div>
+          <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{comp.description}</p>
+        </div>
+      )}
 
       <div className="card">
         <div className="card-header" style={{ padding: 0, border: "none", marginBottom: 12 }}>ที่นั่ง</div>

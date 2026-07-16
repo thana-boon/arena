@@ -29,7 +29,17 @@ export function canViewCompetition(
   );
 }
 
-/** recorder + admin เท่านั้นที่บันทึกคะแนนได้ */
-export function canScore(session: SessionPayload): boolean {
-  return session.role === "recorder" || session.role === "admin";
+/**
+ * ใครบันทึกคะแนนได้: ทุกคนที่เห็นรายการนั้น — admin/recorder (ทุกรายการ),
+ * เจ้าของรายการ และครูที่อยู่หมวดเดียวกับรายการ (ช่วยกันบันทึกคะแนนในหมวดตัวเองได้)
+ * นักเรียนไม่เข้าเงื่อนไขนี้เพราะไม่มี subjectGroupId และไม่ได้เป็นผู้สร้างรายการ
+ * แต่ให้ตัดออกชัด ๆ กันพลาด
+ */
+export function canScore(
+  session: SessionPayload,
+  createdByCode: string,
+  groupCatalogNo: number | null | undefined
+): boolean {
+  if (session.role === "student") return false;
+  return canViewCompetition(session, createdByCode, groupCatalogNo);
 }

@@ -79,17 +79,7 @@ export default async function CertEventEditorPage({ params }: { params: Promise<
 
   return (
     <CertEditor
-      event={{
-        id: ev.id,
-        name: ev.name,
-        kind: ev.kind,
-        eventDate: ev.eventDate,
-        status: ev.status,
-        visibleToStudents: ev.visibleToStudents,
-        registrationOpen: ev.registrationOpen,
-        regStart: ev.regStart ? ev.regStart.toISOString().slice(0, 16) : "",
-        regEnd: ev.regEnd ? ev.regEnd.toISOString().slice(0, 16) : "",
-      }}
+      event={{ id: ev.id, name: ev.name, eventDate: ev.eventDate, status: ev.status }}
       yearBe={year.yearBe}
       initialLayout={main?.layout ?? defaultLayout()}
       initialOrientation={main?.orientation ?? "landscape"}

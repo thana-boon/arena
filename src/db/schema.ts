@@ -33,6 +33,9 @@ export const settings = pgTable("settings", {
   id: serial("id").primaryKey(),
   yearId: integer("year_id").notNull(),
   maxEntriesPerStudent: integer("max_entries_per_student").notNull().default(2),
+  // งานเริ่มต้น — ใช้ pre-select ตอนสร้างรายการแข่งขัน (กันเลือกงานผิด) ; null = ไม่มี default
+  defaultEventId: integer("default_event_id"),
+  // ⚠️ registrationOpen/regStart/regEnd ระดับปี ไม่ใช้แล้ว (ย้ายไปคุมที่ระดับงาน events) — คงคอลัมน์ไว้กันข้อมูลเดิมหาย
   registrationOpen: boolean("registration_open").notNull().default(false),
   regStart: timestamp("reg_start", { mode: "date" }),
   regEnd: timestamp("reg_end", { mode: "date" }),

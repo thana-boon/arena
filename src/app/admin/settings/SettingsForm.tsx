@@ -5,9 +5,6 @@ import { api } from "@/lib/client";
 
 type S = {
   maxEntriesPerStudent: number;
-  registrationOpen: boolean;
-  regStart: string;
-  regEnd: string;
   medalGoldPct: number;
   medalSilverPct: number;
   medalBronzePct: number;
@@ -27,11 +24,7 @@ export function SettingsForm({ initial }: { initial: S }) {
     e.preventDefault();
     setBusy(true);
     setMsg(null);
-    const res = await api.patch("/api/admin/settings", {
-      ...f,
-      regStart: f.regStart || null,
-      regEnd: f.regEnd || null,
-    });
+    const res = await api.patch("/api/admin/settings", f);
     setBusy(false);
     if (!res.ok) return setMsg({ type: "error", text: res.error });
     setMsg({ type: "success", text: "บันทึกข้อมูลเรียบร้อยแล้ว" });
@@ -42,23 +35,8 @@ export function SettingsForm({ initial }: { initial: S }) {
     <form onSubmit={save} className="card" style={{ maxWidth: 640 }}>
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
 
-      <div className="form-group">
-        <label className="form-check">
-          <input type="checkbox" checked={f.registrationOpen} onChange={(e) => set("registrationOpen", e.target.checked)} />
-          <span>เปิดรับสมัคร (สวิตช์หลัก)</span>
-        </label>
-      </div>
-
-      <div className="grid-2">
-        <div className="form-group">
-          <label className="form-label">เปิดรับสมัครตั้งแต่</label>
-          <input type="datetime-local" className="form-input" value={f.regStart} onChange={(e) => set("regStart", e.target.value)} />
-          <div className="form-hint">เว้นว่างได้ถ้าไม่จำกัดช่วงเวลา</div>
-        </div>
-        <div className="form-group">
-          <label className="form-label">ปิดรับสมัครเมื่อ</label>
-          <input type="datetime-local" className="form-input" value={f.regEnd} onChange={(e) => set("regEnd", e.target.value)} />
-        </div>
+      <div className="form-hint" style={{ marginBottom: 12 }}>
+        การเปิด-ปิดรับสมัครและการมองเห็น ย้ายไปตั้งที่ “งาน” แต่ละงานแล้ว (ด้านล่าง)
       </div>
 
       <div className="form-group">

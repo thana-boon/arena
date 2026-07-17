@@ -93,9 +93,10 @@ export function CertEditor(props: {
     const el = wrapRef.current;
     if (!el) return null;
     const r = el.getBoundingClientRect();
+    // พิกัดทั้ง x และ y เป็น % ของ "ความกว้าง" หน้า (ตาม CertificateCanvas) ไม่ใช่ % ของความสูง
     return {
       x: Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100)),
-      y: Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100)),
+      y: Math.max(0, Math.min(100, ((e.clientY - r.top) / r.width) * 100)),
     };
   }
   function onPointerMove(e: PointerEvent) {
@@ -137,6 +138,41 @@ export function CertEditor(props: {
   function removeBlock(id: string) {
     setLayout((L) => L.filter((b) => b.id !== id));
     setSelBlock(null);
+  }
+
+  // ===== จัดหน้าอัตโนมัติ =====
+  // จัดข้อความให้เรียงกลางหน้าจากบนลงล่างแบบกระจายเท่า ๆ กัน, เลขทะเบียน/QR ไปมุมล่าง,
+  // ผู้ลงนามกระจายตามแนวล่าง — เก็บฟอนต์/สี/ขนาดเดิมของผู้ใช้ไว้ ปรับแค่ตำแหน่ง
+  async function autoArrange() {
+    if (locked) return;
+    const ok = await confirm({
+      title: "จัดหน้าอัตโนมัติ",
+      message: "ระบบจะจัดตำแหน่งข้อความ ผู้ลงนาม เลขทะเบียน และ QR ใหม่ให้เข้าที่ (ขนาดฟอนต์และสีเดิมไม่เปลี่ยน) ยืนยัน?",
+      confirmText: "จัดให้เลย",
+    });
+    if (!ok) return;
+
+    setLayout((L) => {
+      const stack = L.filter((b) => b.kind !== "qr" && b.kind !== "serial");
+      const top = 24, bottom = 70;
+      const step = stack.length > 1 ? (bottom - top) / (stack.length - 1) : 0;
+      const patched = new Map<string, CertBlock>();
+      stack.forEach((b, i) => patched.set(b.id, { ...b, x: 50, align: "center", y: round(top + step * i) }));
+      L.forEach((b) => {
+        if (b.kind === "qr") patched.set(b.id, { ...b, x: 92, y: 86, align: "right" });
+        else if (b.kind === "serial") patched.set(b.id, { ...b, x: 8, y: 93, align: "left" });
+      });
+      return L.map((b) => patched.get(b.id) ?? b);
+    });
+
+    setSignatures((S) =>
+      S.map((s, i) => ({
+        ...s,
+        x: S.length <= 1 ? 50 : round(22 + (56 / (S.length - 1)) * i),
+        y: 78,
+      }))
+    );
+    flash("success", "จัดหน้าให้แล้ว — ลากปรับเพิ่มได้ตามต้องการ");
   }
 
   // ===== อัปโหลดรูป =====
@@ -411,16 +447,21 @@ export function CertEditor(props: {
 
         {/* ขวา: preview สด + overlay ลาก */}
         <div className="stack" style={{ position: "sticky", top: 12, alignSelf: "flex-start" }}>
-          <div className="subtitle">ตัวอย่าง (ลากจุดสีเพื่อย้ายตำแหน่ง) — ใช้ชื่อที่ยาวที่สุดจากรายการที่เลือก</div>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <div className="subtitle">ตัวอย่าง (ลากจุดสีเพื่อย้ายตำแหน่ง) — ใช้ชื่อที่ยาวที่สุดจากรายการที่เลือก</div>
+            <button className="btn btn-sm" onClick={autoArrange} disabled={locked} title="จัดตำแหน่งข้อความ/ผู้ลงนามให้เข้าที่โดยอัตโนมัติ" style={{ flexShrink: 0 }}>
+              <Icon name="dashboard" size={16} /> จัดอัตโนมัติ
+            </button>
+          </div>
           <div ref={wrapRef} style={{ position: "relative", width: "100%", border: "1px solid var(--border, #e5e7eb)" }}>
             <CertificateCanvas template={canvasTemplate} data={props.sample} pageWidth={`${pageW}px`} />
             {/* overlay จุดลาก */}
             {!locked && layout.map((b) => (
-              <Handle key={b.id} x={b.x} y={b.y} active={selBlock === b.id}
+              <Handle key={b.id} x={b.x} y={b.y} pw={pageW} active={selBlock === b.id}
                 onDown={() => { setSelBlock(b.id); setSelSig(null); startDrag("block", b.id); }} />
             ))}
             {!locked && signatures.map((s, i) => (
-              <Handle key={`sig${i}`} x={s.x} y={s.y} active={selSig === i} color="#7c3aed"
+              <Handle key={`sig${i}`} x={s.x} y={s.y} pw={pageW} active={selSig === i} color="#7c3aed"
                 onDown={() => { setSelSig(i); setSelBlock(null); startDrag("sig", i); }} />
             ))}
           </div>
@@ -436,14 +477,15 @@ function round(n: number) {
   return Math.round(n * 10) / 10;
 }
 
-function Handle({ x, y, active, color = "#2563eb", onDown }: { x: number; y: number; active: boolean; color?: string; onDown: () => void }) {
+function Handle({ x, y, pw, active, color = "#2563eb", onDown }: { x: number; y: number; pw: number; active: boolean; color?: string; onDown: () => void }) {
   return (
     <div
       onPointerDown={(e) => { e.preventDefault(); onDown(); }}
       style={{
         position: "absolute",
-        left: `${x}%`,
-        top: `${y}%`,
+        // แปลง % → px ด้วยความกว้างหน้า (pw) ให้ตรงกับ CertificateCanvas ที่วางทุกอย่างอิงความกว้าง
+        left: (pw * x) / 100,
+        top: (pw * y) / 100,
         width: 14,
         height: 14,
         marginLeft: -7,

@@ -112,7 +112,11 @@ export const competitions = pgTable(
   {
     id: serial("id").primaryKey(),
     yearId: integer("year_id").notNull(),
-    subjectGroupId: integer("subject_group_id").notNull(),
+    // งานที่รายการนี้สังกัด (events.id) — เป็นเจ้าของช่วงรับสมัคร/การมองเห็น/ดีไซน์เกียรติบัตร
+    // nullable ในสคีมาเพื่อรองรับข้อมูลเดิมก่อน backfill; หลัง backfill รายการทุกอันมีงานเสมอ
+    eventId: integer("event_id"),
+    // หมวดสาระ — optional: งานที่ไม่ใช่วิชาการ (อบรม/อื่น ๆ) ไม่ต้องเลือกหมวด (null = ไม่ระบุหมวด)
+    subjectGroupId: integer("subject_group_id"),
     name: varchar("name", { length: 255 }).notNull(),
     description: text("description").notNull().default(""), // รายละเอียด/กติกาของรายการ (แสดงให้นักเรียนเห็น)
     type: varchar("type", { length: 16 }).notNull(), // 'individual' | 'team'
@@ -135,7 +139,11 @@ export const competitions = pgTable(
     createdBy: varchar("created_by", { length: 64 }).notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (t) => [index("comp_year_idx").on(t.yearId), index("comp_group_idx").on(t.subjectGroupId)]
+  (t) => [
+    index("comp_year_idx").on(t.yearId),
+    index("comp_group_idx").on(t.subjectGroupId),
+    index("comp_event_idx").on(t.eventId),
+  ]
 );
 
 // ===== ความจุที่นั่ง =====
@@ -252,16 +260,24 @@ export const certificateAssets = pgTable("certificate_assets", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// ===== เกียรติบัตร: งาน (รายการใหญ่) =====
-// 1 งาน เช่น "การแข่งขันวันวิชาการ ครั้งที่ 5" = เกียรติบัตร 1 ดีไซน์ ครอบหลายรายการแข่งขัน
-// status: draft = admin แก้ได้ ครูยังไม่เห็น | published = ครู export ได้ | locked = ออกใบแรกแล้ว ต้องปลดล็อกก่อนแก้
-export const certificateEvents = pgTable(
-  "certificate_events",
+// ===== งาน (Event) — แกนกลางของระบบ =====
+// 1 งาน เช่น "วันวิชาการ 2569" หรือ "อบรม Python ครู" ครอบหลายรายการ (competitions.event_id)
+// เป็นเจ้าของ: ช่วงเปิด-ปิดรับสมัคร, การมองเห็นของนักเรียน, และดีไซน์เกียรติบัตร
+// kind: 'competition' = งานแข่งขัน (มีคะแนน/อันดับ) | 'training' = อบรม (ผู้เข้าร่วม → เกียรติบัตร ไม่มีคะแนน)
+// status (ของฝั่งเกียรติบัตร): draft = admin แก้ได้ | published = ครู export ได้ | locked = ออกใบแรกแล้ว ต้องปลดล็อกก่อนแก้
+export const events = pgTable(
+  "events",
   {
     id: serial("id").primaryKey(),
     yearId: integer("year_id").notNull(),
     name: varchar("name", { length: 255 }).notNull(),
+    kind: varchar("kind", { length: 16 }).notNull().default("competition"),
     eventDate: date("event_date", { mode: "string" }),
+    // การรับสมัคร — ย้ายมาจาก settings ระดับปี ให้แต่ละงานคุมเอง
+    visibleToStudents: boolean("visible_to_students").notNull().default(false),
+    registrationOpen: boolean("registration_open").notNull().default(false),
+    regStart: timestamp("reg_start", { mode: "date" }),
+    regEnd: timestamp("reg_end", { mode: "date" }),
     status: varchar("status", { length: 16 }).notNull().default("draft"),
     createdBy: varchar("created_by", { length: 64 }).notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -270,23 +286,7 @@ export const certificateEvents = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (t) => [index("cert_event_year_idx").on(t.yearId)]
-);
-
-// ===== เกียรติบัตร: รายการแข่งขันที่อยู่ในงาน =====
-// unique บน competition_id (ไม่ใช่คู่ event+competition) — รายการแข่งขันหนึ่งอยู่ได้แค่งานเดียว
-// ไม่งั้นตอนครูกด export ระบบไม่รู้ว่าต้องใช้ดีไซน์ของงานไหน + เป็นตัวกรองให้หน้าเลือกซ่อนรายการที่ถูกใช้แล้ว
-export const certificateEventCompetitions = pgTable(
-  "certificate_event_competitions",
-  {
-    id: serial("id").primaryKey(),
-    eventId: integer("event_id").notNull(),
-    competitionId: integer("competition_id").notNull(),
-  },
-  (t) => [
-    uniqueIndex("cert_event_comp_uniq").on(t.competitionId),
-    index("cert_event_comp_event_idx").on(t.eventId),
-  ]
+  (t) => [index("event_year_idx").on(t.yearId)]
 );
 
 // ===== เกียรติบัตร: แม่แบบ (พื้นหลัง + ตำแหน่งข้อความ) =====
@@ -394,7 +394,7 @@ export type EntryMember = typeof entryMembers.$inferSelect;
 export type Score = typeof scores.$inferSelect;
 export type TeacherRole = typeof teacherRoles.$inferSelect;
 export type CertificateAsset = typeof certificateAssets.$inferSelect;
-export type CertificateEvent = typeof certificateEvents.$inferSelect;
 export type CertificateTemplate = typeof certificateTemplates.$inferSelect;
 export type CertificateSignature = typeof certificateSignatures.$inferSelect;
 export type CertificateIssue = typeof certificateIssues.$inferSelect;
+export type EventRow = typeof events.$inferSelect;

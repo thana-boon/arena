@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { certificateEvents, certificateTemplates } from "@/db/schema";
+import { events, certificateTemplates } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
@@ -17,7 +17,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const s = await apiRequireRole("admin");
     const id = Number((await params).id);
     const { action } = bodyInput.parse(await req.json());
-    const rows = await db.select().from(certificateEvents).where(eq(certificateEvents.id, id)).limit(1);
+    const rows = await db.select().from(events).where(eq(events.id, id)).limit(1);
     if (!rows.length) return fail("ไม่พบงาน", 404);
     const ev = rows[0];
 
@@ -30,13 +30,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         .limit(1);
       if (!main.length || !main[0].bg)
         return fail("กรุณาตั้งค่าพื้นหลังของแม่แบบก่อนเผยแพร่");
-      await db.update(certificateEvents).set({ status: "published" }).where(eq(certificateEvents.id, id));
+      await db.update(events).set({ status: "published" }).where(eq(events.id, id));
     } else if (action === "unpublish") {
       if (ev.status === "locked") return fail("งานนี้ออกใบไปแล้ว ยกเลิกเผยแพร่ไม่ได้");
-      await db.update(certificateEvents).set({ status: "draft" }).where(eq(certificateEvents.id, id));
+      await db.update(events).set({ status: "draft" }).where(eq(events.id, id));
     } else {
       // unlock
-      await db.update(certificateEvents).set({ status: "published" }).where(eq(certificateEvents.id, id));
+      await db.update(events).set({ status: "published" }).where(eq(events.id, id));
     }
 
     await logAudit(s.code, "cert_event_status", { id, action });

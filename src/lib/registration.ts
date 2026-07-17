@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/db";
-import { competitions, competitionCapacity, entries, entryMembers } from "@/db/schema";
+import { competitions, competitionCapacity, entries, entryMembers, events } from "@/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { parseJsonArray } from "@/lib/domain";
@@ -42,18 +42,27 @@ export async function registerEntry(args: RegisterArgs): Promise<number> {
   const { year, setting } = await getActiveYearWithSettings();
   if (!year || !setting) throw new RegistrationError("ยังไม่มีปีการศึกษาที่เปิดใช้งาน");
 
-  // กติกา 1: เปิดรับสมัคร + อยู่ในช่วงเวลา
-  if (!override) {
-    if (!setting.registrationOpen) throw new RegistrationError("ขณะนี้ปิดรับสมัคร");
-    const now = new Date();
-    if (setting.regStart && now < new Date(setting.regStart)) throw new RegistrationError("ยังไม่ถึงเวลาเปิดรับสมัคร");
-    if (setting.regEnd && now > new Date(setting.regEnd)) throw new RegistrationError("หมดเวลารับสมัครแล้ว");
-  }
-
   const comp = (await db.select().from(competitions).where(eq(competitions.id, args.competitionId)).limit(1))[0];
   if (!comp) throw new RegistrationError("ไม่พบรายการแข่งขัน", 404);
   if (comp.yearId !== year.id) throw new RegistrationError("รายการนี้ไม่ได้อยู่ในปีการศึกษาปัจจุบัน");
-  // รายการที่ซ่อนจากนักเรียน — ครูเป็นผู้ลงชื่อให้เท่านั้น
+
+  // งานที่รายการสังกัด — เป็นเจ้าของช่วงรับสมัคร/การมองเห็น
+  const event = comp.eventId
+    ? (await db.select().from(events).where(eq(events.id, comp.eventId)).limit(1))[0]
+    : null;
+
+  // กติกา 1: เปิดรับสมัคร + อยู่ในช่วงเวลา (ระดับงาน)
+  if (!override) {
+    if (!event) throw new RegistrationError("รายการนี้ยังไม่ถูกจัดเข้างาน");
+    if (args.byRole === "student" && !event.visibleToStudents)
+      throw new RegistrationError("งานนี้ยังไม่เปิดให้นักเรียน", 403);
+    if (!event.registrationOpen) throw new RegistrationError("ขณะนี้ปิดรับสมัคร");
+    const now = new Date();
+    if (event.regStart && now < new Date(event.regStart)) throw new RegistrationError("ยังไม่ถึงเวลาเปิดรับสมัคร");
+    if (event.regEnd && now > new Date(event.regEnd)) throw new RegistrationError("หมดเวลารับสมัครแล้ว");
+  }
+
+  // รายการที่ซ่อนจากนักเรียน — ครูเป็นผู้ลงชื่อให้เท่านั้น (คุมซ้อนระดับรายการ)
   if (args.byRole === "student" && !comp.visibleToStudents)
     throw new RegistrationError("รายการนี้ไม่เปิดให้นักเรียนสมัครเอง", 403);
 

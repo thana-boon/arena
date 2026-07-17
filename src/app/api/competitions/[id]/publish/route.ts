@@ -17,7 +17,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { isPublished } = schema.parse(await req.json());
     const comp = (await db.select().from(competitions).where(eq(competitions.id, id)).limit(1))[0];
     if (!comp) return fail("ไม่พบรายการแข่งขัน", 404);
-    const group = (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0];
+    const group = comp.subjectGroupId == null ? undefined : (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0];
     if (!canScore(s, comp.createdBy, group?.catalogNo)) return fail("ประกาศผลได้เฉพาะรายการในหมวดของท่าน", 403);
     await db.update(competitions).set({ isPublished }).where(eq(competitions.id, id));
     await logAudit(s.code, isPublished ? "publish" : "unpublish", { competitionId: id });

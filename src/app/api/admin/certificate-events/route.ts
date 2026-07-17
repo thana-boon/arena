@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { certificateEvents, certificateTemplates } from "@/db/schema";
+import { events, certificateTemplates } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
@@ -14,12 +14,12 @@ export async function GET() {
     await apiRequireRole("admin");
     const year = await getActiveYear();
     if (!year) return ok({ events: [] });
-    const events = await db
+    const rows = await db
       .select()
-      .from(certificateEvents)
-      .where(eq(certificateEvents.yearId, year.id))
-      .orderBy(desc(certificateEvents.createdAt));
-    return ok({ events });
+      .from(events)
+      .where(eq(events.yearId, year.id))
+      .orderBy(desc(events.createdAt));
+    return ok({ events: rows });
   });
 }
 
@@ -32,15 +32,16 @@ export async function POST(req: Request) {
     const body = certEventInput.parse(await req.json());
 
     const [ev] = await db
-      .insert(certificateEvents)
+      .insert(events)
       .values({
         yearId: year.id,
         name: body.name.trim(),
+        kind: body.kind ?? "competition",
         eventDate: body.eventDate ?? null,
         status: "draft",
         createdBy: s.code,
       })
-      .returning({ id: certificateEvents.id });
+      .returning({ id: events.id });
 
     await db.insert(certificateTemplates).values({
       eventId: ev.id,

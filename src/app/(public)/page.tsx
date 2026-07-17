@@ -21,7 +21,7 @@ export default async function HomePage() {
       .where(and(eq(competitions.yearId, year.id), eq(competitions.isPublished, true)));
     groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
   }
-  const groupName = (id: number) => groups.find((g) => g.id === id)?.name ?? "-";
+  const groupName = (id: number | null) => (id == null ? "ทั่วไป" : groups.find((g) => g.id === id)?.name ?? "-");
 
   return (
     <div className="stack">

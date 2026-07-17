@@ -9,7 +9,7 @@ export type CompListItem = {
   id: number;
   name: string;
   type: "individual" | "team";
-  subjectGroupId: number;
+  subjectGroupId: number | null;
   groupCatalogNo: number | null;
   groupName: string;
   levels: string[];
@@ -28,8 +28,8 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
   const comps = await db.select().from(competitions).where(eq(competitions.yearId, yearId));
   if (!comps.length) return [];
   const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, yearId));
-  const groupName = (id: number) => groups.find((g) => g.id === id)?.name ?? "-";
-  const groupCatalogNo = (id: number) => groups.find((g) => g.id === id)?.catalogNo ?? null;
+  const groupName = (id: number | null) => (id == null ? "" : groups.find((g) => g.id === id)?.name ?? "-");
+  const groupCatalogNo = (id: number | null) => (id == null ? null : groups.find((g) => g.id === id)?.catalogNo ?? null);
   const compIds = comps.map((c) => c.id);
   const caps = await db.select().from(competitionCapacity).where(inArray(competitionCapacity.competitionId, compIds));
   const ents = await db

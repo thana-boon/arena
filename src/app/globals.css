@@ -361,6 +361,73 @@ p {
   accent-color: var(--skdw-purple);
 }
 
+/* ---------- Field / Form-row (โครงฟอร์มมาตรฐาน — label บน + input เต็มความกว้าง) ---------- */
+/* หลายฟอร์มใช้ <label class="field"><span>..</span><input/></label> โดยไม่ใส่ .form-input
+   จึงให้ .field จัด layout และสไตล์ input ที่อยู่ข้างในให้เท่ากับ .form-input อัตโนมัติ */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0; /* กัน input ล้นใน flex row */
+}
+.field > span {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--skdw-dark);
+}
+.field > input:not([type="checkbox"]):not([type="radio"]),
+.field > select,
+.field > textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--skdw-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-th-sans);
+  font-size: var(--text-md);
+  color: var(--skdw-dark);
+  background: #fff;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+.field > textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.field > input:not([type="checkbox"]):not([type="radio"]):hover,
+.field > select:hover,
+.field > textarea:hover {
+  border-color: var(--skdw-purple-light);
+}
+.field > input:not([type="checkbox"]):not([type="radio"]):focus,
+.field > select:focus,
+.field > textarea:focus {
+  border-color: var(--skdw-purple);
+  box-shadow: var(--shadow-focus);
+  outline: none;
+}
+.field > input::placeholder {
+  color: var(--skdw-muted);
+}
+
+/* .form-row = แถวของ .field วางเรียงข้างกัน (รองรับ style={{flex:N}} ที่ตั้งไว้บน .field) */
+.form-row {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.form-row > .field {
+  flex: 1 1 200px;
+}
+@media (max-width: 560px) {
+  .form-row {
+    gap: var(--space-3);
+  }
+  .form-row > .field {
+    flex-basis: 100%; /* จอเล็ก → เรียงลงเป็นแนวตั้ง */
+  }
+}
+
 /* ---------- Level chip grid (เลือกระดับชั้น) ---------- */
 .level-grid {
   display: grid;
@@ -1218,6 +1285,7 @@ p {
     margin: 15mm;
   }
   .navbar,
+  .topbar,
   .sidebar,
   .bottom-nav,
   .no-print {
@@ -1227,10 +1295,17 @@ p {
   .print-only {
     display: block !important;
   }
+  /* เอกสาร: ใช้ฟอนต์ Sarabun ขนาด 16 ทั้งหมด */
+  body,
+  .card,
+  .card *,
+  .print-title,
+  .print-title * {
+    font-family: "Sarabun", sans-serif !important;
+    font-size: 16px !important;
+  }
   body {
     background: #fff;
-    font-family: var(--font-th-sans);
-    font-size: 16px;
     color: #000;
   }
   .main-content {
@@ -1251,21 +1326,22 @@ p {
   .table {
     border-collapse: collapse;
     width: 100%;
-    font-family: var(--font-th-sans) !important;
+    font-family: "Sarabun", sans-serif !important;
     font-size: 16px !important;
   }
   .table th,
   .table td,
   .table th *,
   .table td * {
-    font-family: var(--font-th-sans) !important;
+    font-family: "Sarabun", sans-serif !important;
     font-size: 16px !important;
     color: #000 !important;
   }
   .table th,
   .table td {
     border: 1px solid #000 !important;
-    padding: 8px 10px !important;
+    padding: 2px 10px !important;
+    line-height: 1.35 !important;
   }
   .table th {
     background: #e5e5e5 !important;

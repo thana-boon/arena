@@ -12,7 +12,9 @@ export type BrowseComp = {
   name: string;
   description: string;
   type: "individual" | "team";
-  subjectGroupId: number;
+  eventId: number | null;
+  eventName: string;
+  subjectGroupId: number | null;
   groupName: string;
   levels: string[];
   teamSizeMin: number | null;
@@ -45,14 +47,15 @@ export function BrowseRegister({
   // เลือกหมวดก่อน แล้วค่อยแสดงรายการของหมวดนั้น (ลดภาระเวลารายการเยอะ)
   const [groupId, setGroupId] = useState<number | null>(null);
 
-  // สรุปหมวด: จำนวนรายการ + จำนวนที่ลงทะเบียนแล้ว ในแต่ละหมวด
+  // สรุปงาน: จำนวนรายการ + จำนวนที่ลงทะเบียนแล้ว ในแต่ละงาน (นักเรียนเลือกงานก่อน แล้วดูรายการในงาน)
   const groups = useMemo(() => {
     const map = new Map<number, { id: number; name: string; count: number; registered: number }>();
     for (const c of comps) {
-      const g = map.get(c.subjectGroupId) ?? { id: c.subjectGroupId, name: c.groupName, count: 0, registered: 0 };
+      const gid = c.eventId ?? -1;
+      const g = map.get(gid) ?? { id: gid, name: c.eventName || "ทั่วไป", count: 0, registered: 0 };
       g.count += 1;
       if (c.alreadyRegistered) g.registered += 1;
-      map.set(c.subjectGroupId, g);
+      map.set(gid, g);
     }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, "th"));
   }, [comps]);
@@ -151,7 +154,7 @@ export function BrowseRegister({
   }
 
   // ขั้นที่ 2: เลือกหมวดแล้ว → แสดงเฉพาะรายการของหมวดนั้น
-  const shownComps = comps.filter((c) => c.subjectGroupId === groupId);
+  const shownComps = comps.filter((c) => (c.eventId ?? -1) === groupId);
   const currentGroupName = groups.find((g) => g.id === groupId)?.name ?? "";
 
   return (

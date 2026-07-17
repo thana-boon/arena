@@ -18,7 +18,7 @@ type Comp = {
   id: number;
   name: string;
   type: "individual" | "team";
-  groupId: number;
+  groupId: number | null;
   levels: string[];
   criteria: { id: number; name: string; max: number }[];
   fullScore: number;

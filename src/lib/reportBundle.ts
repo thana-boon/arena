@@ -1,11 +1,53 @@
 import "server-only";
 import { db } from "@/db";
-import { competitions, subjectGroups } from "@/db/schema";
+import { competitions, subjectGroups, type Competition } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { computeCompetitionResults } from "@/lib/results";
 import { getRoster, type RosterEntry } from "@/lib/roster";
 import { MEDAL_LABEL } from "@/lib/domain";
+
+export type MedalPct = { gold: number; silver: number; bronze: number };
+
+/** สร้างข้อมูลเอกสารของรายการแข่งขันเดียว (roster + คะแนน + อันดับ/เหรียญ) */
+export async function buildBundle(
+  comp: Competition,
+  groupName: string,
+  yearBe: number,
+  medalPct: MedalPct
+): Promise<ReportBundle> {
+  const roster = await getRoster(comp.id);
+  const computed = await computeCompetitionResults(comp.id, medalPct);
+  return {
+    id: comp.id,
+    eventId: comp.eventId,
+    subjectGroupId: comp.subjectGroupId,
+    groupName,
+    meta: {
+      competitionName: comp.name,
+      groupName,
+      type: comp.type as "individual" | "team",
+      yearBe,
+      eventDate: comp.eventDate,
+      startTime: comp.startTime,
+      endTime: comp.endTime,
+    },
+    criteria: (computed?.criteria ?? []).map((c) => ({ id: c.id, name: c.name, max: Number(c.maxScore) })),
+    fullScore: computed?.fullScore ?? 0,
+    roster,
+    results: (computed?.results ?? []).map((r) => ({
+      entryId: r.entryId,
+      teamName: r.teamName,
+      members: r.members,
+      scoresByCriterion: r.scoresByCriterion,
+      total: r.total,
+      percent: r.percent,
+      rank: r.rank,
+      medalLabel: MEDAL_LABEL[r.medal],
+    })),
+    rosterCount: roster.length,
+  };
+}
 
 export type ReportResultRow = {
   entryId: number;
@@ -20,7 +62,8 @@ export type ReportResultRow = {
 
 export type ReportBundle = {
   id: number;
-  subjectGroupId: number;
+  eventId: number | null;
+  subjectGroupId: number | null;
   groupName: string;
   meta: {
     competitionName: string;
@@ -54,41 +97,12 @@ export async function getReportBundles(): Promise<{ yearBe: number; bundles: Rep
 
   const comps = await db.select().from(competitions).where(eq(competitions.yearId, year.id));
   const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
-  const groupOf = (id: number) => groups.find((g) => g.id === id);
+  const groupOf = (id: number | null) => (id == null ? undefined : groups.find((g) => g.id === id));
 
   const bundles: ReportBundle[] = [];
   for (const comp of comps) {
     const g = groupOf(comp.subjectGroupId);
-    const roster = await getRoster(comp.id);
-    const computed = await computeCompetitionResults(comp.id, medalPct);
-    bundles.push({
-      id: comp.id,
-      subjectGroupId: comp.subjectGroupId,
-      groupName: g?.name ?? "-",
-      meta: {
-        competitionName: comp.name,
-        groupName: g?.name ?? "",
-        type: comp.type as "individual" | "team",
-        yearBe: year.yearBe,
-        eventDate: comp.eventDate,
-        startTime: comp.startTime,
-        endTime: comp.endTime,
-      },
-      criteria: (computed?.criteria ?? []).map((c) => ({ id: c.id, name: c.name, max: Number(c.maxScore) })),
-      fullScore: computed?.fullScore ?? 0,
-      roster,
-      results: (computed?.results ?? []).map((r) => ({
-        entryId: r.entryId,
-        teamName: r.teamName,
-        members: r.members,
-        scoresByCriterion: r.scoresByCriterion,
-        total: r.total,
-        percent: r.percent,
-        rank: r.rank,
-        medalLabel: MEDAL_LABEL[r.medal],
-      })),
-      rosterCount: roster.length,
-    });
+    bundles.push(await buildBundle(comp, g?.name ?? "-", year.yearBe, medalPct));
   }
 
   // เรียงตามหมวด แล้วตามชื่อรายการ ให้เอกสารออกมาเป็นระเบียบ

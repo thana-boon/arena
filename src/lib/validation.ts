@@ -10,7 +10,10 @@ export const competitionInput = z
   .object({
     name: z.string().min(1, "กรุณากรอกชื่อรายการ").max(255),
     description: z.string().max(2000, "รายละเอียดยาวเกินไป (ไม่เกิน 2000 ตัวอักษร)").optional().default(""),
-    subjectGroupId: z.number().int().positive("กรุณาเลือกหมวดวิชา"),
+    // งานที่รายการนี้สังกัด (บังคับ) — เป็นเจ้าของช่วงรับสมัคร/การมองเห็น/เกียรติบัตร
+    eventId: z.number().int().positive("กรุณาเลือกงาน"),
+    // หมวดสาระ — ไม่บังคับ (งานที่ไม่ใช่วิชาการไม่ต้องเลือก)
+    subjectGroupId: z.number().int().positive().nullable().optional(),
     type: z.enum(["individual", "team"]),
     // นักเรียนเห็นรายการนี้ในหน้าสมัครหรือไม่ (false = ครูลงให้อย่างเดียว)
     visibleToStudents: z.boolean().optional().default(true),
@@ -29,7 +32,8 @@ export const competitionInput = z
     capacityPerLevel: z.record(z.string(), z.number().int().min(-1)).optional(),
     combinedCapacity: z.number().int().min(-1).optional(),
     teamCapacity: z.number().int().min(-1).optional(),
-    criteria: z.array(criterionInput).min(1, "ต้องมีเกณฑ์การให้คะแนนอย่างน้อย 1 ข้อ"),
+    // เกณฑ์คะแนน — ไม่บังคับ (งานอบรมไม่มีคะแนน) ; งานแข่งขันควรมีอย่างน้อย 1 ข้อ
+    criteria: z.array(criterionInput).optional().default([]),
   })
   .superRefine((v, ctx) => {
     if (v.type === "team") {
@@ -79,7 +83,13 @@ export type CertAssetInput = z.infer<typeof certAssetInput>;
 
 export const certEventInput = z.object({
   name: z.string().min(1, "กรุณากรอกชื่องาน").max(255),
+  kind: z.enum(["competition", "training"]).optional(),
   eventDate: z.string().nullable().optional(),
+  // การรับสมัคร (ระดับงาน) — ส่งมาตอนแก้ไขงาน
+  visibleToStudents: z.boolean().optional(),
+  registrationOpen: z.boolean().optional(),
+  regStart: z.string().nullable().optional(),
+  regEnd: z.string().nullable().optional(),
 });
 export type CertEventInput = z.infer<typeof certEventInput>;
 

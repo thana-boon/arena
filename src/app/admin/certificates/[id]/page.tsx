@@ -1,17 +1,15 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import {
-  certificateEvents,
-  certificateEventCompetitions,
+  events,
   competitions,
   entries,
   entryMembers,
 } from "@/db/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { getActiveYear } from "@/lib/queries";
 import {
   getEventTemplates,
-  getSelectableCompetitions,
   defaultLayout,
   type CertRenderData,
 } from "@/lib/certificates";
@@ -25,30 +23,27 @@ export default async function CertEventEditorPage({ params }: { params: Promise<
   if (!year) notFound();
 
   const ev = (
-    await db.select().from(certificateEvents).where(eq(certificateEvents.id, eventId)).limit(1)
+    await db.select().from(events).where(eq(events.id, eventId)).limit(1)
   )[0];
   if (!ev || ev.yearId !== year.id) notFound();
 
   const templates = await getEventTemplates(eventId);
   const main = templates.find((t) => t.medalFilter === "") ?? null;
 
-  const selectedRows = await db
-    .select({ competitionId: certificateEventCompetitions.competitionId })
-    .from(certificateEventCompetitions)
-    .where(eq(certificateEventCompetitions.eventId, eventId));
-  const selectedIds = selectedRows.map((r) => r.competitionId);
+  // รายการในงานนี้ (source of truth = competitions.event_id)
+  const compsInEvent = await db
+    .select()
+    .from(competitions)
+    .where(eq(competitions.eventId, eventId))
+    .orderBy(asc(competitions.name));
+  const selectedIds = compsInEvent.map((c) => c.id);
 
-  const selectable = await getSelectableCompetitions(year.id, eventId);
-
-  // ตัวอย่างสำหรับ preview: ใช้ "ชื่อที่ยาวที่สุด" จากรายการที่เลือกจริง เพื่อให้เห็นปัญหาชื่อล้นกรอบ
+  // ตัวอย่างสำหรับ preview: ใช้ "ชื่อที่ยาวที่สุด" จากรายการในงาน เพื่อให้เห็นปัญหาชื่อล้นกรอบ
   let sampleName = "เด็กหญิงตัวอย่าง นามสกุลยาวมากพอสมควร";
   let sampleClass = "ม.3/8";
-  let sampleComp = selectable[0]?.name ?? "การแข่งขันตัวอย่าง";
+  let sampleComp = compsInEvent[0]?.name ?? "การแข่งขันตัวอย่าง";
   if (selectedIds.length) {
-    const compRows = await db
-      .select()
-      .from(competitions)
-      .where(inArray(competitions.id, selectedIds));
+    const compRows = compsInEvent;
     const entRows = await db
       .select({ id: entries.id, competitionId: entries.competitionId })
       .from(entries)
@@ -84,7 +79,17 @@ export default async function CertEventEditorPage({ params }: { params: Promise<
 
   return (
     <CertEditor
-      event={{ id: ev.id, name: ev.name, eventDate: ev.eventDate, status: ev.status }}
+      event={{
+        id: ev.id,
+        name: ev.name,
+        kind: ev.kind,
+        eventDate: ev.eventDate,
+        status: ev.status,
+        visibleToStudents: ev.visibleToStudents,
+        registrationOpen: ev.registrationOpen,
+        regStart: ev.regStart ? ev.regStart.toISOString().slice(0, 16) : "",
+        regEnd: ev.regEnd ? ev.regEnd.toISOString().slice(0, 16) : "",
+      }}
       yearBe={year.yearBe}
       initialLayout={main?.layout ?? defaultLayout()}
       initialOrientation={main?.orientation ?? "landscape"}
@@ -100,8 +105,7 @@ export default async function CertEventEditorPage({ params }: { params: Promise<
           width: s.width,
         })) ?? []
       }
-      selectedIds={selectedIds}
-      selectable={selectable.map((c) => ({ id: c.id, name: c.name, type: c.type, isPublished: c.isPublished }))}
+      competitions={compsInEvent.map((c) => ({ id: c.id, name: c.name, type: c.type, isPublished: c.isPublished }))}
       sample={sample}
     />
   );

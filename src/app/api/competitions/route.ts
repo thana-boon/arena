@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { competitions, competitionCapacity, criteria, timeSlots } from "@/db/schema";
+import { competitions, competitionCapacity, criteria, timeSlots, events } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
@@ -18,8 +18,14 @@ export async function POST(req: Request) {
     const year = await getActiveYear();
     if (!year) return fail("ยังไม่มีปีการศึกษาที่เปิดใช้งาน");
 
-    // ครูสร้างได้เฉพาะหมวดของตัวเอง (admin เลือกได้ทุกหมวด)
-    if (!(await isGroupAllowed(s, year.id, body.subjectGroupId)))
+    // งานต้องเป็นงานของปีปัจจุบัน
+    const event = (
+      await db.select().from(events).where(and(eq(events.id, body.eventId), eq(events.yearId, year.id))).limit(1)
+    )[0];
+    if (!event) return fail("กรุณาเลือกงานที่ถูกต้อง");
+
+    // ครูสร้างได้เฉพาะหมวดของตัวเอง (admin เลือกได้ทุกหมวด) — ตรวจเฉพาะเมื่อระบุหมวด
+    if (body.subjectGroupId != null && !(await isGroupAllowed(s, year.id, body.subjectGroupId)))
       return fail("เลือกได้เฉพาะหมวดวิชาของท่านเท่านั้น", 403);
 
     // ช่วงเวลาต้องเป็น slot ของปีปัจจุบัน — เซิร์ฟเวอร์คัดลอกเวลาเริ่ม/สิ้นสุดจาก slot เอง
@@ -44,7 +50,8 @@ export async function POST(req: Request) {
         .insert(competitions)
         .values({
           yearId: year.id,
-          subjectGroupId: body.subjectGroupId,
+          eventId: body.eventId,
+          subjectGroupId: body.subjectGroupId ?? null,
           name: body.name.trim(),
           description: body.description.trim(),
           type: body.type,
@@ -85,15 +92,17 @@ export async function POST(req: Request) {
         });
       }
 
-      // criteria
-      await tx.insert(criteria).values(
-        body.criteria.map((c, i) => ({
-          competitionId: compId,
-          name: c.name.trim(),
-          maxScore: c.maxScore.toFixed(2),
-          sortOrder: i,
-        }))
-      );
+      // criteria (งานอบรมอาจไม่มีเกณฑ์คะแนน)
+      if (body.criteria.length) {
+        await tx.insert(criteria).values(
+          body.criteria.map((c, i) => ({
+            competitionId: compId,
+            name: c.name.trim(),
+            maxScore: c.maxScore.toFixed(2),
+            sortOrder: i,
+          }))
+        );
+      }
       return compId;
     });
 

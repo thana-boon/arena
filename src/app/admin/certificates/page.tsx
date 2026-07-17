@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { certificateEvents, certificateEventCompetitions, certificateIssues } from "@/db/schema";
+import { events, competitions, certificateIssues } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { getActiveYear } from "@/lib/queries";
 import { Icon } from "@/components/Icon";
@@ -18,17 +18,18 @@ export default async function CertificatesPage() {
     );
   }
 
-  const events = await db
+  const eventRows = await db
     .select()
-    .from(certificateEvents)
-    .where(eq(certificateEvents.yearId, year.id))
-    .orderBy(sql`${certificateEvents.createdAt} desc`);
+    .from(events)
+    .where(eq(events.yearId, year.id))
+    .orderBy(sql`${events.createdAt} desc`);
 
-  // นับจำนวนรายการแข่งขัน + ใบที่ออกแล้วต่อแต่ละงาน
+  // นับจำนวนรายการ + ใบที่ออกแล้วต่อแต่ละงาน
   const compCounts = await db
-    .select({ eventId: certificateEventCompetitions.eventId, n: sql<number>`count(*)::int` })
-    .from(certificateEventCompetitions)
-    .groupBy(certificateEventCompetitions.eventId);
+    .select({ eventId: competitions.eventId, n: sql<number>`count(*)::int` })
+    .from(competitions)
+    .where(eq(competitions.yearId, year.id))
+    .groupBy(competitions.eventId);
   const issueCounts = await db
     .select({ eventId: certificateIssues.eventId, n: sql<number>`count(*)::int` })
     .from(certificateIssues)
@@ -37,11 +38,14 @@ export default async function CertificatesPage() {
   const compMap = new Map(compCounts.map((r) => [r.eventId, r.n]));
   const issueMap = new Map(issueCounts.map((r) => [r.eventId, r.n]));
 
-  const rows = events.map((e) => ({
+  const rows = eventRows.map((e) => ({
     id: e.id,
     name: e.name,
+    kind: e.kind,
     eventDate: e.eventDate,
     status: e.status,
+    visibleToStudents: e.visibleToStudents,
+    registrationOpen: e.registrationOpen,
     competitionCount: compMap.get(e.id) ?? 0,
     issuedCount: issueMap.get(e.id) ?? 0,
   }));
@@ -49,9 +53,9 @@ export default async function CertificatesPage() {
   return (
     <div className="stack">
       <div className="page-header">
-        <h1>เกียรติบัตร</h1>
+        <h1>งาน / เกียรติบัตร</h1>
         <div className="subtitle">
-          สร้าง “งาน” เช่น การแข่งขันวันวิชาการ แล้วเลือกรายการแข่งขัน ออกแบบพื้นหลัง/ลายเซ็น/ตำแหน่งข้อความ · ปีการศึกษา {year.yearBe}
+          สร้าง “งาน” (แข่งขัน/อบรม) ตั้งค่าการเปิดรับสมัคร-การมองเห็น และออกแบบเกียรติบัตร · รายการแข่งขันเลือกงานได้ที่หน้าสร้างรายการ · ปีการศึกษา {year.yearBe}
         </div>
       </div>
       <CertEventsManager events={rows} />

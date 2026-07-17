@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { competitions, competitionCapacity, criteria, entries, scores, timeSlots } from "@/db/schema";
+import { competitions, competitionCapacity, criteria, entries, scores, timeSlots, events } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
@@ -26,8 +26,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const body = competitionInput.parse(await req.json());
 
+    // งานต้องเป็นงานของปีเดียวกับรายการ
+    const event = (
+      await db.select().from(events).where(and(eq(events.id, body.eventId), eq(events.yearId, comp.yearId))).limit(1)
+    )[0];
+    if (!event) return fail("กรุณาเลือกงานที่ถูกต้อง");
+
     // ครูย้ายหมวดได้เฉพาะหมวดของตัวเอง (คงหมวดเดิมไว้ได้เสมอ; admin เปลี่ยนได้ทุกหมวด)
-    if (body.subjectGroupId !== comp.subjectGroupId && !(await isGroupAllowed(s, comp.yearId, body.subjectGroupId)))
+    if (
+      body.subjectGroupId != null &&
+      body.subjectGroupId !== comp.subjectGroupId &&
+      !(await isGroupAllowed(s, comp.yearId, body.subjectGroupId))
+    )
       return fail("เลือกได้เฉพาะหมวดวิชาของท่านเท่านั้น", 403);
 
     // ช่วงเวลาต้องเป็น slot ของปีเดียวกับรายการ — คัดลอกเวลาเริ่ม/สิ้นสุดจาก slot
@@ -59,7 +69,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           name: body.name.trim(),
           description: body.description.trim(),
           visibleToStudents: body.visibleToStudents,
-          subjectGroupId: body.subjectGroupId,
+          eventId: body.eventId,
+          subjectGroupId: body.subjectGroupId ?? null,
           timeSlotId: slot.id,
           venueId: body.venueId ?? null,
           eventDate: body.eventDate || null,
@@ -94,9 +105,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           });
         }
         await tx.delete(criteria).where(eq(criteria.competitionId, id));
-        await tx.insert(criteria).values(
-          body.criteria.map((c, i) => ({ competitionId: id, name: c.name.trim(), maxScore: c.maxScore.toFixed(2), sortOrder: i }))
-        );
+        if (body.criteria.length) {
+          await tx.insert(criteria).values(
+            body.criteria.map((c, i) => ({ competitionId: id, name: c.name.trim(), maxScore: c.maxScore.toFixed(2), sortOrder: i }))
+          );
+        }
       } else {
         // มีคนลงแล้ว → อัปเดตได้เฉพาะจำนวนรับ (ห้ามต่ำกว่าที่ลงไปแล้ว)
         for (const row of capRows) {

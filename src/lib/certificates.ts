@@ -3,14 +3,13 @@ import { db, pool } from "@/db";
 import {
   certificateAssets,
   certificateCounters,
-  certificateEventCompetitions,
-  certificateEvents,
+  events,
   certificateIssues,
   certificateSignatures,
   certificateTemplates,
   competitions,
 } from "@/db/schema";
-import { and, asc, eq, inArray, notInArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import type { PoolClient } from "pg";
 import type { Medal } from "@/lib/domain";
@@ -290,42 +289,18 @@ export async function issueCertificates(params: {
 /** ล็อกงานเมื่อออกใบแรก — admin ต้องกดปลดล็อกเองถ้าจะแก้ดีไซน์ (กันใบพิมพ์ซ้ำหน้าตาไม่ตรงกับใบที่แจกไปแล้ว) */
 export async function lockEventIfNeeded(eventId: number): Promise<void> {
   await db
-    .update(certificateEvents)
+    .update(events)
     .set({ status: "locked" })
-    .where(and(eq(certificateEvents.id, eventId), eq(certificateEvents.status, "published")));
+    .where(and(eq(events.id, eventId), eq(events.status, "published")));
 }
 
-// ===== หน้าเลือกรายการแข่งขัน =====
-
-/**
- * รายการแข่งขันที่เลือกเข้างานนี้ได้ = รายการในปี ที่ยังไม่ถูกงาน "อื่น" หยิบไป
- * (รายการของงานตัวเองต้องยังอยู่ในลิสต์ ไม่งั้นตอนแก้ไขงานจะเห็นเป็นช่องว่าง)
- */
-export async function getSelectableCompetitions(yearId: number, eventId: number | null) {
-  const takenRows = await db
-    .select({ competitionId: certificateEventCompetitions.competitionId })
-    .from(certificateEventCompetitions)
-    .where(
-      eventId == null
-        ? undefined
-        : sql`${certificateEventCompetitions.eventId} <> ${eventId}`
-    );
-  const taken = takenRows.map((r) => r.competitionId);
-
-  const where = taken.length
-    ? and(eq(competitions.yearId, yearId), notInArray(competitions.id, taken))
-    : eq(competitions.yearId, yearId);
-
-  return db.select().from(competitions).where(where).orderBy(asc(competitions.name));
-}
-
-/** งานที่ถือรายการแข่งขันนี้อยู่ (null = ยังไม่ถูกจัดเข้างานไหน → ครูยัง export ไม่ได้) */
+/** งานที่รายการแข่งขันนี้สังกัด (null = ยังไม่ถูกจัดเข้างานไหน → ครูยัง export ไม่ได้) */
 export async function findEventForCompetition(competitionId: number) {
   const rows = await db
-    .select({ event: certificateEvents })
-    .from(certificateEventCompetitions)
-    .innerJoin(certificateEvents, eq(certificateEvents.id, certificateEventCompetitions.eventId))
-    .where(eq(certificateEventCompetitions.competitionId, competitionId))
+    .select({ event: events })
+    .from(competitions)
+    .innerJoin(events, eq(events.id, competitions.eventId))
+    .where(eq(competitions.id, competitionId))
     .limit(1);
   return rows[0]?.event ?? null;
 }

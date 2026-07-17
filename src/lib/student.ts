@@ -35,7 +35,7 @@ export async function getStudentEntries(studentCode: string, yearId: number): Pr
   const comps = await db.select().from(competitions).where(inArray(competitions.id, compIds));
   const compById = new Map(comps.map((c) => [c.id, c]));
   const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, yearId));
-  const groupName = (id: number) => groups.find((g) => g.id === id)?.name ?? "-";
+  const groupName = (id: number | null) => (id == null ? "" : groups.find((g) => g.id === id)?.name ?? "-");
 
   const allMembers = await db.select().from(entryMembers).where(inArray(entryMembers.entryId, entRows.map((e) => e.id)));
 

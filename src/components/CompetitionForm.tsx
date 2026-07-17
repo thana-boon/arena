@@ -14,6 +14,7 @@ export type CompFormInitial = {
   id?: number;
   name: string;
   description: string;
+  eventId: number | "";
   subjectGroupId: number | "";
   type: "individual" | "team";
   /** นักเรียนเห็นรายการนี้ในหน้าสมัครหรือไม่ (false = ครูลงให้อย่างเดียว) */
@@ -35,6 +36,7 @@ export type CompFormInitial = {
 };
 
 export function CompetitionForm({
+  events,
   groups,
   slots,
   venues,
@@ -42,6 +44,7 @@ export function CompetitionForm({
   returnTo = "/teacher/competitions",
   lockSubjectGroup = false,
 }: {
+  events: { id: number; name: string; kind: string }[];
   groups: { id: number; name: string }[];
   slots: SlotOption[];
   venues: VenueOption[];
@@ -85,6 +88,7 @@ export function CompetitionForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
+    if (!f.eventId) return setMsg({ type: "error", text: "กรุณาเลือกงาน" });
     if (!f.timeSlotId) return setMsg({ type: "error", text: "กรุณาเลือกช่วงเวลาแข่งขัน" });
     setBusy(true);
     // จำนวนรับ: ไม่จำกัด → -1 ทุกช่อง; จำกัด → ใช้ค่าที่กรอก (ช่องว่าง = 0)
@@ -94,7 +98,8 @@ export function CompetitionForm({
     const payload = {
       name: f.name,
       description: f.description,
-      subjectGroupId: Number(f.subjectGroupId),
+      eventId: Number(f.eventId),
+      subjectGroupId: f.subjectGroupId === "" ? null : Number(f.subjectGroupId),
       type: f.type,
       visibleToStudents: f.visibleToStudents,
       teamSizeMin: f.type === "team" && f.teamSizeMin !== "" ? Number(f.teamSizeMin) : null,
@@ -165,11 +170,23 @@ export function CompetitionForm({
           />
           <span className="form-hint">แสดงให้นักเรียนเห็นในหน้าสมัคร · ไม่เกิน 2000 ตัวอักษร</span>
         </div>
+        <div className="form-group">
+          <label className="form-label">งาน</label>
+          {events.length ? (
+            <select className="form-select" value={f.eventId} onChange={(e) => set("eventId", e.target.value === "" ? "" : Number(e.target.value))}>
+              <option value="">— เลือกงาน —</option>
+              {events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}{ev.kind === "training" ? " (อบรม)" : ""}</option>)}
+            </select>
+          ) : (
+            <div className="form-hint">ยังไม่มีงาน — ผู้ดูแลระบบต้องสร้างงานที่เมนู “งาน/เกียรติบัตร” ก่อน</div>
+          )}
+          <span className="form-hint">งานเป็นเจ้าของช่วงเปิด-ปิดรับสมัคร และการมองเห็นของนักเรียน</span>
+        </div>
         <div className="grid-2">
           <div className="form-group">
-            <label className="form-label">หมวดวิชา</label>
+            <label className="form-label">หมวดวิชา (ไม่บังคับ)</label>
             <select className="form-select" value={f.subjectGroupId} disabled={lockSubjectGroup} onChange={(e) => set("subjectGroupId", e.target.value === "" ? "" : Number(e.target.value))}>
-              <option value="">— เลือกหมวดวิชา —</option>
+              <option value="">— ไม่ระบุหมวด —</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
             {lockSubjectGroup && <span className="form-hint">สร้างได้เฉพาะหมวดของท่าน</span>}

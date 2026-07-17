@@ -31,14 +31,23 @@ type SigEdit = {
 type CompRow = { id: number; name: string; type: string; isPublished: boolean };
 
 export function CertEditor(props: {
-  event: { id: number; name: string; eventDate: string | null; status: string };
+  event: {
+    id: number;
+    name: string;
+    kind: string;
+    eventDate: string | null;
+    status: string;
+    visibleToStudents: boolean;
+    registrationOpen: boolean;
+    regStart: string;
+    regEnd: string;
+  };
   yearBe: number;
   initialLayout: CertLayout;
   initialOrientation: "landscape" | "portrait";
   initialBackgroundId: number | null;
   initialSignatures: SigEdit[];
-  selectedIds: number[];
-  selectable: CompRow[];
+  competitions: CompRow[];
   sample: CertRenderData;
 }) {
   const router = useRouter();
@@ -51,11 +60,35 @@ export function CertEditor(props: {
   const [backgroundId, setBackgroundId] = useState<number | null>(props.initialBackgroundId);
   const [layout, setLayout] = useState<CertLayout>(props.initialLayout);
   const [signatures, setSignatures] = useState<SigEdit[]>(props.initialSignatures);
-  const [selected, setSelected] = useState<Set<number>>(new Set(props.selectedIds));
   const [selBlock, setSelBlock] = useState<string | null>(null);
   const [selSig, setSelSig] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ type: string; text: string } | null>(null);
+
+  // ===== ตั้งค่างาน (ชื่อ/ประเภท/การรับสมัคร) =====
+  const [evName, setEvName] = useState(props.event.name);
+  const [evKind, setEvKind] = useState(props.event.kind);
+  const [evVisible, setEvVisible] = useState(props.event.visibleToStudents);
+  const [evRegOpen, setEvRegOpen] = useState(props.event.registrationOpen);
+  const [evRegStart, setEvRegStart] = useState(props.event.regStart);
+  const [evRegEnd, setEvRegEnd] = useState(props.event.regEnd);
+
+  async function saveEventSettings() {
+    if (!evName.trim()) return flash("error", "กรุณากรอกชื่องาน");
+    setBusy(true); setMsg(null);
+    const res = await api.patch(`/api/admin/certificate-events/${eventId}`, {
+      name: evName,
+      kind: evKind,
+      visibleToStudents: evVisible,
+      registrationOpen: evRegOpen,
+      regStart: evRegStart || null,
+      regEnd: evRegEnd || null,
+    });
+    setBusy(false);
+    if (!res.ok) return flash("error", res.error);
+    flash("success", "บันทึกตั้งค่างานแล้ว");
+    router.refresh();
+  }
 
   // วัดความกว้าง canvas จริงเพื่อคำนวณ % ↔ px ตอนลาก
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -197,17 +230,6 @@ export function CertEditor(props: {
   }
 
   // ===== บันทึก =====
-  async function saveCompetitions() {
-    setBusy(true); setMsg(null);
-    const res = await api.put(`/api/admin/certificate-events/${eventId}/competitions`, {
-      competitionIds: [...selected],
-    });
-    setBusy(false);
-    if (!res.ok) return flash("error", res.error);
-    flash("success", "บันทึกรายการแข่งขันแล้ว");
-    router.refresh();
-  }
-
   async function saveTemplate() {
     if (!backgroundId) return flash("error", "กรุณาอัปโหลดพื้นหลังก่อน");
     setBusy(true); setMsg(null);
@@ -267,32 +289,59 @@ export function CertEditor(props: {
       <div className="cert-editor-grid">
         {/* ซ้าย: แผงตั้งค่า */}
         <div className="stack">
-          {/* รายการแข่งขัน */}
+          {/* ตั้งค่างาน: ชื่อ/ประเภท/การรับสมัคร */}
           <details className="card" open>
-            <summary><strong>1. รายการแข่งขันในงานนี้</strong> ({selected.size})</summary>
+            <summary><strong>ตั้งค่างาน</strong></summary>
             <div className="stack" style={{ marginTop: 12 }}>
-              <div className="subtitle">รายการที่ถูกจัดเข้างานอื่นแล้วจะไม่แสดงที่นี่</div>
+              <label className="field">
+                <span>ชื่องาน</span>
+                <input value={evName} onChange={(e) => setEvName(e.target.value)} />
+              </label>
+              <label className="field">
+                <span>ประเภทงาน</span>
+                <select value={evKind} onChange={(e) => setEvKind(e.target.value)}>
+                  <option value="competition">งานแข่งขัน (มีคะแนน/อันดับ)</option>
+                  <option value="training">งานอบรม (ผู้เข้าร่วม → เกียรติบัตร)</option>
+                </select>
+              </label>
+              <label className="form-check">
+                <input type="checkbox" checked={evVisible} onChange={(e) => setEvVisible(e.target.checked)} />
+                <span>ให้นักเรียนเห็นงานนี้ (แสดงในหน้าสมัคร)</span>
+              </label>
+              <label className="form-check">
+                <input type="checkbox" checked={evRegOpen} onChange={(e) => setEvRegOpen(e.target.checked)} />
+                <span>เปิดรับสมัคร</span>
+              </label>
+              <div className="grid-2">
+                <label className="field">
+                  <span>เปิดรับสมัคร (เวลา)</span>
+                  <input type="datetime-local" value={evRegStart} onChange={(e) => setEvRegStart(e.target.value)} />
+                </label>
+                <label className="field">
+                  <span>ปิดรับสมัคร (เวลา)</span>
+                  <input type="datetime-local" value={evRegEnd} onChange={(e) => setEvRegEnd(e.target.value)} />
+                </label>
+              </div>
+              <div>
+                <button className="btn btn-primary btn-sm" onClick={saveEventSettings} disabled={busy}>บันทึกตั้งค่างาน</button>
+              </div>
+            </div>
+          </details>
+
+          {/* รายการแข่งขันในงานนี้ (อ่านอย่างเดียว — จัดการที่หน้าสร้าง/แก้รายการ) */}
+          <details className="card" open>
+            <summary><strong>1. รายการในงานนี้</strong> ({props.competitions.length})</summary>
+            <div className="stack" style={{ marginTop: 12 }}>
+              <div className="subtitle">กำหนดว่ารายการอยู่งานไหน ได้ที่หน้าสร้าง/แก้รายการแข่งขัน</div>
               <div style={{ maxHeight: 220, overflowY: "auto" }}>
-                {props.selectable.length === 0 && <div className="subtitle">ไม่มีรายการแข่งขันให้เลือก</div>}
-                {props.selectable.map((c) => (
-                  <label key={c.id} className="row" style={{ gap: 8, padding: "4px 0", alignItems: "center" }}>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(c.id)}
-                      onChange={(e) => {
-                        setSelected((S) => {
-                          const n = new Set(S);
-                          e.target.checked ? n.add(c.id) : n.delete(c.id);
-                          return n;
-                        });
-                      }}
-                    />
+                {props.competitions.length === 0 && <div className="subtitle">ยังไม่มีรายการในงานนี้</div>}
+                {props.competitions.map((c) => (
+                  <div key={c.id} className="row" style={{ gap: 8, padding: "4px 0", alignItems: "center" }}>
                     <span>{c.name}</span>
                     {!c.isPublished && <span className="badge" style={{ marginInlineStart: "auto" }}>ยังไม่ประกาศผล</span>}
-                  </label>
+                  </div>
                 ))}
               </div>
-              <button className="btn btn-primary btn-sm" onClick={saveCompetitions} disabled={busy}>บันทึกรายการ</button>
             </div>
           </details>
 

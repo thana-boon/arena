@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { certificateEvents, certificateSignatures, certificateTemplates } from "@/db/schema";
+import { events, certificateSignatures, certificateTemplates } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
@@ -12,7 +12,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   return handle(async () => {
     const s = await apiRequireRole("admin");
     const eventId = Number((await params).id);
-    const ev = await db.select().from(certificateEvents).where(eq(certificateEvents.id, eventId)).limit(1);
+    const ev = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
     if (!ev.length) return fail("ไม่พบงาน", 404);
     if (ev[0].status === "locked")
       return fail("งานนี้ถูกล็อกเพราะออกเกียรติบัตรไปแล้ว กรุณาปลดล็อกก่อนแก้ไข");

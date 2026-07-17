@@ -12,7 +12,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/class-registrations", label: "การสมัครรายห้อง", icon: "clipboard" },
   { href: "/admin/teachers", label: "สิทธิ์ครู", icon: "user" },
   { href: "/admin/reports", label: "ออกรายงาน", icon: "file" },
-  { href: "/admin/certificates", label: "เกียรติบัตร", icon: "trophy" },
+  { href: "/admin/certificates", label: "งาน / เกียรติบัตร", icon: "trophy" },
   { href: "/admin/audit", label: "บันทึกการใช้งาน / Log", icon: "log" },
   { href: "/admin/backup", label: "สำรอง & กู้คืนข้อมูล", icon: "database" },
 ];

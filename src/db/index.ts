@@ -7,11 +7,17 @@ const globalForDb = globalThis as unknown as {
   pool: Pool | undefined;
 };
 
+// max = จำนวน connection สูงสุดต่อ process (ปรับผ่าน env ได้โดยไม่ต้องแก้โค้ด)
+// ⚠️ ถ้ารัน PM2 cluster N instance รวมกันต้อง ≤ Postgres max_connections (default 100)
+//    เช่น 4 instance × 20 = 80 → ยังปลอดภัย
 const pool =
   globalForDb.pool ??
   new Pool({
     connectionString: process.env.DATABASE_URL,
-    max: 10,
+    max: Number(process.env.DB_POOL_MAX ?? 20),
+    // รอ connection ว่างสูงสุด 10 วิ แล้วค่อย error — กันไม่ให้ตอนโหลดพีค request ค้างไม่มีกำหนด
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 30_000,
   });
 
 if (process.env.NODE_ENV !== "production") globalForDb.pool = pool;

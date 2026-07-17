@@ -23,7 +23,7 @@ export async function ReportsBody({
   const { year, setting } = await getActiveYearWithSettings();
   const comp = (await db.select().from(competitions).where(eq(competitions.id, id)).limit(1))[0];
   if (!comp) return <div className="alert alert-error">ไม่พบรายการแข่งขัน</div>;
-  const group = (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0];
+  const group = comp.subjectGroupId == null ? undefined : (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0];
   if (!canViewCompetition(session, comp.createdBy, group?.catalogNo))
     return <div className="alert alert-error">คุณไม่มีสิทธิ์เข้าถึงรายการนี้</div>;
 

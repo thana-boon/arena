@@ -3,7 +3,7 @@ import { getActiveYear } from "@/lib/queries";
 import { listCompetitions } from "@/lib/listings";
 import { canViewCompetition } from "@/lib/permit";
 import { db } from "@/db";
-import { certificateEventCompetitions, certificateEvents } from "@/db/schema";
+import { competitions, events } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { Icon } from "@/components/Icon";
 import { TeacherCertificates } from "./TeacherCertificates";
@@ -29,24 +29,27 @@ export default async function TeacherCertificatesPage() {
   const links = viewable.length
     ? await db
         .select({
-          competitionId: certificateEventCompetitions.competitionId,
-          eventId: certificateEvents.id,
-          eventName: certificateEvents.name,
-          status: certificateEvents.status,
+          competitionId: competitions.id,
+          eventId: events.id,
+          eventName: events.name,
+          status: events.status,
+          kind: events.kind,
         })
-        .from(certificateEventCompetitions)
-        .innerJoin(certificateEvents, eq(certificateEvents.id, certificateEventCompetitions.eventId))
-        .where(inArray(certificateEventCompetitions.competitionId, viewable.map((c) => c.id)))
+        .from(competitions)
+        .innerJoin(events, eq(events.id, competitions.eventId))
+        .where(inArray(competitions.id, viewable.map((c) => c.id)))
     : [];
   const linkOf = new Map(links.map((l) => [l.competitionId, l]));
 
   const rows = viewable.map((c) => {
     const link = linkOf.get(c.id);
-    const ready = c.isPublished && link != null && link.status !== "draft";
+    const isTraining = link?.kind === "training";
+    // อบรม: ออกได้เลยไม่ต้องประกาศผล; แข่งขัน: ต้องประกาศผลก่อน
+    const ready = link != null && link.status !== "draft" && (isTraining || c.isPublished);
     let reason = "";
-    if (!c.isPublished) reason = "ยังไม่ประกาศผล";
-    else if (!link) reason = "ยังไม่ถูกจัดเข้างานเกียรติบัตร";
+    if (!link) reason = "ยังไม่ถูกจัดเข้างาน";
     else if (link.status === "draft") reason = "ผู้ดูแลยังตั้งค่าไม่เสร็จ";
+    else if (!isTraining && !c.isPublished) reason = "ยังไม่ประกาศผล";
     return {
       id: c.id,
       name: c.name,

@@ -9,8 +9,11 @@ import { Icon } from "@/components/Icon";
 type EventRow = {
   id: number;
   name: string;
+  kind: string;
   eventDate: string | null;
   status: string;
+  visibleToStudents: boolean;
+  registrationOpen: boolean;
   competitionCount: number;
   issuedCount: number;
 };
@@ -26,12 +29,11 @@ const STATUS_CLASS: Record<string, string> = {
   locked: "badge-purple",
 };
 
-const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-
 export function CertEventsManager({ events }: { events: EventRow[] }) {
   const router = useRouter();
   const confirm = useConfirm();
   const [name, setName] = useState("");
+  const [kind, setKind] = useState("competition");
   const [date, setDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ type: string; text: string } | null>(null);
@@ -41,11 +43,13 @@ export function CertEventsManager({ events }: { events: EventRow[] }) {
     setBusy(true); setMsg(null);
     const res = await api.post<{ id: number }>("/api/admin/certificate-events", {
       name,
+      kind,
       eventDate: date || null,
     });
     setBusy(false);
     if (!res.ok) return setMsg({ type: "error", text: res.error });
-    router.push(`${BASE}/admin/certificates/${res.data.id}`);
+    // next/navigation เติม basePath (/arena) ให้เองอยู่แล้ว — ห้าม prefix ซ้ำ ไม่งั้นได้ /arena/arena/... = 404
+    router.push(`/admin/certificates/${res.data.id}`);
   }
 
   async function del(e: EventRow) {
@@ -70,6 +74,13 @@ export function CertEventsManager({ events }: { events: EventRow[] }) {
           <label className="field" style={{ flex: 2 }}>
             <span>ชื่องาน</span>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="เช่น การแข่งขันวันวิชาการ ครั้งที่ 5" />
+          </label>
+          <label className="field">
+            <span>ประเภท</span>
+            <select value={kind} onChange={(e) => setKind(e.target.value)}>
+              <option value="competition">งานแข่งขัน</option>
+              <option value="training">งานอบรม</option>
+            </select>
           </label>
           <label className="field">
             <span>วันที่จัดงาน (ไม่บังคับ)</span>
@@ -104,13 +115,18 @@ export function CertEventsManager({ events }: { events: EventRow[] }) {
               {events.map((e) => (
                 <tr key={e.id}>
                   <td>
-                    <Link href={`${BASE}/admin/certificates/${e.id}`} className="link">{e.name}</Link>
+                    <Link href={`/admin/certificates/${e.id}`} className="link">{e.name}</Link>
+                    <div className="row" style={{ gap: 6, marginTop: 4 }}>
+                      <span className="badge">{e.kind === "training" ? "อบรม" : "แข่งขัน"}</span>
+                      {e.visibleToStudents && <span className="badge badge-purple">นักเรียนเห็น</span>}
+                      {e.registrationOpen && <span className="badge badge-gold">เปิดรับสมัคร</span>}
+                    </div>
                   </td>
                   <td><span className={STATUS_CLASS[e.status] ?? "badge"}>{STATUS_LABEL[e.status] ?? e.status}</span></td>
                   <td style={{ textAlign: "center" }}>{e.competitionCount}</td>
                   <td style={{ textAlign: "center" }}>{e.issuedCount}</td>
                   <td style={{ textAlign: "right" }}>
-                    <Link href={`${BASE}/admin/certificates/${e.id}`} className="btn btn-sm">ตั้งค่า</Link>
+                    <Link href={`/admin/certificates/${e.id}`} className="btn btn-sm">ตั้งค่า</Link>
                     {e.issuedCount === 0 && (
                       <button className="btn btn-sm btn-danger" onClick={() => del(e)} style={{ marginInlineStart: 6 }}>ลบ</button>
                     )}

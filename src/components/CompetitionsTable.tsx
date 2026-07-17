@@ -33,9 +33,11 @@ export function CompetitionsTable({
   // หมวดที่มีในรายการ (ไม่ซ้ำ) — ใช้ทำปุ่มกรอง เผื่อรายการเยอะ
   const groups = useMemo(() => {
     const seen = new Map<number, { id: number; name: string; catalogNo: number | null }>();
-    for (const c of comps)
-      if (!seen.has(c.subjectGroupId))
-        seen.set(c.subjectGroupId, { id: c.subjectGroupId, name: c.groupName, catalogNo: c.groupCatalogNo });
+    for (const c of comps) {
+      const gid = c.subjectGroupId ?? -1;
+      if (!seen.has(gid))
+        seen.set(gid, { id: gid, name: c.groupName || "ทั่วไป", catalogNo: c.groupCatalogNo });
+    }
     return [...seen.values()].sort(
       (a, b) => (a.catalogNo ?? 9999) - (b.catalogNo ?? 9999) || a.name.localeCompare(b.name, "th")
     );

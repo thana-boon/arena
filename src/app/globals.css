@@ -716,7 +716,9 @@ p {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    /* จบที่ none ไม่ใช่ translateY(0): ค่า transform ที่ค้างไว้ (fill both) จะทำให้ element
+       กลายเป็น containing block ของ position:fixed ทำให้ modal/overlay หลุดตำแหน่ง */
+    transform: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -748,7 +750,8 @@ p {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    /* จบที่ none เพื่อไม่ให้ค้าง transform (fill both) แล้วกลายเป็น containing block ของ fixed */
+    transform: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -954,6 +957,11 @@ p {
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.side-group {
   display: flex;
   flex-direction: column;
   gap: 2px;

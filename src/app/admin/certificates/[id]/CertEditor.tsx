@@ -152,15 +152,19 @@ export function CertEditor(props: {
     });
     if (!ok) return;
 
+    // ทุกพิกัดเป็น % ของ "ความกว้าง" หน้า ดังนั้นขอบล่างสุดของกระดาษ = 100 * (สูง/กว้าง)
+    // แนวนอน ≈ 70.7, แนวตั้ง ≈ 141.4 — ต้องจัดให้อยู่ในช่วงนี้ ไม่งั้นหลุดออกนอกหน้า
+    const maxY = 100 * (orientation === "portrait" ? 297 / 210 : 210 / 297);
+
     setLayout((L) => {
       const stack = L.filter((b) => b.kind !== "qr" && b.kind !== "serial");
-      const top = 24, bottom = 70;
+      const top = maxY * 0.1, bottom = maxY * 0.72;
       const step = stack.length > 1 ? (bottom - top) / (stack.length - 1) : 0;
       const patched = new Map<string, CertBlock>();
       stack.forEach((b, i) => patched.set(b.id, { ...b, x: 50, align: "center", y: round(top + step * i) }));
       L.forEach((b) => {
-        if (b.kind === "qr") patched.set(b.id, { ...b, x: 92, y: 86, align: "right" });
-        else if (b.kind === "serial") patched.set(b.id, { ...b, x: 8, y: 93, align: "left" });
+        if (b.kind === "qr") patched.set(b.id, { ...b, x: 92, y: round(maxY * 0.82), align: "right" });
+        else if (b.kind === "serial") patched.set(b.id, { ...b, x: 8, y: round(maxY * 0.95), align: "left" });
       });
       return L.map((b) => patched.get(b.id) ?? b);
     });
@@ -169,7 +173,7 @@ export function CertEditor(props: {
       S.map((s, i) => ({
         ...s,
         x: S.length <= 1 ? 50 : round(22 + (56 / (S.length - 1)) * i),
-        y: 78,
+        y: round(maxY * 0.78),
       }))
     );
     flash("success", "จัดหน้าให้แล้ว — ลากปรับเพิ่มได้ตามต้องการ");

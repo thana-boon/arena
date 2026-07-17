@@ -38,6 +38,7 @@ export function ClassRegistrations() {
 
   const students = data?.students ?? [];
   const registeredCount = students.filter((s) => s.registrations.length > 0).length;
+  const registeredPct = students.length ? Math.round((registeredCount / students.length) * 100) : 0;
 
   return (
     <div className="stack">
@@ -72,12 +73,35 @@ export function ClassRegistrations() {
 
       {data && (
         <div className="card">
-          <div className="row between mb-4">
+          <div className="row between mb-2">
             <div className="muted text-sm">
-              {level}/{room} · {students.length} คน · สมัครแล้ว {registeredCount} คน · ยังไม่สมัคร {students.length - registeredCount} คน
+              {level}/{room} · {students.length} คน · สมัครแล้ว {registeredCount} คน ({registeredPct}%) · ยังไม่สมัคร {students.length - registeredCount} คน
             </div>
             {data.yearBe && <span className="badge badge-purple">ปีการศึกษา {data.yearBe}</span>}
           </div>
+          {students.length > 0 && (
+            <div className="row mb-4" style={{ gap: 10, alignItems: "center" }}>
+              <div
+                role="progressbar"
+                aria-valuenow={registeredPct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="สัดส่วนนักเรียนที่สมัครแล้ว"
+                style={{ flex: 1, height: 8, borderRadius: 999, background: "var(--skdw-bg, #eee)", overflow: "hidden" }}
+              >
+                <div
+                  style={{
+                    width: `${registeredPct}%`,
+                    height: "100%",
+                    borderRadius: 999,
+                    background: registeredPct >= 100 ? "var(--skdw-green, #16a34a)" : "var(--skdw-purple, #7c3aed)",
+                    transition: "width .3s ease",
+                  }}
+                />
+              </div>
+              <span className="text-sm" style={{ fontWeight: 600, minWidth: 42, textAlign: "right" }}>{registeredPct}%</span>
+            </div>
+          )}
           <div className="table-wrap">
             <table className="table">
               <thead>

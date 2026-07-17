@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Sidebar, BottomNav, type NavItem } from "./Nav";
+import { Sidebar, BottomNav } from "./Nav";
 import { LogoutButton } from "./LogoutButton";
 import { RouteTransition } from "./RouteTransition";
 import { BrandLogo } from "./BrandLogo";
 import { Wordmark } from "./Wordmark";
+import { flattenNav, type NavGroup } from "@/lib/nav";
 import type { SessionPayload, Role } from "@/lib/auth/session";
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -15,16 +16,15 @@ const ROLE_LABEL: Record<Role, string> = {
 
 export function AppShell({
   session,
-  items,
-  section,
+  groups,
   children,
 }: {
   session: SessionPayload;
-  items: NavItem[];
-  section?: string;
+  groups: NavGroup[];
   children: React.ReactNode;
 }) {
   const initial = (session.name ?? "?").trim().charAt(0) || "?";
+  const bottomItems = flattenNav(groups);
   return (
     <div className="app-shell-nav">
       <aside className="sidebar">
@@ -32,7 +32,7 @@ export function AppShell({
           <BrandLogo />
           <Wordmark />
         </Link>
-        <Sidebar items={items} section={section} />
+        <Sidebar groups={groups} />
         <div className="side-user">
           <span className="avatar" aria-hidden="true">{initial}</span>
           <span className="who">
@@ -55,7 +55,7 @@ export function AppShell({
         <main className="main-content"><RouteTransition>{children}</RouteTransition></main>
       </div>
 
-      <BottomNav items={items} />
+      <BottomNav items={bottomItems} />
     </div>
   );
 }

@@ -2,25 +2,34 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/Icon";
+import type { NavGroup } from "@/lib/nav";
 
 export type NavItem = { href: string; label: string; icon: IconName };
 
-export function Sidebar({ items, section }: { items: NavItem[]; section?: string }) {
+function isActive(path: string, href: string) {
+  return path === href || (href !== "/" && path.startsWith(href + "/"));
+}
+
+export function Sidebar({ groups }: { groups: NavGroup[] }) {
   const path = usePathname();
   return (
     <nav className="side-nav">
-      {section && <div className="side-section">{section}</div>}
-      {items.map((it) => {
-        const active = path === it.href || (it.href !== "/" && path.startsWith(it.href + "/"));
-        return (
-          <Link key={it.href} href={it.href} className={`side-item${active ? " active" : ""}`} aria-current={active ? "page" : undefined}>
-            <span className="ico">
-              <Icon name={it.icon} size={20} />
-            </span>
-            <span>{it.label}</span>
-          </Link>
-        );
-      })}
+      {groups.map((g, gi) => (
+        <div className="side-group" key={g.section ?? `g${gi}`}>
+          {g.section && <div className="side-section">{g.section}</div>}
+          {g.items.map((it) => {
+            const active = isActive(path, it.href);
+            return (
+              <Link key={it.href} href={it.href} className={`side-item${active ? " active" : ""}`} aria-current={active ? "page" : undefined}>
+                <span className="ico">
+                  <Icon name={it.icon} size={20} />
+                </span>
+                <span>{it.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 }

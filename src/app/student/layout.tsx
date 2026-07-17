@@ -1,11 +1,11 @@
 import { requireRole } from "@/lib/auth/guards";
 import { AppShell } from "@/components/AppShell";
-import { STUDENT_NAV } from "@/lib/nav";
+import { STUDENT_NAV_GROUPS } from "@/lib/nav";
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const session = await requireRole("student");
   return (
-    <AppShell session={session} items={STUDENT_NAV} section="นักเรียน">
+    <AppShell session={session} groups={STUDENT_NAV_GROUPS}>
       {children}
     </AppShell>
   );

@@ -63,18 +63,22 @@ export type CertRenderData = {
   dateText: string;
 };
 
-/** layout เริ่มต้นของแม่แบบใหม่ — วางให้พอใช้งานได้ทันทีโดยไม่ต้องลากอะไรเลย */
+/**
+ * layout เริ่มต้นของแม่แบบใหม่ — วางให้พอใช้งานได้ทันทีโดยไม่ต้องลากอะไรเลย
+ * หมายเหตุ: y เป็น % ของ "ความกว้าง" หน้า (ตาม CertificateCanvas) แนวนอนขอบล่าง ≈ 70.7
+ * ค่าทั้งหมดจึงต้องอยู่ในช่วง 0–70 สำหรับกระดาษแนวนอน (ค่าเริ่มต้น) ไม่งั้นหลุดนอกหน้า
+ */
 export function defaultLayout(): CertLayout {
   const base = { align: "center" as const, font: "th-serif" as const, weight: 400, color: "#1f2937" };
   return [
-    { id: "b1", kind: "event_name", x: 50, y: 30, w: 80, fontSize: 2.4, ...base },
-    { id: "b2", kind: "student_name", x: 50, y: 44, w: 80, fontSize: 3.4, ...base, weight: 700 },
-    { id: "b3", kind: "class", x: 50, y: 52, w: 60, fontSize: 1.8, ...base },
-    { id: "b4", kind: "competition_name", x: 50, y: 60, w: 80, fontSize: 2.2, ...base },
-    { id: "b5", kind: "medal", x: 50, y: 67, w: 60, fontSize: 1.8, ...base },
-    { id: "b6", kind: "date", x: 50, y: 88, w: 60, fontSize: 1.4, ...base },
-    { id: "b7", kind: "serial", x: 8, y: 93, w: 20, fontSize: 1.1, ...base, align: "left" },
-    { id: "b8", kind: "qr", x: 92, y: 90, w: 7, ...base, align: "right", fontSize: 1 },
+    { id: "b1", kind: "event_name", x: 50, y: 14, w: 80, fontSize: 2.4, ...base },
+    { id: "b2", kind: "student_name", x: 50, y: 28, w: 80, fontSize: 3.4, ...base, weight: 700 },
+    { id: "b3", kind: "class", x: 50, y: 37, w: 60, fontSize: 1.8, ...base },
+    { id: "b4", kind: "competition_name", x: 50, y: 46, w: 80, fontSize: 2.2, ...base },
+    { id: "b5", kind: "medal", x: 50, y: 54, w: 60, fontSize: 1.8, ...base },
+    { id: "b6", kind: "date", x: 50, y: 62, w: 60, fontSize: 1.4, ...base },
+    { id: "b7", kind: "serial", x: 8, y: 67, w: 20, fontSize: 1.1, ...base, align: "left" },
+    { id: "b8", kind: "qr", x: 92, y: 58, w: 7, ...base, align: "right", fontSize: 1 },
   ];
 }
 

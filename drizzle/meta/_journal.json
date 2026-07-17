@@ -8,6 +8,13 @@
       "when": 1784185513327,
       "tag": "0000_init_postgres",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784187552986,
+      "tag": "0001_certificates",
+      "breakpoints": true
     }
   ]
 }

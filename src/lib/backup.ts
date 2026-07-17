@@ -25,10 +25,22 @@ const TABLES = [
   "scores",
   "audit_log",
   "teacher_cache",
+  "certificate_assets",
+  "certificate_events",
+  "certificate_event_competitions",
+  "certificate_templates",
+  "certificate_signatures",
+  "certificate_issues",
+  "certificate_counters",
 ] as const;
 
 // ตารางที่ไม่มีคอลัมน์ serial "id" (ใช้ natural key เป็น PK) → ไม่ต้องรีเซ็ต sequence
-const NO_SERIAL_ID = new Set<string>(["subject_group_catalog", "teacher_roles", "teacher_cache"]);
+const NO_SERIAL_ID = new Set<string>([
+  "subject_group_catalog",
+  "teacher_roles",
+  "teacher_cache",
+  "certificate_counters",
+]);
 
 export const BACKUP_VERSION = 1;
 const APP_TAG = "skdw-arena";

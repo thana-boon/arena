@@ -1441,3 +1441,37 @@ p {
   color: var(--skdw-purple);
   font-weight: 600;
 }
+
+/* ---------- เกียรติบัตร: หน้าพิมพ์ ---------- */
+/* บนจอ: แสดงตัวอย่างเรียงกลางจอ; เวลาพิมพ์: หนึ่งใบต่อหนึ่งหน้ากระดาษ ไม่มีขอบ */
+.cert-print-root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  background: #e5e7eb;
+  min-height: 100vh;
+}
+.cert-page {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+  background: #fff;
+}
+@media print {
+  .cert-print-root {
+    display: block;
+    padding: 0;
+    gap: 0;
+    background: #fff;
+    min-height: 0;
+  }
+  .cert-page {
+    box-shadow: none;
+    break-after: page;
+    page-break-after: always;
+  }
+  .cert-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}

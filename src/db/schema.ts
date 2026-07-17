@@ -235,6 +235,150 @@ export const teacherCache = pgTable("teacher_cache", {
     .$onUpdate(() => new Date()),
 });
 
+// ===== เกียรติบัตร: ไฟล์รูป (พื้นหลัง / ลายเซ็น) =====
+// เก็บรูปเป็น base64 ใน text ไม่ใช่ bytea เพราะ lib/backup.ts ทำ backup ด้วย SELECT * + JSON.stringify
+// ถ้าเป็น bytea จะได้ Buffer แล้ว JSON.stringify ออกมาเป็น {"type":"Buffer","data":[...]} ซึ่งใหญ่กว่าเดิมและ restore ไม่กลับ
+// ฝั่ง client ย่อ+แปลงเป็น WebP ก่อนอัปโหลดเสมอ (ดู lib/imageCompress.ts) เซิร์ฟเวอร์ตรวจขนาดซ้ำอีกชั้น
+export const certificateAssets = pgTable("certificate_assets", {
+  id: serial("id").primaryKey(),
+  kind: varchar("kind", { length: 16 }).notNull(), // 'background' | 'signature'
+  name: varchar("name", { length: 191 }).notNull().default(""),
+  mime: varchar("mime", { length: 64 }).notNull(), // image/webp | image/png | image/jpeg
+  data: text("data").notNull(), // base64 (ไม่มี data: prefix)
+  bytes: integer("bytes").notNull().default(0),
+  width: integer("width").notNull().default(0),
+  height: integer("height").notNull().default(0),
+  createdBy: varchar("created_by", { length: 64 }).notNull().default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ===== เกียรติบัตร: งาน (รายการใหญ่) =====
+// 1 งาน เช่น "การแข่งขันวันวิชาการ ครั้งที่ 5" = เกียรติบัตร 1 ดีไซน์ ครอบหลายรายการแข่งขัน
+// status: draft = admin แก้ได้ ครูยังไม่เห็น | published = ครู export ได้ | locked = ออกใบแรกแล้ว ต้องปลดล็อกก่อนแก้
+export const certificateEvents = pgTable(
+  "certificate_events",
+  {
+    id: serial("id").primaryKey(),
+    yearId: integer("year_id").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    eventDate: date("event_date", { mode: "string" }),
+    status: varchar("status", { length: 16 }).notNull().default("draft"),
+    createdBy: varchar("created_by", { length: 64 }).notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("cert_event_year_idx").on(t.yearId)]
+);
+
+// ===== เกียรติบัตร: รายการแข่งขันที่อยู่ในงาน =====
+// unique บน competition_id (ไม่ใช่คู่ event+competition) — รายการแข่งขันหนึ่งอยู่ได้แค่งานเดียว
+// ไม่งั้นตอนครูกด export ระบบไม่รู้ว่าต้องใช้ดีไซน์ของงานไหน + เป็นตัวกรองให้หน้าเลือกซ่อนรายการที่ถูกใช้แล้ว
+export const certificateEventCompetitions = pgTable(
+  "certificate_event_competitions",
+  {
+    id: serial("id").primaryKey(),
+    eventId: integer("event_id").notNull(),
+    competitionId: integer("competition_id").notNull(),
+  },
+  (t) => [
+    uniqueIndex("cert_event_comp_uniq").on(t.competitionId),
+    index("cert_event_comp_event_idx").on(t.eventId),
+  ]
+);
+
+// ===== เกียรติบัตร: แม่แบบ (พื้นหลัง + ตำแหน่งข้อความ) =====
+// medalFilter = '' คือแม่แบบหลักของงาน; ใส่ 'gold'/'silver'/'bronze' เพื่อ override เฉพาะเหรียญนั้น
+// ใช้ '' แทน null เพราะ Postgres ถือว่า null แต่ละตัวไม่ซ้ำกัน → unique(event_id, medal_filter) จะกันซ้ำไม่ได้
+// layout เก็บ json array ของ block (ดู CertLayout ใน lib/certificates.ts) พิกัดเป็น % ของหน้ากระดาษ
+export const certificateTemplates = pgTable(
+  "certificate_templates",
+  {
+    id: serial("id").primaryKey(),
+    eventId: integer("event_id").notNull(),
+    medalFilter: varchar("medal_filter", { length: 16 }).notNull().default(""),
+    backgroundAssetId: integer("background_asset_id"),
+    orientation: varchar("orientation", { length: 16 }).notNull().default("landscape"),
+    layout: text("layout").notNull().default("[]"), // json array
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [uniqueIndex("cert_tpl_event_medal_uniq").on(t.eventId, t.medalFilter)]
+);
+
+// ===== เกียรติบัตร: ผู้ลงนาม =====
+// mode: 'image' = ลายเซ็นดิจิทัล (วางรูปจาก asset) | 'blank' = เว้นเส้นไว้เซ็นสด
+// เก็บพิกัดไว้ที่แถวนี้เลย ไม่ปนใน layout json เพื่อไม่ให้ตำแหน่งลายเซ็นมีสองแหล่งความจริง
+export const certificateSignatures = pgTable(
+  "certificate_signatures",
+  {
+    id: serial("id").primaryKey(),
+    templateId: integer("template_id").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    name: varchar("name", { length: 191 }).notNull().default(""), // ชื่อผู้ลงนาม
+    roleLabel: varchar("role_label", { length: 191 }).notNull().default(""), // เช่น "ผู้อำนวยการโรงเรียน"
+    mode: varchar("mode", { length: 16 }).notNull().default("blank"),
+    assetId: integer("asset_id"), // ใช้เมื่อ mode = 'image'
+    x: numeric("x", { precision: 6, scale: 3 }).notNull().default("50"), // % จุดกึ่งกลางแนวนอน
+    y: numeric("y", { precision: 6, scale: 3 }).notNull().default("75"), // % จากขอบบน
+    width: numeric("width", { precision: 6, scale: 3 }).notNull().default("18"), // % ของความกว้างหน้า
+  },
+  (t) => [index("cert_sig_tpl_idx").on(t.templateId)]
+);
+
+// ===== เกียรติบัตร: ทะเบียนคุม =====
+// 1 แถว = เกียรติบัตร 1 ใบที่ออกจริง (เลขทะเบียนถูกจอง ณ ตอน insert เท่านั้น)
+// snapshot ทุกอย่างที่พิมพ์ลงกระดาษ เพื่อให้ใบที่แจกไปแล้วตรวจสอบย้อนหลังได้ แม้ข้อมูลต้นทางจะถูกแก้ทีหลัง
+// unique(competition_id, entry_id, student_code) → กดออกซ้ำได้เลขเดิม ไม่เผาเลขใหม่ (นับที่ reprint_count แทน)
+export const certificateIssues = pgTable(
+  "certificate_issues",
+  {
+    id: serial("id").primaryKey(),
+    serialNo: varchar("serial_no", { length: 32 }).notNull().unique(), // "2569/0042"
+    verifyToken: varchar("verify_token", { length: 32 }).notNull().unique(), // สุ่ม ใช้ทำ QR
+    yearId: integer("year_id").notNull(),
+    eventId: integer("event_id").notNull(),
+    competitionId: integer("competition_id").notNull(),
+    entryId: integer("entry_id").notNull(),
+    studentCode: varchar("student_code", { length: 64 }).notNull(),
+    templateId: integer("template_id").notNull(),
+    // snapshot ณ เวลาออกใบ
+    nameSnapshot: varchar("name_snapshot", { length: 191 }).notNull(),
+    classSnapshot: varchar("class_snapshot", { length: 32 }).notNull().default(""),
+    teamNameSnapshot: varchar("team_name_snapshot", { length: 191 }),
+    competitionNameSnapshot: varchar("competition_name_snapshot", { length: 255 }).notNull(),
+    eventNameSnapshot: varchar("event_name_snapshot", { length: 255 }).notNull(),
+    yearBeSnapshot: integer("year_be_snapshot").notNull(),
+    medal: varchar("medal", { length: 16 }).notNull().default("none"),
+    rank: integer("rank").notNull().default(0),
+    percent: numeric("percent", { precision: 6, scale: 2 }).notNull().default("0"),
+    issuedBy: varchar("issued_by", { length: 64 }).notNull(),
+    issuedAt: timestamp("issued_at").notNull().defaultNow(),
+    reprintCount: integer("reprint_count").notNull().default(0),
+    revokedAt: timestamp("revoked_at"),
+    revokeReason: varchar("revoke_reason", { length: 255 }),
+  },
+  (t) => [
+    uniqueIndex("cert_issue_target_uniq").on(t.competitionId, t.entryId, t.studentCode),
+    index("cert_issue_event_idx").on(t.eventId),
+    index("cert_issue_comp_idx").on(t.competitionId),
+  ]
+);
+
+// ===== เกียรติบัตร: ตัวเดินเลขทะเบียน (ต่อปีการศึกษา) =====
+// เลขวิ่งต่อเนื่องทั้งปี ข้ามงาน (รูปแบบโรงเรียน: 2569/0001, 2569/0002, ...)
+// จึงต้องอยู่ระดับปี ไม่ใช่ระดับงาน ไม่งั้นงานที่สองจะเริ่มนับ 1 ใหม่แล้วเลขชนกัน
+// lastNo = เลขล่าสุดที่แจกไปแล้ว (0 = ยังไม่เคยออกใบในปีนี้)
+export const certificateCounters = pgTable("certificate_counters", {
+  yearId: integer("year_id").primaryKey(),
+  lastNo: integer("last_no").notNull().default(0),
+});
+
 // types
 export type AcademicYear = typeof academicYears.$inferSelect;
 export type Setting = typeof settings.$inferSelect;
@@ -249,3 +393,8 @@ export type Entry = typeof entries.$inferSelect;
 export type EntryMember = typeof entryMembers.$inferSelect;
 export type Score = typeof scores.$inferSelect;
 export type TeacherRole = typeof teacherRoles.$inferSelect;
+export type CertificateAsset = typeof certificateAssets.$inferSelect;
+export type CertificateEvent = typeof certificateEvents.$inferSelect;
+export type CertificateTemplate = typeof certificateTemplates.$inferSelect;
+export type CertificateSignature = typeof certificateSignatures.$inferSelect;
+export type CertificateIssue = typeof certificateIssues.$inferSelect;

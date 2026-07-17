@@ -42,6 +42,17 @@ export const competitionInput = z
 
 export type CompetitionInput = z.infer<typeof competitionInput>;
 
+// ===== ช่วงเวลาแข่งขัน (time slot) =====
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+export const slotInput = z
+  .object({
+    label: z.string().min(1, "กรุณากรอกชื่อช่วงเวลา").max(191),
+    startTime: z.string().regex(HHMM, "เวลาไม่ถูกต้อง"),
+    endTime: z.string().regex(HHMM, "เวลาไม่ถูกต้อง"),
+  })
+  .refine((v) => v.startTime < v.endTime, { message: "เวลาเริ่มต้องก่อนเวลาสิ้นสุด", path: ["endTime"] });
+export type SlotInput = z.infer<typeof slotInput>;
+
 // ===== สถานที่แข่งขัน (venue master data) =====
 export const venueInput = z.object({
   name: z.string().min(1, "กรุณากรอกชื่อสถานที่").max(191),
@@ -49,3 +60,73 @@ export const venueInput = z.object({
   note: z.string().max(255).optional().default(""),
 });
 export type VenueInput = z.infer<typeof venueInput>;
+
+// ===== เกียรติบัตร =====
+
+// จำกัดขนาด base64 ที่รับ (base64 พองจากไบต์จริง ~4/3 → 4MB base64 ≈ 3MB ไฟล์จริง)
+// การย่อฝั่ง client ควรได้เล็กกว่านี้มาก ค่านี้เป็นเพดานกันพลาด/กันยิง API ตรง
+const MAX_ASSET_B64 = 4 * 1024 * 1024;
+
+export const certAssetInput = z.object({
+  kind: z.enum(["background", "signature"]),
+  name: z.string().max(191).optional().default(""),
+  mime: z.enum(["image/webp", "image/png", "image/jpeg"]),
+  data: z.string().min(1, "ไม่มีข้อมูลรูป").max(MAX_ASSET_B64, "ไฟล์รูปใหญ่เกินไป"),
+  width: z.number().int().min(0).optional().default(0),
+  height: z.number().int().min(0).optional().default(0),
+});
+export type CertAssetInput = z.infer<typeof certAssetInput>;
+
+export const certEventInput = z.object({
+  name: z.string().min(1, "กรุณากรอกชื่องาน").max(255),
+  eventDate: z.string().nullable().optional(),
+});
+export type CertEventInput = z.infer<typeof certEventInput>;
+
+const certBlock = z.object({
+  id: z.string(),
+  kind: z.enum([
+    "student_name", "class", "team_name", "competition_name", "event_name",
+    "medal", "rank", "date", "serial", "qr", "static_text",
+  ]),
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  align: z.enum(["left", "center", "right"]),
+  fontSize: z.number(),
+  font: z.enum(["th-serif", "th-sans", "th-modern"]),
+  weight: z.number(),
+  color: z.string().max(32),
+  text: z.string().max(255).optional(),
+});
+
+const certSignatureInput = z.object({
+  name: z.string().max(191).optional().default(""),
+  roleLabel: z.string().max(191).optional().default(""),
+  mode: z.enum(["image", "blank"]),
+  assetId: z.number().int().positive().nullable().optional(),
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+});
+
+// บันทึกแม่แบบทั้งก้อน (พื้นหลัง + layout + ผู้ลงนาม) ในครั้งเดียว
+export const certTemplateInput = z.object({
+  medalFilter: z.enum(["", "gold", "silver", "bronze"]).optional().default(""),
+  backgroundAssetId: z.number().int().positive().nullable().optional(),
+  orientation: z.enum(["landscape", "portrait"]).optional().default("landscape"),
+  layout: z.array(certBlock),
+  signatures: z.array(certSignatureInput).max(6, "ผู้ลงนามได้ไม่เกิน 6 คน"),
+});
+export type CertTemplateInput = z.infer<typeof certTemplateInput>;
+
+// เลือกรายการแข่งขันเข้างาน
+export const certEventCompetitionsInput = z.object({
+  competitionIds: z.array(z.number().int().positive()),
+});
+
+// ครูสั่งออกเกียรติบัตร: ระบุรายการแข่งขัน (ออกให้ทุกคนที่มีผลในรายการนั้น)
+export const certIssueInput = z.object({
+  competitionId: z.number().int().positive(),
+  entryIds: z.array(z.number().int().positive()).optional(), // ว่าง = ทุก entry ที่ได้เหรียญ
+});

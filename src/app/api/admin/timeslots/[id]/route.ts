@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
 import { logAudit } from "@/lib/audit";
-import { slotInput } from "../route";
+import { slotInput } from "@/lib/validation";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {

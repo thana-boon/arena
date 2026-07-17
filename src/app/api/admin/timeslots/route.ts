@@ -1,19 +1,10 @@
-import { z } from "zod";
 import { db } from "@/db";
 import { timeSlots } from "@/db/schema";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
 import { getActiveYear, getTimeSlots } from "@/lib/queries";
+import { slotInput } from "@/lib/validation";
 import { logAudit } from "@/lib/audit";
-
-const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
-export const slotInput = z
-  .object({
-    label: z.string().min(1, "กรุณากรอกชื่อช่วงเวลา").max(191),
-    startTime: z.string().regex(HHMM, "เวลาไม่ถูกต้อง"),
-    endTime: z.string().regex(HHMM, "เวลาไม่ถูกต้อง"),
-  })
-  .refine((v) => v.startTime < v.endTime, { message: "เวลาเริ่มต้องก่อนเวลาสิ้นสุด", path: ["endTime"] });
 
 // GET: รายการช่วงเวลาของปีที่ active
 export async function GET() {

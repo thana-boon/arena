@@ -4,14 +4,29 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
 
 type Year = { id: number; yearBe: number; isActive: boolean };
-type SourceYear = { yearBe: number; title: string; isActiveAtSource: boolean; imported: boolean };
+export type SourceYear = {
+  yearBe: number;
+  title: string;
+  isActiveAtSource: boolean;
+  imported: boolean;
+};
 
-export function YearsManager({ years }: { years: Year[] }) {
+export function YearsManager({
+  years,
+  initialSource = null,
+  initialSourceError = null,
+}: {
+  years: Year[];
+  initialSource?: SourceYear[] | null;
+  initialSourceError?: string | null;
+}) {
   const router = useRouter();
-  const [msg, setMsg] = useState<{ type: string; text: string } | null>(null);
+  const [msg, setMsg] = useState<{ type: string; text: string } | null>(
+    initialSourceError ? { type: "error", text: initialSourceError } : null
+  );
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [source, setSource] = useState<SourceYear[] | null>(null);
+  const [source, setSource] = useState<SourceYear[] | null>(initialSource);
 
   async function loadSource() {
     setLoading(true); setMsg(null);

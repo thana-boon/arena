@@ -233,7 +233,7 @@ export function CompetitionForm({
             {CLASS_LEVELS.map((lv) => {
               const on = f.allowedClassLevels.includes(lv);
               return (
-                <label key={lv} className={`level-chip${on ? " on" : ""}${locked ? " disabled" : ""}`}>
+                <label key={lv} className={`level-chip${lv.length > 4 ? " wide" : ""}${on ? " on" : ""}${locked ? " disabled" : ""}`}>
                   <input type="checkbox" checked={on} disabled={locked} onChange={() => toggleLevel(lv)} />
                   <span>{lv}</span>
                 </label>

@@ -12,6 +12,8 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:push": "drizzle-kit push --force",
     "db:seed": "tsx src/db/seed.ts",
+    "db:bootstrap": "tsx src/db/bootstrap.ts",
+    "admin:password": "tsx src/db/set-admin-password.ts",
     "db:setup": "npm run db:push && npm run db:seed"
   },
   "dependencies": {

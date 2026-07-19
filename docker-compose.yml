@@ -1,44 +1,29 @@
-# SKDW Arena — สแตกเดียว: Next.js (3017) + PostgreSQL (5017)
+# SKDW Arena — app อย่างเดียว (Next.js :3017)
+# DB ใช้ postgres-core ที่มีอยู่แล้วบน network "school-net" (ไม่สร้าง container db เอง)
 # รัน:  docker compose up -d --build
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: arena-db
-    # ค่า user/pass/db อ่านจาก .env (ไม่ hardcode รหัสไว้ในไฟล์ที่ commit)
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      TZ: Asia/Bangkok
-    ports:
-      - "5017:5432" # host 5017 → container 5432
-    volumes:
-      - arena_pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-    restart: unless-stopped
-
   app:
     build: .
     container_name: arena-app
-    depends_on:
-      db:
-        condition: service_healthy # รอ Postgres พร้อมก่อนค่อย push/seed/start
     env_file:
-      - .env # โหลด JWT_SECRET, SCHOOLOS_API_* ฯลฯ จาก .env
+      - .env # โหลด JWT_SECRET, SCHOOLOS_API_KEY ฯลฯ จาก .env
     environment:
       NODE_ENV: production
       PORT: "3017"
       TZ: Asia/Bangkok
-      # ชี้ไปที่ service db ภายในเน็ตเวิร์ก compose (พอร์ตภายในคือ 5432) — override ค่าใน .env
-      # รหัส/ชื่อ DB อ่านจาก .env เพื่อไม่ hardcode ไว้ในไฟล์ที่ commit
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # ในเน็ตเวิร์ก school-net เรียก postgres-core ด้วยชื่อ service (พอร์ตภายใน 5432)
+      # — override ค่า DATABASE_URL ใน .env ที่ใช้ตอน dev บน host
+      # :? = ถ้าไม่ได้ตั้งใน .env compose จะหยุดพร้อมบอกเหตุผลตั้งแต่ต้น
+      # ดีกว่าปล่อยให้ container สตาร์ตด้วยค่าว่างแล้วไปพังตอนมีคนใช้งาน
+      DATABASE_URL: postgres://${ARENA_DB_USER:-arena}:${ARENA_DB_PASSWORD:?ต้องตั้ง ARENA_DB_PASSWORD ใน .env}@${ARENA_DB_HOST:-postgres-core}:${ARENA_DB_PORT:-5432}/${ARENA_DB_NAME:-arena}
+      JWT_SECRET: ${JWT_SECRET:?ต้องตั้ง JWT_SECRET ใน .env (สุ่มยาว ๆ เช่น openssl rand -hex 32)}
+      # SCHOOLOS_API_BASE ใช้ค่าจาก .env ตรง ๆ (192.168.200.56:3002 ถึงได้ทั้งจาก host และในคอนเทนเนอร์)
     ports:
       - "3017:3017"
+    networks:
+      - school-net
     restart: unless-stopped
 
-volumes:
-  arena_pgdata:
+networks:
+  school-net:
+    external: true # สร้างไว้แล้วโดยสแตก postgres-core

@@ -450,6 +450,11 @@ p {
   user-select: none;
   transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
+/* ชั้นที่ชื่อยาว (เตรียมอนุบาล) กินสองช่องเพื่อไม่ให้ตัดบรรทัด */
+.level-chip.wide {
+  grid-column: span 2;
+  white-space: nowrap;
+}
 .level-chip input {
   position: absolute;
   opacity: 0;

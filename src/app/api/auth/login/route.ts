@@ -6,13 +6,14 @@ import bcrypt from "bcryptjs";
 import { ok, fail, handle } from "@/lib/api";
 import { createSession, type Role } from "@/lib/auth/session";
 import { teacherLogin, teacherFullName } from "@/lib/external/teacher-api";
-import { studentVerify, fetchStudent, studentFullName } from "@/lib/external/student-api";
+import { studentLogin, studentFullName, type StudentProfile } from "@/lib/external/student-api";
+import { SosRateLimitError } from "@/lib/external/schoolos";
 import { getTeacherRole } from "@/lib/queries";
 
-// ฟอร์ม login เดียว: identifier (รหัสผู้ใช้/รหัสนักเรียน) + secret (รหัสผ่าน/เลขบัตรประชาชน)
+// ฟอร์ม login เดียว: identifier (รหัสผู้ใช้/รหัสนักเรียน/รหัสครู) + secret (รหัสผ่าน)
 const schema = z.object({
   identifier: z.string().min(1, "กรุณากรอกรหัสผู้ใช้ / รหัสนักเรียน"),
-  secret: z.string().min(1, "กรุณากรอกรหัสผ่าน / เลขบัตรประชาชน"),
+  secret: z.string().min(1, "กรุณากรอกรหัสผ่าน"),
 });
 
 export async function POST(req: Request) {
@@ -30,31 +31,32 @@ export async function POST(req: Request) {
       return ok({ role: "admin", redirect: "/admin" });
     }
 
-    // 2) นักเรียน — รหัสผ่านนักเรียน = "Skdw" + เลขบัตรประชาชน 13 หลัก
-    //    (ทำก่อน Teacher API เพื่อไม่ให้ต้องเรียก API ครูโดยไม่จำเป็น และเลี่ยงกรณี API ครูล่มมากระทบนักเรียน)
-    const studentMatch = /^Skdw(\d{13})$/.exec(secret);
-    if (studentMatch) {
-      const citizenId = studentMatch[1];
-      const matched = await studentVerify(identifier, citizenId);
-      if (matched) {
-        const student = await fetchStudent(identifier);
-        if (student) {
-          await createSession({
-            role: "student",
-            code: student.student_code,
-            name: studentFullName(student),
-            classLevel: student.class_level,
-            classRoom: student.class_room,
-          });
-          return ok({ role: "student", redirect: "/student" });
-        }
-      }
-      // ไม่ใช่นักเรียน → ตกไปลอง Teacher API ต่อ (เผื่อรหัสผ่านครูบังเอิญขึ้นต้น Skdw + เลข 13 หลัก)
-    }
+    // 2) นักเรียน / ครู — ตรวจรหัสผ่านผ่าน SchoolOS (/auth/verify)
+    //    เดา role จากรูปแบบรหัส: รหัสนักเรียนเป็นตัวเลขล้วน, รหัสครูมีตัวอักษรนำ (เช่น T00116)
+    //    ถ้าเดาแล้วไม่ผ่าน ค่อยลองอีก role หนึ่งเป็น fallback
+    const numeric = /^\d+$/.test(identifier.trim());
 
-    // 3) ครู — ผ่าน Teacher API
-    const profile = await teacherLogin(identifier, secret);
-    if (profile) {
+    const loginStudent = async (): Promise<boolean> => {
+      const student: StudentProfile | null = await studentLogin(identifier, secret);
+      if (!student) return false;
+      await createSession({
+        role: "student",
+        code: student.student_code,
+        name: studentFullName(student),
+        classLevel: student.class_level,
+        classRoom: student.class_room,
+      });
+      return true;
+    };
+
+    try {
+      if (numeric && (await loginStudent())) {
+        return ok({ role: "student", redirect: "/student" });
+      }
+
+      // 3) ครู — ผ่าน SchoolOS
+      const profile = await teacherLogin(identifier, secret);
+      if (profile) {
       // อ่านสิทธิ์เพิ่มจาก teacher_roles
       const roleRow = await getTeacherRole(profile.teacher_code);
       let role: Role = "teacher";
@@ -77,6 +79,17 @@ export async function POST(req: Request) {
         subjectGroupId: Number.isFinite(sg) ? sg : undefined,
       });
       return ok({ role, redirect: role === "admin" ? "/admin" : "/teacher" });
+      }
+
+      // 4) fallback — ถ้ารหัสไม่ใช่ตัวเลข (เดาว่าครู) แต่ที่จริงเป็นนักเรียน
+      if (!numeric && (await loginStudent())) {
+        return ok({ role: "student", redirect: "/student" });
+      }
+    } catch (e) {
+      if (e instanceof SosRateLimitError) {
+        return fail("พยายามเข้าสู่ระบบบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่", 429);
+      }
+      throw e;
     }
 
     return fail("รหัสผู้ใช้ / รหัสผ่านไม่ถูกต้อง", 401);

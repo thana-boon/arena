@@ -1,18 +1,15 @@
 import { ok, handle, fail } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
 import { fetchAllTeachers, teacherFullName } from "@/lib/external/teacher-api";
-import { syncSubjectGroupCatalog, getSubjectGroupMap, subjectGroupLabel } from "@/lib/subjectGroups";
+import { getSubjectGroupMap, subjectGroupLabel } from "@/lib/subjectGroups";
 
-// GET: ดึงรายชื่อครูทั้งหมดจาก Teacher API (สำหรับค้นหา/มอบสิทธิ์)
+// GET: ดึงรายชื่อครูทั้งหมดจาก SchoolOS (สำหรับค้นหา/มอบสิทธิ์)
 export async function GET() {
   return handle(async () => {
     await apiRequireRole("admin");
     try {
-      // ซิงค์แคตตาล็อกหมวดไปในตัว (best-effort) เพื่อให้ map เลข → ชื่อหมวดล่าสุด
-      const [teachers] = await Promise.all([
-        fetchAllTeachers(),
-        syncSubjectGroupCatalog().catch(() => undefined),
-      ]);
+      // fetchAllTeachers อัปเดตแคตตาล็อกหมวด (ชื่อ→เลข) ให้ในตัวแล้ว
+      const teachers = await fetchAllTeachers();
       const groupMap = await getSubjectGroupMap();
       return ok({
         teachers: teachers.map((t) => {

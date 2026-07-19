@@ -1,7 +1,13 @@
 import "server-only";
-import { env } from "@/lib/env";
+import {
+  sosVerify,
+  sosListStudents,
+  sosCurrentAcademicYear,
+  type SosStudent,
+} from "@/lib/external/schoolos";
 
-// ===== Student API client — 2 keys แยก scope (verify / read:basic) =====
+// ===== Student client — เดิมชี้ students-api, ตอนนี้ backed by SchoolOS (/api/public/v1/*) =====
+// คงรูปแบบ StudentProfile (snake_case) ไว้เท่าเดิมเพื่อไม่ให้ผู้เรียกต้องแก้
 
 export type StudentProfile = {
   student_code: string;
@@ -12,70 +18,94 @@ export type StudentProfile = {
   [k: string]: unknown;
 };
 
-async function sfetch(path: string, key: string, init?: RequestInit) {
-  const res = await fetch(`${env.STUDENT_API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "X-API-Key": key,
-      "content-type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    cache: "no-store",
-  });
-  return res;
-}
-
-/** ตรวจสอบ นักเรียน + เลขบัตรประชาชน 13 หลัก (scope: verify) */
-export async function studentVerify(
-  studentCode: string,
-  citizenId: string
-): Promise<boolean> {
-  const res = await sfetch("/students/verify", env.STUDENT_API_KEY_VERIFY, {
-    method: "POST",
-    body: JSON.stringify({ student_code: studentCode, citizen_id: citizenId }),
-  });
-  if (!res.ok) return false;
-  const data = await res.json();
-  return data?.match === true;
-}
-
-/** ดึงข้อมูลนักเรียน 1 คน (scope: read:basic) */
-export async function fetchStudent(studentCode: string): Promise<StudentProfile | null> {
-  const res = await sfetch(
-    `/students/${encodeURIComponent(studentCode)}`,
-    env.STUDENT_API_KEY_READ
-  );
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Student API get error: ${res.status}`);
-  const data = await res.json();
-  return (data.student ?? data.data ?? data) as StudentProfile;
-}
-
-/** ค้นหานักเรียน (scope: read:basic) — สำหรับครู/admin เพิ่มสมาชิกทีม */
-export async function searchStudents(params: {
-  q?: string;
-  class_level?: string;
-  class_room?: string;
-}): Promise<StudentProfile[]> {
-  const sp = new URLSearchParams();
-  if (params.q) sp.set("q", params.q);
-  if (params.class_level) sp.set("class_level", params.class_level);
-  if (params.class_room) sp.set("class_room", params.class_room);
-  const res = await sfetch(`/students?${sp.toString()}`, env.STUDENT_API_KEY_READ);
-  if (!res.ok) throw new Error(`Student API search error: ${res.status}`);
-  const data = await res.json();
-  const arr = Array.isArray(data) ? data : (data.students ?? data.data ?? []);
-  return arr as StudentProfile[];
+function toProfile(s: SosStudent): StudentProfile {
+  return {
+    student_code: s.studentCode,
+    first_name: s.firstName,
+    last_name: s.lastName,
+    class_level: s.gradeLevel ?? "",
+    class_room: s.classroom != null ? String(s.classroom) : "",
+  };
 }
 
 export function studentFullName(s: { first_name: string; last_name: string }): string {
   return `${s.first_name} ${s.last_name}`.trim();
 }
 
+/** ดึงข้อมูลนักเรียน 1 คนจากรหัส (ค้นด้วย q แล้วกรองรหัสตรงเป๊ะ) */
+export async function fetchStudent(studentCode: string): Promise<StudentProfile | null> {
+  const code = studentCode.trim();
+  const { data } = await sosListStudents({ q: code, status: "all", pageSize: 50 });
+  const hit = data.find((s) => String(s.studentCode) === code);
+  return hit ? toProfile(hit) : null;
+}
+
+/** login นักเรียนผ่าน SchoolOS (/auth/verify) — คืน profile ถ้าสำเร็จ + ยังเรียนอยู่ */
+export async function studentLogin(
+  username: string,
+  password: string
+): Promise<StudentProfile | null> {
+  const user = await sosVerify("student", username.trim(), password);
+  if (!user || !user.active) return null; // ลาออก/จบแล้ว = เข้าไม่ได้
+
+  const profile = await fetchStudent(user.code).catch(() => null);
+  if (profile) return profile;
+
+  // ไม่มีแถวนักเรียน (เช่น key ไม่มี students:read) — สร้าง profile ขั้นต่ำจากผล verify
+  const [first, ...rest] = (user.name ?? "").split(" ");
+  return {
+    student_code: user.code,
+    first_name: first ?? user.name,
+    last_name: rest.join(" "),
+    class_level: "",
+    class_room: "",
+  };
+}
+
+/** ค้นหานักเรียน — สำหรับครู/admin เพิ่มสมาชิกทีม */
+export async function searchStudents(params: {
+  q?: string;
+  class_level?: string;
+  class_room?: string;
+}): Promise<StudentProfile[]> {
+  const { data } = await sosListStudents({
+    q: params.q,
+    grade: params.class_level,
+    classroom: params.class_room,
+    pageSize: 50,
+  });
+  return data.map(toProfile);
+}
+
+// ===== รายชื่อนักเรียน (pagination) =====
+export type StudentListResult = {
+  data: StudentProfile[];
+  meta: { total: number; page: number; limit: number };
+};
+
+export async function listStudents(params: {
+  q?: string;
+  class_level?: string;
+  class_room?: string;
+  page?: number;
+  limit?: number;
+}): Promise<StudentListResult> {
+  const r = await sosListStudents({
+    q: params.q,
+    grade: params.class_level,
+    classroom: params.class_room,
+    page: params.page ?? 1,
+    pageSize: params.limit ?? 50,
+  });
+  return {
+    data: r.data.map(toProfile),
+    meta: { total: r.total, page: r.page, limit: r.pageSize },
+  };
+}
+
 /**
  * รายชื่อห้อง (distinct) ของระดับชั้นหนึ่ง เรียงแบบตัวเลข
  * ดึงทุกหน้าจนครบ total เพื่อไม่ให้พลาดห้องที่นักเรียนอยู่ท้าย ๆ
- * (Student API จำกัด limit สูงสุด ~200/หน้า ปกติ 1 หน้าครบทุกห้องอยู่แล้ว)
  */
 export async function listClassRooms(classLevel: string): Promise<string[]> {
   const rooms = new Set<string>();
@@ -94,10 +124,7 @@ export async function listClassRooms(classLevel: string): Promise<string[]> {
   });
 }
 
-/**
- * นักเรียนทั้งห้อง (ทุกหน้า) — ใช้หน้า "การสมัครรายห้อง" ที่ต้องเห็นครบทั้งห้อง
- * ไม่ใช่แค่ 50 คนแรกเหมือนหน้าค้นหา
- */
+/** นักเรียนทั้งห้อง (ทุกหน้า) — ใช้หน้า "การสมัครรายห้อง" */
 export async function listStudentsInRoom(
   classLevel: string,
   classRoom: string
@@ -106,7 +133,12 @@ export async function listStudentsInRoom(
   const limit = 200;
   let page = 1;
   for (;;) {
-    const { data, meta } = await listStudents({ class_level: classLevel, class_room: classRoom, page, limit });
+    const { data, meta } = await listStudents({
+      class_level: classLevel,
+      class_room: classRoom,
+      page,
+      limit,
+    });
     out.push(...data);
     if (data.length === 0 || page * limit >= meta.total || page >= 10) break;
     page++;
@@ -114,7 +146,8 @@ export async function listStudentsInRoom(
   return out;
 }
 
-// ===== ปีการศึกษา (จาก Student API — เป็นแหล่งเดียวที่ arena ใช้สร้างปี) =====
+// ===== ปีการศึกษา =====
+// SchoolOS ไม่มี endpoint "list ปีทั้งหมด" — ดึงได้เฉพาะปีปัจจุบัน (จาก field academicYear ของ /students)
 export type ApiAcademicYear = {
   id: number;
   year_be: number;
@@ -122,50 +155,16 @@ export type ApiAcademicYear = {
   is_active?: number;
 };
 
-/** ดึงรายการปีการศึกษาทั้งหมดจาก Student API */
 export async function fetchAcademicYears(): Promise<{
   current: { id: number; year_be: number; title: string } | null;
   years: ApiAcademicYear[];
 }> {
-  const res = await sfetch("/academic-years", env.STUDENT_API_KEY_READ);
-  if (!res.ok) throw new Error(`Student API academic-years error: ${res.status}`);
-  const data = await res.json();
+  const ay = await sosCurrentAcademicYear();
+  if (!ay) return { current: null, years: [] };
+  const year_be = Number(ay.year);
+  const title = `ปีการศึกษา ${ay.year}`;
   return {
-    current: data.current ?? null,
-    years: (data.years ?? []) as ApiAcademicYear[],
-  };
-}
-
-// ===== รายชื่อนักเรียน (สำหรับ admin ดูรายชื่อ) — pagination =====
-export type StudentListResult = {
-  data: StudentProfile[];
-  meta: { total: number; page: number; limit: number };
-};
-
-export async function listStudents(params: {
-  q?: string;
-  class_level?: string;
-  class_room?: string;
-  page?: number;
-  limit?: number;
-}): Promise<StudentListResult> {
-  const sp = new URLSearchParams();
-  if (params.q) sp.set("q", params.q);
-  if (params.class_level) sp.set("class_level", params.class_level);
-  if (params.class_room) sp.set("class_room", params.class_room);
-  sp.set("page", String(params.page ?? 1));
-  sp.set("limit", String(params.limit ?? 50));
-  const res = await sfetch(`/students?${sp.toString()}`, env.STUDENT_API_KEY_READ);
-  if (!res.ok) throw new Error(`Student API list error: ${res.status}`);
-  const data = await res.json();
-  const arr = (Array.isArray(data) ? data : (data.data ?? data.students ?? [])) as StudentProfile[];
-  const meta = data.meta ?? {};
-  return {
-    data: arr,
-    meta: {
-      total: Number(meta.total ?? arr.length),
-      page: Number(meta.page ?? params.page ?? 1),
-      limit: Number(meta.limit ?? params.limit ?? 50),
-    },
+    current: { id: ay.id, year_be, title },
+    years: [{ id: ay.id, year_be, title, is_active: 1 }],
   };
 }

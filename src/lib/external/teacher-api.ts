@@ -1,7 +1,14 @@
 import "server-only";
-import { env } from "@/lib/env";
+import {
+  sosVerify,
+  sosListTeachers,
+  sosAllTeachers,
+  type SosTeacher,
+} from "@/lib/external/schoolos";
+import { ensureSubjectGroupsByName, getSubjectGroupNoByName } from "@/lib/subjectGroups";
 
-// ===== Teacher API client — เรียกจาก server เท่านั้น (key ห้ามหลุด browser) =====
+// ===== Teacher client — เดิมชี้ teacher-api, ตอนนี้ backed by SchoolOS (/api/public/v1/*) =====
+// คงรูปแบบ TeacherProfile (snake_case) ไว้เท่าเดิมเพื่อไม่ให้ผู้เรียกต้องแก้
 
 export type TeacherProfile = {
   id: number;
@@ -10,68 +17,69 @@ export type TeacherProfile = {
   first_name: string;
   last_name: string;
   email?: string;
-  subject_group?: string;
+  subject_group?: string; // เลข groupNo (เก็บเป็น string) — map มาจากชื่อหมวดของ SchoolOS
   [k: string]: unknown;
 };
 
-async function tfetch(path: string, init?: RequestInit) {
-  const res = await fetch(`${env.TEACHER_API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "x-api-key": env.TEACHER_API_KEY,
-      "content-type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    cache: "no-store",
-  });
-  return res;
-}
-
-/** ทำให้รหัสครูเป็นรูปแบบมาตรฐาน (ตัวใหญ่) — Teacher API เก็บรหัสเป็นตัวใหญ่ (เช่น A00001, T00)
- *  และเทียบแบบ case-sensitive จึงต้อง normalize ก่อน เพื่อให้พิมพ์ t เล็ก/ใหญ่ ได้เหมือนกัน */
+/** ทำให้รหัสครูเป็นตัวใหญ่ให้ตรงกับที่ระบบเก็บ (เทียบแบบ case-insensitive ตอนค้น) */
 export function normalizeTeacherCode(code: string): string {
   return code.trim().toUpperCase();
 }
 
-/** login ครู → คืน profile ถ้าสำเร็จ, null ถ้า 401, throw ถ้า error อื่น */
+function toProfile(t: SosTeacher, subjectGroupNo?: number | null): TeacherProfile {
+  return {
+    id: t.id,
+    teacher_code: t.teacherCode,
+    title: t.prefix,
+    first_name: t.firstName,
+    last_name: t.lastName,
+    email: t.email ?? undefined,
+    subject_group: subjectGroupNo != null ? String(subjectGroupNo) : undefined,
+  };
+}
+
+/** หาแถวครูจากรหัส (q ค้นชื่อ/รหัส แล้วกรองรหัสตรงแบบ case-insensitive) */
+async function findTeacherByCode(code: string): Promise<SosTeacher | null> {
+  const norm = normalizeTeacherCode(code);
+  const { data } = await sosListTeachers({ q: norm, status: "all", pageSize: 50 });
+  return data.find((t) => (t.teacherCode ?? "").toUpperCase() === norm) ?? null;
+}
+
+/** login ครู → คืน profile ถ้าสำเร็จ + ยังทำงานอยู่, null ถ้ารหัสผิด/ลาออก */
 export async function teacherLogin(
   teacherCode: string,
   password: string
 ): Promise<TeacherProfile | null> {
-  const res = await tfetch("/api/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ teacher_code: normalizeTeacherCode(teacherCode), password }),
-  });
-  if (res.status === 401) return null;
-  if (!res.ok) throw new Error(`Teacher API login error: ${res.status}`);
-  const data = await res.json();
-  // รองรับทั้งกรณี API ห่อ { teacher: {...} } หรือคืน object ตรง ๆ
-  return (data.teacher ?? data.data ?? data) as TeacherProfile;
+  const user = await sosVerify("teacher", normalizeTeacherCode(teacherCode), password);
+  if (!user || !user.active) return null; // ลาออก/พักงาน = เข้าไม่ได้
+
+  // ดึงหมวด + ชื่อจริงจากรายชื่อครู (ต้องมี scope teachers:read) — พลาดได้แบบ graceful
+  const row = await findTeacherByCode(user.code).catch(() => null);
+  if (row) {
+    const no = await getSubjectGroupNoByName(row.subjectGroup).catch(() => null);
+    return toProfile(row, no);
+  }
+
+  // ไม่มีแถวครู (เช่น key ไม่มี teachers:read) — สร้าง profile ขั้นต่ำจากผล verify
+  const [first, ...rest] = (user.name ?? "").split(" ");
+  return {
+    id: user.id,
+    teacher_code: user.code,
+    first_name: first ?? user.name,
+    last_name: rest.join(" "),
+    subject_group: undefined,
+  };
 }
 
-/** รายชื่อครูทั้งหมด (สำหรับ admin ค้นหา/มอบสิทธิ์) */
+/** รายชื่อครูทั้งหมด (admin ค้นหา/มอบสิทธิ์) — subject_group = เลข groupNo (string) */
 export async function fetchAllTeachers(): Promise<TeacherProfile[]> {
-  const res = await tfetch("/api/teachers");
-  if (!res.ok) throw new Error(`Teacher API list error: ${res.status}`);
-  const data = await res.json();
-  const arr = Array.isArray(data) ? data : (data.teachers ?? data.data ?? []);
-  return arr as TeacherProfile[];
+  const teachers = await sosAllTeachers("active");
+  const map = await ensureSubjectGroupsByName(teachers.map((t) => t.subjectGroup));
+  return teachers.map((t) =>
+    toProfile(t, t.subjectGroup ? map.get(t.subjectGroup.trim()) ?? null : null)
+  );
 }
 
 export function teacherFullName(t: TeacherProfile): string {
   return `${t.title ?? ""}${t.first_name} ${t.last_name}`.trim();
-}
-
-export type TeacherSubjectGroup = { id: number; name: string };
-
-/** รายการหมวด (กลุ่มสาระ) จาก Teacher API — id ตรงกับ field subject_group ของครู */
-export async function fetchSubjectGroups(): Promise<TeacherSubjectGroup[]> {
-  const res = await tfetch("/api/subject-groups");
-  if (!res.ok) throw new Error(`Teacher API subject-groups error: ${res.status}`);
-  const data = await res.json();
-  const arr = Array.isArray(data) ? data : (data.subject_groups ?? data.data ?? []);
-  return (arr as Array<{ id: number | string; name?: string }>).map((g) => ({
-    id: Number(g.id),
-    name: String(g.name ?? "").trim(),
-  }));
 }

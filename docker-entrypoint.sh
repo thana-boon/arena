@@ -43,5 +43,38 @@ else
   npm run db:bootstrap < /dev/null
 fi
 
+# ---- ตรวจ SchoolOS API key ----
+# ต้องเช็คตรงนี้เพราะถ้า key ผิด อาการจะไปโผล่หน้า login ว่า "รหัสผู้ใช้ / รหัสผ่านไม่ถูกต้อง"
+# (SchoolOS ตอบ 401 ทั้งกรณีรหัสผู้ใช้ผิดและ key ผิด) — ชี้ไปผิดทางจนหาสาเหตุไม่เจอ
+# ยอมให้สตาร์ตไม่ขึ้นดีกว่าปล่อยขึ้นแล้วไม่มีใครล็อกอินได้โดยไม่รู้ว่าทำไม
+echo "==> ตรวจ SchoolOS API key"
+if [ -z "$SCHOOLOS_API_KEY" ]; then
+  echo "    ❌ ไม่ได้ตั้ง SCHOOLOS_API_KEY ใน .env — ครูและนักเรียนจะล็อกอินไม่ได้"
+  exit 1
+fi
+# ใช้ node ไม่ใช่ curl — image เป็น node:20-alpine ซึ่งไม่มี curl ติดมา
+# (ถ้าใช้ curl จะกลายเป็นว่าคอนเทนเนอร์ไม่ยอมสตาร์ตทั้งที่ key ถูกต้อง)
+node -e "
+const base = (process.env.SCHOOLOS_API_BASE || 'http://192.168.200.56:3002').replace(/\/+\$/, '');
+fetch(base + '/api/public/v1/teachers?pageSize=1', {
+  headers: { 'X-API-Key': process.env.SCHOOLOS_API_KEY },
+  signal: AbortSignal.timeout(10000),
+})
+  .then(async (res) => {
+    if (res.ok) { console.log('    API key ใช้งานได้'); process.exit(0); }
+    const code = await res.json().then((d) => d?.error?.code).catch(() => undefined);
+    if (res.status === 401 || res.status === 403) {
+      console.error('    ❌ SCHOOLOS_API_KEY ใช้ไม่ได้ (' + res.status + (code ? ' ' + code : '') + ') — key ผิด/หมดอายุ หรือขาด scope');
+    } else {
+      console.error('    ❌ ' + base + ' ตอบ HTTP ' + res.status);
+    }
+    process.exit(1);
+  })
+  .catch((e) => {
+    console.error('    ❌ ต่อ ' + base + ' ไม่ได้ (' + (e.cause?.code || e.message) + ') — เช็ค network / SCHOOLOS_API_BASE');
+    process.exit(1);
+  });
+" < /dev/null
+
 echo "==> starting Next.js on :3017"
 exec "$@"

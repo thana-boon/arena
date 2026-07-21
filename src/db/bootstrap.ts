@@ -48,7 +48,33 @@ async function main() {
     .select({ count: sql<number>`count(*)::int` })
     .from(schema.adminsLocal);
 
-  if (adminCount > 0) {
+  // ตั้ง ADMIN_PASSWORD_RESET=1 = บังคับตั้งรหัส admin ใหม่ตาม .env ทุกครั้งที่สตาร์ต
+  // มีไว้สำหรับกรณีที่คนดูแลระบบเข้า shell เครื่อง prod ไม่ได้ (สั่ง admin:password เองไม่ได้)
+  // แต่แก้ .env แล้ว deploy ใหม่ได้ — เข้าระบบเสร็จแล้วควรเอา flag นี้ออก
+  const forceReset = process.env.ADMIN_PASSWORD_RESET === "1";
+  const resetUser =
+    process.env.BOOTSTRAP_ADMIN_USERNAME || process.env.SEED_ADMIN_USERNAME || "admin";
+  const resetPass = process.env.BOOTSTRAP_ADMIN_PASSWORD || process.env.SEED_ADMIN_PASSWORD;
+
+  if (adminCount > 0 && forceReset && resetPass) {
+    const passwordHash = await bcrypt.hash(resetPass, 10);
+    const updated = await db
+      .update(schema.adminsLocal)
+      .set({ passwordHash })
+      .where(sql`${schema.adminsLocal.username} = ${resetUser}`)
+      .returning({ id: schema.adminsLocal.id });
+
+    if (updated.length) {
+      console.log(`  • ⚠️  ADMIN_PASSWORD_RESET=1 — ตั้งรหัสผ่านของ "${resetUser}" ใหม่ตาม .env แล้ว`);
+    } else {
+      await db.insert(schema.adminsLocal).values({ username: resetUser, passwordHash });
+      console.log(`  • ⚠️  ADMIN_PASSWORD_RESET=1 — ไม่พบ "${resetUser}" จึงสร้างใหม่ให้`);
+    }
+    console.log("     เข้าระบบได้แล้วให้เอา ADMIN_PASSWORD_RESET ออกจาก .env");
+  } else if (adminCount > 0) {
+    if (forceReset) {
+      console.log("  • ⚠️  ตั้ง ADMIN_PASSWORD_RESET=1 ไว้ แต่ไม่ได้ตั้ง SEED_ADMIN_PASSWORD — ข้าม");
+    }
     console.log(`  • มี admin local อยู่แล้ว (${adminCount} บัญชี) — ข้าม ไม่แตะรหัสผ่านเดิม`);
   } else {
     // รับได้ทั้ง BOOTSTRAP_* และ SEED_* (ชุดหลังคือชื่อที่ seed.ts ใช้และมีอยู่ใน .env จริง)

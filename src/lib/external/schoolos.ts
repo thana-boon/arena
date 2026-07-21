@@ -78,6 +78,20 @@ export class SosRateLimitError extends Error {
   }
 }
 
+/**
+ * โยนเมื่อ API key ของ arena เองใช้ไม่ได้ (ไม่ได้ตั้ง / ผิด / หมดอายุ / ขาด scope)
+ *
+ * สำคัญ: SchoolOS ตอบ 401 ทั้งกรณี "รหัสผ่านผู้ใช้ผิด" และ "API key ใช้ไม่ได้"
+ * ถ้าไม่แยกออกจากกัน ปัญหาฝั่ง config จะไปโผล่หน้า login ว่า "รหัสผ่านไม่ถูกต้อง"
+ * ซึ่งไล่หาสาเหตุแทบไม่ได้เลย — เคยกินเวลาไปแล้วครั้งหนึ่ง
+ */
+export class SosKeyError extends Error {
+  constructor(public code: string) {
+    super(`schoolos_key_${code}`);
+    this.name = "SosKeyError";
+  }
+}
+
 // ===== students =====
 export async function sosListStudents(params: {
   q?: string;
@@ -146,8 +160,19 @@ export async function sosVerify(
     method: "POST",
     body: JSON.stringify({ role, username, password }),
   });
-  if (res.status === 401) return null; // invalid_credentials — ไม่บอกว่ารหัสหรือ user ผิด
   if (res.status === 429) throw new SosRateLimitError();
+
+  if (res.status === 401 || res.status === 403) {
+    // แยก "ผู้ใช้กรอกรหัสผิด" ออกจาก "key ของ arena เองใช้ไม่ได้" ด้วย error.code ใน body
+    const code = await res
+      .clone()
+      .json()
+      .then((d) => d?.error?.code as string | undefined)
+      .catch(() => undefined);
+    if (code && code !== "invalid_credentials") throw new SosKeyError(code);
+    return null; // invalid_credentials — ไม่บอกว่ารหัสหรือ user ผิด
+  }
+
   if (!res.ok) throw new Error(`SchoolOS auth/verify error: ${res.status}`);
   const data = await res.json();
   if (!data?.valid || !data.user) return null;

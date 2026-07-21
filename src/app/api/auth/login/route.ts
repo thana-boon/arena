@@ -7,7 +7,7 @@ import { ok, fail, handle } from "@/lib/api";
 import { createSession, type Role } from "@/lib/auth/session";
 import { teacherLogin, teacherFullName } from "@/lib/external/teacher-api";
 import { studentLogin, studentFullName, type StudentProfile } from "@/lib/external/student-api";
-import { SosRateLimitError } from "@/lib/external/schoolos";
+import { SosRateLimitError, SosKeyError } from "@/lib/external/schoolos";
 import { getTeacherRole } from "@/lib/queries";
 
 // ฟอร์ม login เดียว: identifier (รหัสผู้ใช้/รหัสนักเรียน/รหัสครู) + secret (รหัสผ่าน)
@@ -88,6 +88,11 @@ export async function POST(req: Request) {
     } catch (e) {
       if (e instanceof SosRateLimitError) {
         return fail("พยายามเข้าสู่ระบบบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่", 429);
+      }
+      if (e instanceof SosKeyError) {
+        // ปัญหา config ฝั่งเรา ไม่ใช่ผู้ใช้กรอกผิด — ต้องอ่านออกจาก log ได้ทันที
+        console.error(`[login] SCHOOLOS_API_KEY ใช้ไม่ได้ (${e.code}) — เช็ค .env บนเครื่องที่ deploy`);
+        return fail("ระบบเชื่อมต่อฐานข้อมูลบุคลากรไม่ได้ กรุณาแจ้งผู้ดูแลระบบ", 503);
       }
       throw e;
     }

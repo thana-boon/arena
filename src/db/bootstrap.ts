@@ -51,8 +51,10 @@ async function main() {
   if (adminCount > 0) {
     console.log(`  • มี admin local อยู่แล้ว (${adminCount} บัญชี) — ข้าม ไม่แตะรหัสผ่านเดิม`);
   } else {
-    const username = process.env.BOOTSTRAP_ADMIN_USERNAME || "admin";
-    const envPass = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+    // รับได้ทั้ง BOOTSTRAP_* และ SEED_* (ชุดหลังคือชื่อที่ seed.ts ใช้และมีอยู่ใน .env จริง)
+    const username =
+      process.env.BOOTSTRAP_ADMIN_USERNAME || process.env.SEED_ADMIN_USERNAME || "admin";
+    const envPass = process.env.BOOTSTRAP_ADMIN_PASSWORD || process.env.SEED_ADMIN_PASSWORD;
     // ไม่ตั้งรหัสใน .env → สุ่มให้ แล้วพิมพ์ลง log ครั้งเดียว (ปลอดภัยกว่ารหัส default ตายตัว)
     const password = envPass || randomBytes(9).toString("base64url");
 
@@ -66,7 +68,7 @@ async function main() {
     console.log("  │ สร้าง admin local ครั้งแรก");
     console.log(`  │   username: ${username}`);
     if (envPass) {
-      console.log("  │   password: (ตามค่าใน BOOTSTRAP_ADMIN_PASSWORD)");
+      console.log("  │   password: (ตามค่าใน BOOTSTRAP_ADMIN_PASSWORD / SEED_ADMIN_PASSWORD)");
     } else {
       console.log(`  │   password: ${password}`);
       console.log("  │ ⚠️  รหัสนี้แสดงครั้งเดียว — จดไว้แล้วเปลี่ยนหลัง login");

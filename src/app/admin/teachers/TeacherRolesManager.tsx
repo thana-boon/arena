@@ -4,9 +4,16 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
 
 type Role = { teacherCode: string; name: string; isAdmin: boolean; isRecorder: boolean };
-type ApiTeacher = { teacherCode: string; name: string; subjectGroup: string };
+type ApiTeacher = { teacherCode: string; name: string; subjectGroup: string; role?: string };
+type ApiAdmin = { teacherCode: string; name: string };
 
-export function TeacherRolesManager({ roles }: { roles: Role[] }) {
+export function TeacherRolesManager({
+  roles,
+  apiAdmins = [],
+}: {
+  roles: Role[];
+  apiAdmins?: ApiAdmin[];
+}) {
   const router = useRouter();
   const [msg, setMsg] = useState<{ type: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -32,6 +39,23 @@ export function TeacherRolesManager({ roles }: { roles: Role[] }) {
   }
 
   const roleMap = new Map(roles.map((r) => [r.teacherCode, r]));
+  const apiAdminSet = new Set(apiAdmins.map((a) => a.teacherCode));
+
+  // สรุป "ครูที่มีสิทธิ์พิเศษ" = สิทธิ์ท้องถิ่น (teacher_roles) + admin จาก SchoolOS ที่ยังไม่มี row ท้องถิ่น
+  const special = [
+    ...roles.map((r) => ({ ...r, viaApi: apiAdminSet.has(r.teacherCode), apiOnly: false })),
+    ...apiAdmins
+      .filter((a) => !roleMap.has(a.teacherCode))
+      .map((a) => ({
+        teacherCode: a.teacherCode,
+        name: a.name,
+        isAdmin: true,
+        isRecorder: false,
+        viaApi: true,
+        apiOnly: true,
+      })),
+  ];
+
   const filtered = (apiTeachers ?? []).filter(
     (t) => !search || t.name.includes(search) || t.teacherCode.includes(search)
   );
@@ -46,22 +70,33 @@ export function TeacherRolesManager({ roles }: { roles: Role[] }) {
           <table className="table">
             <thead><tr><th>รหัสครู</th><th>ชื่อ</th><th>Admin</th><th>ผู้บันทึกผล</th><th></th></tr></thead>
             <tbody>
-              {roles.map((r) => (
+              {special.map((r) => (
                 <tr key={r.teacherCode}>
                   <td>{r.teacherCode}</td>
                   <td>{r.name || "-"}</td>
-                  <td>{r.isAdmin ? <span className="badge badge-purple">Admin</span> : "-"}</td>
+                  <td>
+                    {r.isAdmin ? (
+                      <span className="badge badge-purple">Admin{r.viaApi ? " · SchoolOS" : ""}</span>
+                    ) : "-"}
+                  </td>
                   <td>{r.isRecorder ? <span className="badge badge-info">Recorder</span> : "-"}</td>
                   <td className="num">
-                    <button className="btn btn-danger btn-sm" disabled={busy}
-                      onClick={() => setRole(r.teacherCode, r.name, false, false)}>ยกเลิกสิทธิ์</button>
+                    {r.apiOnly ? (
+                      <span className="text-sm muted">จาก SchoolOS</span>
+                    ) : (
+                      <button className="btn btn-danger btn-sm" disabled={busy}
+                        onClick={() => setRole(r.teacherCode, r.name, false, false)}>ยกเลิกสิทธิ์</button>
+                    )}
                   </td>
                 </tr>
               ))}
-              {!roles.length && <tr><td colSpan={5} className="text-center muted">ยังไม่มีการมอบสิทธิ์</td></tr>}
+              {!special.length && <tr><td colSpan={5} className="text-center muted">ยังไม่มีการมอบสิทธิ์</td></tr>}
             </tbody>
           </table>
         </div>
+        {apiAdmins.length > 0 && (
+          <div className="form-hint mt-2">สิทธิ์ Admin ที่มี “· SchoolOS” มาจาก role teacher-admin ของระบบกลาง — เพิกถอนที่นี่ไม่ได้ ต้องแก้ที่ SchoolOS</div>
+        )}
       </div>
 
       <div className="card">
@@ -81,7 +116,9 @@ export function TeacherRolesManager({ roles }: { roles: Role[] }) {
                 <tbody>
                   {filtered.slice(0, 100).map((t) => {
                     const cur = roleMap.get(t.teacherCode);
-                    const isAdmin = cur?.isAdmin ?? false;
+                    // admin จาก SchoolOS = ล็อกไว้ (ติ๊กถูก แต่แก้ที่นี่ไม่ได้)
+                    const viaApi = t.role === "teacher-admin" || apiAdminSet.has(t.teacherCode);
+                    const isAdmin = viaApi || (cur?.isAdmin ?? false);
                     const isRecorder = cur?.isRecorder ?? false;
                     return (
                       <tr key={t.teacherCode}>
@@ -89,12 +126,13 @@ export function TeacherRolesManager({ roles }: { roles: Role[] }) {
                         <td>{t.name}</td>
                         <td className="text-sm muted">{t.subjectGroup}</td>
                         <td>
-                          <input type="checkbox" checked={isAdmin} disabled={busy}
+                          <input type="checkbox" checked={isAdmin} disabled={busy || viaApi}
+                            title={viaApi ? "admin จาก SchoolOS (teacher-admin) — แก้ที่นี่ไม่ได้" : undefined}
                             onChange={(e) => setRole(t.teacherCode, t.name, e.target.checked, isRecorder)} />
                         </td>
                         <td>
                           <input type="checkbox" checked={isRecorder} disabled={busy}
-                            onChange={(e) => setRole(t.teacherCode, t.name, isAdmin, e.target.checked)} />
+                            onChange={(e) => setRole(t.teacherCode, t.name, cur?.isAdmin ?? false, e.target.checked)} />
                         </td>
                       </tr>
                     );

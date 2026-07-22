@@ -19,6 +19,7 @@ export async function GET() {
             name: teacherFullName(t),
             subjectGroupNo: no,
             subjectGroup: subjectGroupLabel(no, groupMap),
+            role: t.role, // "teacher" | "teacher-admin" — teacher-admin = admin จาก SchoolOS
           };
         }),
       });

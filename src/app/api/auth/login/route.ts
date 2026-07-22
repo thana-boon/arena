@@ -57,10 +57,11 @@ export async function POST(req: Request) {
       // 3) ครู — ผ่าน SchoolOS
       const profile = await teacherLogin(identifier, secret);
       if (profile) {
-      // อ่านสิทธิ์เพิ่มจาก teacher_roles
+      // สิทธิ์ admin มาจาก role ของ SchoolOS โดยตรง: role === "teacher-admin" = admin ของระบบนี้
+      // teacher_roles ยังใช้เป็นตัวเสริม (มอบ admin/recorder แบบมือผ่านหน้า /admin/teachers)
       const roleRow = await getTeacherRole(profile.teacher_code);
       let role: Role = "teacher";
-      if (roleRow?.isAdmin) role = "admin";
+      if (profile.role === "teacher-admin" || roleRow?.isAdmin) role = "admin";
       else if (roleRow?.isRecorder) role = "recorder";
 
       // อัปเดต snapshot ชื่อไว้ใน teacher_roles ถ้ามี row

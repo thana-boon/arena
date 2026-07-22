@@ -18,6 +18,7 @@ export type TeacherProfile = {
   last_name: string;
   email?: string;
   subject_group?: string; // เลข groupNo (เก็บเป็น string) — map มาจากชื่อหมวดของ SchoolOS
+  role?: string; // role ดิบจาก SchoolOS: "teacher" | "teacher-admin" — ใช้ตัดสินสิทธิ์ admin
   [k: string]: unknown;
 };
 
@@ -35,6 +36,7 @@ function toProfile(t: SosTeacher, subjectGroupNo?: number | null): TeacherProfil
     last_name: t.lastName,
     email: t.email ?? undefined,
     subject_group: subjectGroupNo != null ? String(subjectGroupNo) : undefined,
+    role: t.role,
   };
 }
 
@@ -68,6 +70,7 @@ export async function teacherLogin(
     first_name: first ?? user.name,
     last_name: rest.join(" "),
     subject_group: undefined,
+    role: user.role,
   };
 }
 

@@ -22,6 +22,9 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?ต้องตั้ง SEED_ADMIN_PASSWORD ใน Portainer stack env}
+      # ตั้ง 1 ใน Portainer เพื่อบังคับ reset รหัส admin ให้ตรง SEED_ADMIN_PASSWORD ทุกครั้งที่สตาร์ต
+      # ใช้ตอน "admin เข้าไม่ได้ / ลืมรหัส" — เข้าได้แล้วให้ลบออก (default ว่าง = ไม่ reset)
+      ADMIN_PASSWORD_RESET: ${ADMIN_PASSWORD_RESET:-}
       # รหัสครูที่ได้สิทธิ์ admin อัตโนมัติตอน bootstrap (คั่นด้วย , เพิ่มคนได้)
       BOOTSTRAP_ADMIN_TEACHERS: ${BOOTSTRAP_ADMIN_TEACHERS:-T00241}
     ports:

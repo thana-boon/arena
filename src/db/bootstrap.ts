@@ -103,6 +103,28 @@ async function main() {
     console.log("");
   }
 
+  // ---- มอบสิทธิ์ admin ให้รหัสครูที่กำหนดไว้ล่วงหน้า ----
+  // BOOTSTRAP_ADMIN_TEACHERS=T00241,T00123 (คั่นด้วย ,) — ตั้งใน Portainer stack env
+  // idempotent: ถ้ามี row อยู่แล้วแค่เปิด is_admin=true ไม่แตะ is_recorder เดิม
+  // ไม่เคยลบสิทธิ์ให้ใครที่นี่ (การถอนสิทธิ์ทำผ่านหน้า /admin/teachers เท่านั้น)
+  const adminTeachers = (process.env.BOOTSTRAP_ADMIN_TEACHERS || "")
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
+
+  if (adminTeachers.length) {
+    for (const teacherCode of adminTeachers) {
+      await db
+        .insert(schema.teacherRoles)
+        .values({ teacherCode, isAdmin: true })
+        .onConflictDoUpdate({
+          target: schema.teacherRoles.teacherCode,
+          set: { isAdmin: true },
+        });
+    }
+    console.log(`  • มอบสิทธิ์ admin ให้รหัสครู: ${adminTeachers.join(", ")}`);
+  }
+
   console.log("✅ auto-bootstrap เสร็จสมบูรณ์");
   await pool.end();
   process.exit(0);

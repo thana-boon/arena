@@ -22,6 +22,8 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?ต้องตั้ง SEED_ADMIN_PASSWORD ใน Portainer stack env}
+      # รหัสครูที่ได้สิทธิ์ admin อัตโนมัติตอน bootstrap (คั่นด้วย , เพิ่มคนได้)
+      BOOTSTRAP_ADMIN_TEACHERS: ${BOOTSTRAP_ADMIN_TEACHERS:-T00241}
     ports:
       - "3017:3017"
     networks:

@@ -5,8 +5,6 @@ services:
   app:
     build: .
     container_name: arena-app
-    env_file:
-      - .env # โหลด JWT_SECRET, SCHOOLOS_API_KEY ฯลฯ จาก .env
     environment:
       NODE_ENV: production
       PORT: "3017"

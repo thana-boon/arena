@@ -2,6 +2,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
+import { Icon } from "@/components/Icon";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { CLASS_LEVELS, UNLIMITED_CAPACITY, formatSlot, hhmm, scaleMaxScoresTo100 } from "@/lib/domain";
 
@@ -171,216 +172,261 @@ export function CompetitionForm({
   }
 
   return (
-    <form onSubmit={submit} className="stack" style={{ maxWidth: 720 }}>
+    <form onSubmit={submit} className="stack" style={{ maxWidth: 760 }}>
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
       {locked && <div className="alert alert-warning">รายการนี้มีผู้ลงทะเบียนแล้ว แก้ไขได้เฉพาะชื่อ/วันเวลา/จำนวนรับ (ไม่สามารถเปลี่ยนประเภท ระดับชั้น หรือเกณฑ์)</div>}
 
-      <div className="card stack">
-        <div className="form-group">
-          <label className="form-label">ชื่อรายการแข่งขัน</label>
-          <input className="form-input" value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="เช่น คัดลายมือ ระดับ ม.ต้น" />
-        </div>
-        <div className="form-group">
-          <label className="form-label">รายละเอียด</label>
-          <textarea
-            className="form-input"
-            rows={4}
-            style={{ resize: "vertical", minHeight: 88 }}
-            value={f.description}
-            onChange={(e) => set("description", e.target.value)}
-            placeholder="เช่น กติกา อุปกรณ์ที่ต้องเตรียม เกณฑ์การตัดสิน (ไม่บังคับ)"
-          />
-          <span className="form-hint">แสดงให้นักเรียนเห็นในหน้าสมัคร · ไม่เกิน 2000 ตัวอักษร</span>
-        </div>
-        <div className="form-group">
-          <label className="form-label">งาน</label>
-          {events.length ? (
-            <select className="form-select" value={f.eventId} onChange={(e) => set("eventId", e.target.value === "" ? "" : Number(e.target.value))}>
-              <option value="">— เลือกงาน —</option>
-              {events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}{ev.kind === "training" ? " (อบรม)" : ""}</option>)}
-            </select>
-          ) : (
-            <div className="form-hint">ยังไม่มีงาน — ผู้ดูแลระบบต้องสร้างงานที่เมนู “งาน/เกียรติบัตร” ก่อน</div>
-          )}
-          <span className="form-hint">งานเป็นเจ้าของช่วงเปิด-ปิดรับสมัคร และการมองเห็นของนักเรียน</span>
-        </div>
-        <div className="grid-2">
-          <div className="form-group">
-            <label className="form-label">หมวดวิชา (ไม่บังคับ)</label>
-            <select className="form-select" value={f.subjectGroupId} disabled={lockSubjectGroup} onChange={(e) => set("subjectGroupId", e.target.value === "" ? "" : Number(e.target.value))}>
-              <option value="">— ไม่ระบุหมวด —</option>
-              {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
-            {lockSubjectGroup && <span className="form-hint">สร้างได้เฉพาะหมวดของท่าน</span>}
-          </div>
-          <div className="form-group">
-            <label className="form-label">ประเภท</label>
-            <select className="form-select" value={f.type} disabled={locked} onChange={(e) => set("type", e.target.value as "individual" | "team")}>
-              <option value="individual">เดี่ยว</option>
-              <option value="team">ทีม</option>
-            </select>
+      {/* ── ส่วนที่ 1: ข้อมูลรายการ ── */}
+      <section className="card form-section">
+        <div className="form-section-head">
+          <span className="ico"><Icon name="clipboard" size={20} /></span>
+          <div>
+            <h3>ข้อมูลรายการ</h3>
+            <div className="hint">ชื่อรายการ งานที่สังกัด หมวดวิชา และประเภทการแข่งขัน</div>
           </div>
         </div>
-
-        {f.type === "team" && (
+        <div className="form-section-body">
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">ชื่อรายการแข่งขัน</label>
+            <input className="form-input" value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="เช่น คัดลายมือ ระดับ ม.ต้น" />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">รายละเอียด</label>
+            <textarea
+              className="form-input"
+              rows={4}
+              style={{ resize: "vertical", minHeight: 88 }}
+              value={f.description}
+              onChange={(e) => set("description", e.target.value)}
+              placeholder="เช่น กติกา อุปกรณ์ที่ต้องเตรียม เกณฑ์การตัดสิน (ไม่บังคับ)"
+            />
+            <span className="form-hint">แสดงให้นักเรียนเห็นในหน้าสมัคร · ไม่เกิน 2000 ตัวอักษร</span>
+          </div>
           <div className="grid-2">
-            <div className="form-group">
-              <label className="form-label">จำนวนสมาชิกต่ำสุด</label>
-              <input type="number" min={1} className="form-input" value={f.teamSizeMin} disabled={locked} onChange={(e) => set("teamSizeMin", e.target.value === "" ? "" : Number(e.target.value))} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">จำนวนสมาชิกสูงสุด</label>
-              <input type="number" min={1} className="form-input" value={f.teamSizeMax} disabled={locked} onChange={(e) => set("teamSizeMax", e.target.value === "" ? "" : Number(e.target.value))} />
-            </div>
-          </div>
-        )}
-
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-check">
-            <input type="checkbox" checked={f.visibleToStudents} onChange={(e) => set("visibleToStudents", e.target.checked)} />
-            <span>ให้นักเรียนเห็นรายการนี้</span>
-          </label>
-          <span className="form-hint">
-            {f.visibleToStudents
-              ? "นักเรียนเห็นรายการนี้ในหน้าสมัคร และสมัครเองได้"
-              : "นักเรียนมองไม่เห็นและสมัครเองไม่ได้ — ครูเป็นผู้ลงชื่อให้เท่านั้น"}
-          </span>
-        </div>
-      </div>
-
-      <div className="card stack">
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-label">ระดับชั้นที่รับ</label>
-          <div className="level-grid">
-            {CLASS_LEVELS.map((lv) => {
-              const on = f.allowedClassLevels.includes(lv);
-              return (
-                <label key={lv} className={`level-chip${lv.length > 4 ? " wide" : ""}${on ? " on" : ""}${locked ? " disabled" : ""}`}>
-                  <input type="checkbox" checked={on} disabled={locked} onChange={() => toggleLevel(lv)} />
-                  <span>{lv}</span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-
-        <div>
-          <label className="form-label">จำนวนรับ {f.type === "team" ? "(จำนวนทีม)" : ""}</label>
-          <label className="form-check" style={{ marginBottom: 12 }}>
-            <input type="checkbox" checked={f.unlimited} onChange={(e) => set("unlimited", e.target.checked)} />
-            <span>รับไม่จำกัดจำนวน</span>
-          </label>
-
-          {f.unlimited ? (
-            <div className="form-hint">รับนักเรียนได้ไม่จำกัดจำนวน — เอาเครื่องหมายถูกออกเพื่อกำหนดจำนวนที่นั่ง</div>
-          ) : f.type === "team" ? (
-            <input type="number" min={0} className="form-input" style={{ width: 160 }} value={f.teamCapacity} onChange={(e) => set("teamCapacity", Number(e.target.value))} />
-          ) : (
-            <>
-              <div className="row" style={{ gap: 16, marginBottom: 12 }}>
-                <label className="form-check">
-                  <input type="radio" name="capMode" checked={f.capacityMode === "per_level"} disabled={locked} onChange={() => set("capacityMode", "per_level")} />
-                  <span>แยกตามระดับชั้น</span>
-                </label>
-                <label className="form-check">
-                  <input type="radio" name="capMode" checked={f.capacityMode === "combined"} disabled={locked} onChange={() => set("capacityMode", "combined")} />
-                  <span>รวมทุกระดับชั้น</span>
-                </label>
-              </div>
-              {f.capacityMode === "combined" ? (
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">จำนวนรับรวมทุกระดับชั้น</label>
-                  <input type="number" min={0} className="form-input" style={{ width: 160 }} value={f.combinedCapacity} onChange={(e) => set("combinedCapacity", Number(e.target.value))} />
-                  <span className="form-hint">
-                    {f.allowedClassLevels.length ? `${f.allowedClassLevels.join(" + ")} รวมกันไม่เกินจำนวนนี้` : "เลือกระดับชั้นก่อน"}
-                  </span>
-                </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">งาน</label>
+              {events.length ? (
+                <select className="form-select" value={f.eventId} onChange={(e) => set("eventId", e.target.value === "" ? "" : Number(e.target.value))}>
+                  <option value="">— เลือกงาน —</option>
+                  {events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}{ev.kind === "training" ? " (อบรม)" : ""}</option>)}
+                </select>
               ) : (
-                <div className="grid-3">
-                  {f.allowedClassLevels.map((lv) => (
-                    <div key={lv} className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label">{lv}</label>
-                      <input type="number" min={0} className="form-input" value={f.capacityPerLevel[lv] ?? 0} onChange={(e) => setCap(lv, Number(e.target.value))} />
-                    </div>
-                  ))}
-                  {!f.allowedClassLevels.length && <div className="muted text-sm">เลือกระดับชั้นก่อน</div>}
-                </div>
+                <div className="form-hint">ยังไม่มีงาน — ผู้ดูแลระบบต้องสร้างงานที่เมนู “งาน/เกียรติบัตร” ก่อน</div>
               )}
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="card stack">
-        <div className="grid-2">
-          <div className="form-group">
-            <label className="form-label">วันที่แข่ง</label>
-            <input type="date" lang="th" className="form-input" value={f.eventDate} onChange={(e) => set("eventDate", e.target.value)} />
+              <span className="form-hint">งานเป็นเจ้าของช่วงเปิด-ปิดรับสมัคร</span>
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">หมวดวิชา (ไม่บังคับ)</label>
+              <select className="form-select" value={f.subjectGroupId} disabled={lockSubjectGroup} onChange={(e) => set("subjectGroupId", e.target.value === "" ? "" : Number(e.target.value))}>
+                <option value="">— ไม่ระบุหมวด —</option>
+                {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+              {lockSubjectGroup && <span className="form-hint">สร้างได้เฉพาะหมวดของท่าน</span>}
+            </div>
           </div>
-          <div className="form-group">
-            <label className="form-label">ช่วงเวลาแข่งขัน</label>
-            {slots.length ? (
-              <select className="form-select" value={f.timeSlotId} onChange={(e) => set("timeSlotId", e.target.value === "" ? "" : Number(e.target.value))}>
-                <option value="">— เลือกช่วงเวลา —</option>
-                {slots.map((sl) => (
-                  <option key={sl.id} value={sl.id}>{formatSlot(sl.label, sl.startTime, sl.endTime)}</option>
+
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">ประเภทการแข่งขัน</label>
+            <div className="seg" role="group" aria-label="ประเภทการแข่งขัน">
+              <button type="button" className={`seg-btn${f.type === "individual" ? " on" : ""}`} disabled={locked} onClick={() => set("type", "individual")}>
+                เดี่ยว
+              </button>
+              <button type="button" className={`seg-btn${f.type === "team" ? " on" : ""}`} disabled={locked} onClick={() => set("type", "team")}>
+                ทีม
+              </button>
+            </div>
+          </div>
+
+          {f.type === "team" && (
+            <div className="grid-2">
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">จำนวนสมาชิกต่ำสุด</label>
+                <input type="number" min={1} className="form-input" value={f.teamSizeMin} disabled={locked} onChange={(e) => set("teamSizeMin", e.target.value === "" ? "" : Number(e.target.value))} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">จำนวนสมาชิกสูงสุด</label>
+                <input type="number" min={1} className="form-input" value={f.teamSizeMax} disabled={locked} onChange={(e) => set("teamSizeMax", e.target.value === "" ? "" : Number(e.target.value))} />
+              </div>
+            </div>
+          )}
+
+          <label className="switch-row">
+            <span className="switch">
+              <input type="checkbox" checked={f.visibleToStudents} onChange={(e) => set("visibleToStudents", e.target.checked)} />
+              <span className="knob" />
+            </span>
+            <span>
+              <span className="switch-label">ให้นักเรียนเห็นรายการนี้</span>
+              <span className="form-hint">
+                {f.visibleToStudents
+                  ? "นักเรียนเห็นรายการนี้ในหน้าสมัคร และสมัครเองได้"
+                  : "นักเรียนมองไม่เห็นและสมัครเองไม่ได้ — ครูเป็นผู้ลงชื่อให้เท่านั้น"}
+              </span>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      {/* ── ส่วนที่ 2: ผู้เข้าแข่งขันและจำนวนรับ ── */}
+      <section className="card form-section">
+        <div className="form-section-head">
+          <span className="ico"><Icon name="user" size={20} /></span>
+          <div>
+            <h3>ผู้เข้าแข่งขันและจำนวนรับ</h3>
+            <div className="hint">ระดับชั้นที่เปิดรับ และจำนวนที่นั่ง{f.type === "team" ? " (จำนวนทีม)" : ""}</div>
+          </div>
+        </div>
+        <div className="form-section-body">
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">ระดับชั้นที่รับ</label>
+            <div className="level-grid">
+              {CLASS_LEVELS.map((lv) => {
+                const on = f.allowedClassLevels.includes(lv);
+                return (
+                  <label key={lv} className={`level-chip${lv.length > 4 ? " wide" : ""}${on ? " on" : ""}${locked ? " disabled" : ""}`}>
+                    <input type="checkbox" checked={on} disabled={locked} onChange={() => toggleLevel(lv)} />
+                    <span>{lv}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="form-label">จำนวนรับ {f.type === "team" ? "(จำนวนทีม)" : ""}</label>
+            <label className="switch-row" style={{ marginBottom: 12 }}>
+              <span className="switch">
+                <input type="checkbox" checked={f.unlimited} onChange={(e) => set("unlimited", e.target.checked)} />
+                <span className="knob" />
+              </span>
+              <span>
+                <span className="switch-label">รับไม่จำกัดจำนวน</span>
+                {f.unlimited && <span className="form-hint">รับนักเรียนได้ไม่จำกัดจำนวน — ปิดสวิตช์เพื่อกำหนดจำนวนที่นั่ง</span>}
+              </span>
+            </label>
+
+            {!f.unlimited && (f.type === "team" ? (
+              <input type="number" min={0} className="form-input" style={{ width: 160 }} value={f.teamCapacity} onChange={(e) => set("teamCapacity", Number(e.target.value))} />
+            ) : (
+              <>
+                <div className="seg" role="group" aria-label="รูปแบบโควตา" style={{ marginBottom: 12 }}>
+                  <button type="button" className={`seg-btn${f.capacityMode === "per_level" ? " on" : ""}`} disabled={locked} onClick={() => set("capacityMode", "per_level")}>
+                    แยกตามระดับชั้น
+                  </button>
+                  <button type="button" className={`seg-btn${f.capacityMode === "combined" ? " on" : ""}`} disabled={locked} onClick={() => set("capacityMode", "combined")}>
+                    รวมทุกระดับชั้น
+                  </button>
+                </div>
+                {f.capacityMode === "combined" ? (
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">จำนวนรับรวมทุกระดับชั้น</label>
+                    <input type="number" min={0} className="form-input" style={{ width: 160 }} value={f.combinedCapacity} onChange={(e) => set("combinedCapacity", Number(e.target.value))} />
+                    <span className="form-hint">
+                      {f.allowedClassLevels.length ? `${f.allowedClassLevels.join(" + ")} รวมกันไม่เกินจำนวนนี้` : "เลือกระดับชั้นก่อน"}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="grid-3">
+                    {f.allowedClassLevels.map((lv) => (
+                      <div key={lv} className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">{lv}</label>
+                        <input type="number" min={0} className="form-input" value={f.capacityPerLevel[lv] ?? 0} onChange={(e) => setCap(lv, Number(e.target.value))} />
+                      </div>
+                    ))}
+                    {!f.allowedClassLevels.length && <div className="muted text-sm">เลือกระดับชั้นก่อน</div>}
+                  </div>
+                )}
+              </>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── ส่วนที่ 3: วัน เวลา และสถานที่ ── */}
+      <section className="card form-section">
+        <div className="form-section-head">
+          <span className="ico"><Icon name="calendar" size={20} /></span>
+          <div>
+            <h3>วัน เวลา และสถานที่</h3>
+            <div className="hint">กำหนดการแข่งขัน — ระบบเตือนอัตโนมัติถ้าสถานที่ถูกใช้ซ้ำในช่วงเวลาเดียวกัน</div>
+          </div>
+        </div>
+        <div className="form-section-body">
+          <div className="grid-2">
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">วันที่แข่ง</label>
+              <input type="date" lang="th" className="form-input" value={f.eventDate} onChange={(e) => set("eventDate", e.target.value)} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">ช่วงเวลาแข่งขัน</label>
+              {slots.length ? (
+                <select className="form-select" value={f.timeSlotId} onChange={(e) => set("timeSlotId", e.target.value === "" ? "" : Number(e.target.value))}>
+                  <option value="">— เลือกช่วงเวลา —</option>
+                  {slots.map((sl) => (
+                    <option key={sl.id} value={sl.id}>{formatSlot(sl.label, sl.startTime, sl.endTime)}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="form-hint">ยังไม่มีช่วงเวลา — ผู้ดูแลระบบต้องเพิ่มช่วงเวลาที่เมนู “ช่วงเวลาแข่งขัน” ก่อน</div>
+              )}
+            </div>
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">สถานที่แข่งขัน</label>
+            {venues.length ? (
+              <select className="form-select" value={f.venueId} onChange={(e) => set("venueId", e.target.value === "" ? "" : Number(e.target.value))}>
+                <option value="">— ไม่ระบุ —</option>
+                {venues.map((v) => (
+                  <option key={v.id} value={v.id}>{v.building ? `${v.building} · ${v.name}` : v.name}</option>
                 ))}
               </select>
             ) : (
-              <div className="form-hint">ยังไม่มีช่วงเวลา — ผู้ดูแลระบบต้องเพิ่มช่วงเวลาที่เมนู “ช่วงเวลาแข่งขัน” ก่อน</div>
+              <div className="form-hint">ยังไม่มีสถานที่ — ผู้ดูแลระบบเพิ่มได้ที่เมนู “สถานที่แข่งขัน”</div>
             )}
           </div>
         </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-label">สถานที่แข่งขัน</label>
-          {venues.length ? (
-            <select className="form-select" value={f.venueId} onChange={(e) => set("venueId", e.target.value === "" ? "" : Number(e.target.value))}>
-              <option value="">— ไม่ระบุ —</option>
-              {venues.map((v) => (
-                <option key={v.id} value={v.id}>{v.building ? `${v.building} · ${v.name}` : v.name}</option>
-              ))}
-            </select>
-          ) : (
-            <div className="form-hint">ยังไม่มีสถานที่ — ผู้ดูแลระบบเพิ่มได้ที่เมนู “สถานที่แข่งขัน”</div>
+      </section>
+
+      {/* ── ส่วนที่ 4: เกณฑ์การให้คะแนน ── */}
+      <section className="card form-section">
+        <div className="form-section-head">
+          <span className="ico"><Icon name="chart" size={20} /></span>
+          <div>
+            <h3>เกณฑ์การให้คะแนน</h3>
+            <div className="hint">
+              {isTraining ? "งานอบรมไม่บังคับเกณฑ์คะแนน" : "ใส่คะแนนเต็มเท่าไรก็ได้ ระบบปรับให้รวมเป็น 100 อัตโนมัติ (คงสัดส่วนเดิม)"}
+            </div>
+          </div>
+          <span className="right badge badge-purple">รวม {fullScore}{!isTraining && " → 100"}</span>
+        </div>
+        <div className="form-section-body">
+          {f.criteria.map((c, i) => (
+            <div key={i} className="row" style={{ alignItems: "center" }}>
+              <span className="crit-no">{i + 1}</span>
+              <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+                <input className="form-input" placeholder="ชื่อเกณฑ์ เช่น ความสวยงาม" value={c.name} disabled={locked} onChange={(e) => setCrit(i, "name", e.target.value)} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0, width: 120 }}>
+                <input type="number" min={0} step="0.01" className="form-input" placeholder="คะแนนเต็ม" value={c.maxScore} disabled={locked} onChange={(e) => setCrit(i, "maxScore", e.target.value)} />
+              </div>
+              {!locked && f.criteria.length > 1 && (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => set("criteria", f.criteria.filter((_, x) => x !== i))}>ลบ</button>
+              )}
+            </div>
+          ))}
+          {!locked && (
+            <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: "flex-start" }} onClick={() => set("criteria", [...f.criteria, { name: "", maxScore: "" }])}>
+              + เพิ่มเกณฑ์
+            </button>
           )}
         </div>
-      </div>
+      </section>
 
-      <div className="card stack">
-        <div className="row between">
-          <label className="form-label" style={{ marginBottom: 0 }}>เกณฑ์การให้คะแนน</label>
-          <span className="badge badge-purple">คะแนนเต็มรวม {fullScore}{!isTraining && " → 100"}</span>
-        </div>
-        {!isTraining && (
-          <span className="form-hint" style={{ marginTop: 0 }}>
-            ใส่คะแนนเต็มของแต่ละเกณฑ์เท่าไรก็ได้ ระบบจะปรับให้รวมเป็น 100 อัตโนมัติเมื่อบันทึก (คงสัดส่วนเดิม) — บังคับอย่างน้อย 1 เกณฑ์
-          </span>
-        )}
-        {f.criteria.map((c, i) => (
-          <div key={i} className="row" style={{ alignItems: "flex-end" }}>
-            <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
-              <input className="form-input" placeholder="ชื่อเกณฑ์ เช่น ความสวยงาม" value={c.name} disabled={locked} onChange={(e) => setCrit(i, "name", e.target.value)} />
-            </div>
-            <div className="form-group" style={{ marginBottom: 0, width: 120 }}>
-              <input type="number" min={0} step="0.01" className="form-input" placeholder="คะแนนเต็ม" value={c.maxScore} disabled={locked} onChange={(e) => setCrit(i, "maxScore", e.target.value)} />
-            </div>
-            {!locked && f.criteria.length > 1 && (
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => set("criteria", f.criteria.filter((_, x) => x !== i))}>ลบ</button>
-            )}
-          </div>
-        ))}
-        {!locked && (
-          <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: "flex-start" }} onClick={() => set("criteria", [...f.criteria, { name: "", maxScore: "" }])}>
-            + เพิ่มเกณฑ์
-          </button>
-        )}
-      </div>
-
-      <div className="row">
+      <div className="row" style={{ alignItems: "center" }}>
         <button className="btn btn-primary" disabled={busy}>{busy ? "กำลังบันทึก…" : initial.id ? "บันทึกการแก้ไข" : "สร้างรายการ"}</button>
         <button type="button" className="btn btn-ghost" onClick={() => router.back()}>ยกเลิก</button>
+        <span className="form-hint" style={{ marginLeft: "auto" }}>รายการที่สร้างจะยังไม่เผยแพร่ จนกว่าจะเปิดจากหน้ารายการ</span>
       </div>
-      <p className="form-hint">รายการที่สร้างจะยังไม่เผยแพร่ (default ปิด) จนกว่าจะเปิดจากหน้ารายการ</p>
     </form>
   );
 }

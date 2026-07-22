@@ -1,15 +1,19 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
-import { formatThaiDate } from "@/lib/domain";
+import { formatThaiDate, formatLevels, hhmm, isUnlimited } from "@/lib/domain";
 import type { ReportBundle } from "@/lib/reportBundle";
 
-type DocType = "roster" | "scoresheet" | "announce";
+type DocType = "roster" | "scoresheet" | "announce" | "summary" | "regcount";
 const DOC_LABEL: Record<DocType, string> = {
   roster: "ใบรายชื่อ",
   scoresheet: "ใบกรอกคะแนน",
   announce: "ใบประกาศผล",
+  summary: "สรุปรายการแข่งขัน",
+  regcount: "สรุปยอดผู้สมัคร",
 };
+/** เอกสารสรุป = ตารางรวมฉบับเดียวทั้งงาน (ไม่แยกหน้าใหม่ต่อรายการ) — แสดงตัวอย่างบนจอได้เลย */
+const SUMMARY_DOCS: DocType[] = ["summary", "regcount"];
 
 export function ReportsByEvent({
   yearBe,
@@ -29,6 +33,7 @@ export function ReportsByEvent({
     () => bundles.filter((b) => b.eventId === eventId),
     [bundles, eventId]
   );
+  const isSummaryDoc = SUMMARY_DOCS.includes(docType);
 
   useEffect(() => {
     if (!printing) return;
@@ -53,7 +58,7 @@ export function ReportsByEvent({
           disabled={!selectedBundles.length || printing}
           onClick={() => setPrinting(true)}
         >
-          <Icon name="printer" size={18} /> {printing ? "กำลังเตรียมเอกสาร…" : `พิมพ์ (${selectedBundles.length})`}
+          <Icon name="printer" size={18} /> {printing ? "กำลังเตรียมเอกสาร…" : isSummaryDoc ? "พิมพ์" : `พิมพ์ (${selectedBundles.length})`}
         </button>
       </div>
 
@@ -70,7 +75,7 @@ export function ReportsByEvent({
 
         <div>
           <label className="form-label">ประเภทเอกสาร</label>
-          <div className="auth-tabs" style={{ maxWidth: 520 }}>
+          <div className="auth-tabs" style={{ maxWidth: 760, flexWrap: "wrap" }}>
             {(Object.keys(DOC_LABEL) as DocType[]).map((t) => (
               <button key={t} className={`auth-tab${docType === t ? " active" : ""}`} onClick={() => setDocType(t)}>
                 {DOC_LABEL[t]}
@@ -80,11 +85,20 @@ export function ReportsByEvent({
         </div>
 
         <div className="alert alert-info">
-          งานนี้มี {selectedBundles.length} รายการ — กด “พิมพ์” เพื่อสร้างเอกสาร (แต่ละรายการขึ้นหน้าใหม่)
+          {isSummaryDoc
+            ? `งานนี้มี ${selectedBundles.length} รายการ — เอกสารสรุปเป็นตารางรวมฉบับเดียว (ดูตัวอย่างด้านล่างแล้วกด "พิมพ์")`
+            : `งานนี้มี ${selectedBundles.length} รายการ — กด "พิมพ์" เพื่อสร้างเอกสาร (แต่ละรายการขึ้นหน้าใหม่)`}
         </div>
       </div>
 
-      {printing && (
+      {/* เอกสารสรุป: แสดงตัวอย่างบนจอตลอด และใช้ตัวเดียวกันเป็นเอกสารพิมพ์ */}
+      {isSummaryDoc && selectedBundles.length > 0 && (
+        <div className="card">
+          <SummarySheet bundles={selectedBundles} docType={docType as "summary" | "regcount"} eventName={eventName} yearBe={yearBe} />
+        </div>
+      )}
+
+      {printing && !isSummaryDoc && (
         <div className="print-only">
           {selectedBundles.map((b) => (
             <ReportSheet key={b.id} bundle={b} docType={docType} eventName={eventName} />
@@ -92,6 +106,156 @@ export function ReportsByEvent({
         </div>
       )}
     </div>
+  );
+}
+
+/** ป้ายประเภท เช่น "เดี่ยว" / "ทีม 2–5 คน" */
+function typeLabel(b: ReportBundle): string {
+  if (b.meta.type !== "team") return "เดี่ยว";
+  const { teamSizeMin: mn, teamSizeMax: mx } = b;
+  if (mn && mx) return mn === mx ? `ทีม ${mn} คน` : `ทีม ${mn}–${mx} คน`;
+  if (mn) return `ทีม ≥${mn} คน`;
+  if (mx) return `ทีม ≤${mx} คน`;
+  return "ทีม";
+}
+
+/** ข้อความจำนวนรับ — ไม่จำกัด → "ไม่จำกัดจำนวน" */
+function capacityLabel(b: ReportBundle): string {
+  if (isUnlimited(b.capacity)) return "ไม่จำกัดจำนวน";
+  return `${b.capacity} ${b.meta.type === "team" ? "ทีม" : "คน"}`;
+}
+
+/** จัดกลุ่ม bundle ตามหมวด (คงลำดับที่เรียงมาแล้วจากเซิร์ฟเวอร์: หมวด → ชื่อรายการ) */
+function groupBySubject(bundles: ReportBundle[]): { groupName: string; items: ReportBundle[] }[] {
+  const out: { groupName: string; items: ReportBundle[] }[] = [];
+  for (const b of bundles) {
+    const last = out[out.length - 1];
+    if (last && last.groupName === b.groupName) last.items.push(b);
+    else out.push({ groupName: b.groupName, items: [b] });
+  }
+  return out;
+}
+
+/** เอกสารสรุปทั้งงาน: ตารางรวมรายการ (summary) / ยอดผู้สมัคร (regcount) แยกหัวข้อตามหมวด */
+function SummarySheet({
+  bundles,
+  docType,
+  eventName,
+  yearBe,
+}: {
+  bundles: ReportBundle[];
+  docType: "summary" | "regcount";
+  eventName: string;
+  yearBe: number;
+}) {
+  const groups = groupBySubject(bundles);
+  const totalStudents = bundles.reduce((s, b) => s + b.studentCount, 0);
+
+  return (
+    <section className="report-section" style={{ breakBefore: "auto" }}>
+      <div className="print-title" style={{ marginBottom: 16, textAlign: "center" }}>
+        <div style={{ fontWeight: 700 }}>โรงเรียนสุคนธีรวิทย์</div>
+        <div>{eventName}</div>
+        <h2 style={{ margin: "8px 0 4px" }}>{DOC_LABEL[docType]}</h2>
+        <div className="text-sm">
+          ปีการศึกษา {yearBe} · {bundles.length} รายการ
+          {docType === "regcount" && ` · ผู้สมัครรวม ${totalStudents} คน`}
+        </div>
+      </div>
+
+      <div className="table-wrap" style={{ boxShadow: "none" }}>
+        <table className="table">
+          <thead>
+            {docType === "summary" ? (
+              <tr>
+                <th style={{ width: 45 }}>ลำดับ</th>
+                <th>รายการแข่งขัน</th>
+                <th style={{ width: 100 }}>ประเภท</th>
+                <th style={{ width: 110 }}>ระดับชั้น</th>
+                <th style={{ width: 170 }}>สถานที่ / ห้อง</th>
+                <th style={{ width: 110 }}>จำนวนรับ</th>
+              </tr>
+            ) : (
+              <tr>
+                <th style={{ width: 45 }}>ลำดับ</th>
+                <th>รายการแข่งขัน</th>
+                <th style={{ width: 100 }}>ประเภท</th>
+                <th style={{ width: 110 }}>จำนวนรับ</th>
+                <th style={{ width: 100 }}>สมัครแล้ว</th>
+                <th className="num" style={{ width: 110 }}>นักเรียน (คน)</th>
+              </tr>
+            )}
+          </thead>
+          <tbody>
+            {groups.map((g) => (
+              <SummaryGroupRows key={g.groupName} group={g} docType={docType} />
+            ))}
+            {docType === "regcount" && (
+              <tr style={{ fontWeight: 700 }}>
+                <td colSpan={4}>รวมทั้งหมด {bundles.length} รายการ</td>
+                <td>{bundles.reduce((s, b) => s + b.rosterCount, 0)} รายการสมัคร</td>
+                <td className="num">{totalStudents}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function SummaryGroupRows({
+  group,
+  docType,
+}: {
+  group: { groupName: string; items: ReportBundle[] };
+  docType: "summary" | "regcount";
+}) {
+  const label = group.groupName === "-" ? "ไม่ระบุหมวด" : group.groupName;
+  return (
+    <>
+      <tr className="report-group-row">
+        <td colSpan={6}>
+          {label} ({group.items.length} รายการ)
+        </td>
+      </tr>
+      {group.items.map((b, i) =>
+        docType === "summary" ? (
+          <tr key={b.id}>
+            <td>{i + 1}</td>
+            <td>
+              {b.meta.competitionName}
+              {(b.meta.eventDate || b.meta.startTime) && (
+                <div className="text-xs muted">
+                  {formatThaiDate(b.meta.eventDate)}
+                  {b.meta.startTime ? ` ${hhmm(b.meta.startTime)}–${hhmm(b.meta.endTime)} น.` : ""}
+                </div>
+              )}
+            </td>
+            <td>{typeLabel(b)}</td>
+            <td>{formatLevels(b.levels) || "-"}</td>
+            <td>{b.venueName || "-"}</td>
+            <td>{capacityLabel(b)}</td>
+          </tr>
+        ) : (
+          <tr key={b.id}>
+            <td>{i + 1}</td>
+            <td>{b.meta.competitionName}</td>
+            <td>{typeLabel(b)}</td>
+            <td>{capacityLabel(b)}</td>
+            <td>{b.meta.type === "team" ? `${b.rosterCount} ทีม` : `${b.rosterCount} คน`}</td>
+            <td className="num">{b.studentCount}</td>
+          </tr>
+        )
+      )}
+      {docType === "regcount" && (
+        <tr style={{ fontWeight: 600 }}>
+          <td colSpan={4} style={{ textAlign: "right" }}>รวม{label !== "ไม่ระบุหมวด" ? `หมวด${label}` : ""}</td>
+          <td>{group.items.reduce((s, b) => s + b.rosterCount, 0)} รายการสมัคร</td>
+          <td className="num">{group.items.reduce((s, b) => s + b.studentCount, 0)}</td>
+        </tr>
+      )}
+    </>
   );
 }
 

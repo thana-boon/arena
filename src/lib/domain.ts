@@ -159,6 +159,24 @@ export function formatSeats(registered: number, capacity: number | null | undefi
   return `${registered}/${isUnlimited(capacity) ? "ไม่จำกัด" : capacity ?? 0}`;
 }
 
+/**
+ * ย่อรายการระดับชั้นเป็นช่วง เช่น ["ป.4","ป.5","ป.6","ม.1"] → "ป.4–ป.6, ม.1"
+ * (ยุบเฉพาะชั้นที่ติดกันตามลำดับ CLASS_LEVELS) — ใช้ในรายงานสรุปให้อ่านง่าย
+ */
+export function formatLevels(levels: string[]): string {
+  const idx = (lv: string) => CLASS_LEVELS.indexOf(lv as ClassLevel);
+  const sorted = [...levels].filter((lv) => idx(lv) >= 0).sort((a, b) => idx(a) - idx(b));
+  const unknown = levels.filter((lv) => idx(lv) < 0);
+  const parts: string[] = [];
+  for (let i = 0; i < sorted.length; ) {
+    let j = i;
+    while (j + 1 < sorted.length && idx(sorted[j + 1]) === idx(sorted[j]) + 1) j++;
+    parts.push(j - i >= 2 ? `${sorted[i]}–${sorted[j]}` : sorted.slice(i, j + 1).join(", "));
+    i = j + 1;
+  }
+  return [...parts, ...unknown].join(", ");
+}
+
 // ===== ช่วงเวลา (time slot) =====
 /** "09:00:00" → "09:00" (ตัดวินาที) */
 export function hhmm(t: string | null | undefined): string {

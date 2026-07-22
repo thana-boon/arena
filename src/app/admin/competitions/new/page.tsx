@@ -20,6 +20,7 @@ export default async function AdminNewCompetition() {
     <div className="stack">
       <div className="page-header">
         <h1>สร้างรายการแข่งขัน</h1>
+        <div className="subtitle">ปีการศึกษา {year.yearBe} · กรอกข้อมูล 4 ส่วนแล้วกด “สร้างรายการ”</div>
       </div>
       <CompetitionForm
         events={eventList.map((e) => ({ id: e.id, name: e.name, kind: e.kind }))}

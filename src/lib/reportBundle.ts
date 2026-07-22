@@ -1,20 +1,24 @@
 import "server-only";
 import { db } from "@/db";
-import { competitions, subjectGroups, type Competition } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { competitions, subjectGroups, competitionCapacity, venues, type Competition } from "@/db/schema";
+import { eq, inArray } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { computeCompetitionResults } from "@/lib/results";
 import { getRoster, type RosterEntry } from "@/lib/roster";
-import { MEDAL_LABEL } from "@/lib/domain";
+import { MEDAL_LABEL, parseJsonArray, isUnlimited, UNLIMITED_CAPACITY } from "@/lib/domain";
 
 export type MedalPct = { gold: number; silver: number; bronze: number };
+
+/** ข้อมูลเสริมสำหรับรายงานสรุป (สถานที่/จำนวนรับ) — คำนวณจาก getReportBundles */
+export type BundleExtras = { venueName: string; capacity: number };
 
 /** สร้างข้อมูลเอกสารของรายการแข่งขันเดียว (roster + คะแนน + อันดับ/เหรียญ) */
 export async function buildBundle(
   comp: Competition,
   groupName: string,
   yearBe: number,
-  medalPct: MedalPct
+  medalPct: MedalPct,
+  extras: BundleExtras = { venueName: "", capacity: 0 }
 ): Promise<ReportBundle> {
   const roster = await getRoster(comp.id);
   const computed = await computeCompetitionResults(comp.id, medalPct);
@@ -23,6 +27,11 @@ export async function buildBundle(
     eventId: comp.eventId,
     subjectGroupId: comp.subjectGroupId,
     groupName,
+    levels: parseJsonArray(comp.allowedClassLevels),
+    teamSizeMin: comp.teamSizeMin,
+    teamSizeMax: comp.teamSizeMax,
+    venueName: extras.venueName,
+    capacity: extras.capacity,
     meta: {
       competitionName: comp.name,
       groupName,
@@ -46,6 +55,7 @@ export async function buildBundle(
       medalLabel: MEDAL_LABEL[r.medal],
     })),
     rosterCount: roster.length,
+    studentCount: roster.reduce((s, e) => s + e.members.length, 0),
   };
 }
 
@@ -65,6 +75,11 @@ export type ReportBundle = {
   eventId: number | null;
   subjectGroupId: number | null;
   groupName: string;
+  levels: string[]; // ระดับชั้นที่รับ
+  teamSizeMin: number | null;
+  teamSizeMax: number | null;
+  venueName: string; // "อาคาร · ห้อง" หรือ "" ถ้าไม่ระบุ
+  capacity: number; // < 0 = ไม่จำกัดจำนวน
   meta: {
     competitionName: string;
     groupName: string;
@@ -78,7 +93,8 @@ export type ReportBundle = {
   fullScore: number;
   roster: RosterEntry[];
   results: ReportResultRow[];
-  rosterCount: number;
+  rosterCount: number; // จำนวน entry (เดี่ยว = คน, ทีม = ทีม)
+  studentCount: number; // จำนวนนักเรียนรวมทุก entry
 };
 
 /**
@@ -99,10 +115,24 @@ export async function getReportBundles(): Promise<{ yearBe: number; bundles: Rep
   const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
   const groupOf = (id: number | null) => (id == null ? undefined : groups.find((g) => g.id === id));
 
+  // ข้อมูลเสริมสำหรับรายงานสรุป: สถานที่ + จำนวนรับ (ดึงเป็นชุดเดียว)
+  const compIds = comps.map((c) => c.id);
+  const caps = compIds.length
+    ? await db.select().from(competitionCapacity).where(inArray(competitionCapacity.competitionId, compIds))
+    : [];
+  const venueRows = await db.select().from(venues);
+
   const bundles: ReportBundle[] = [];
   for (const comp of comps) {
     const g = groupOf(comp.subjectGroupId);
-    bundles.push(await buildBundle(comp, g?.name ?? "-", year.yearBe, medalPct));
+    const cRows = caps.filter((x) => x.competitionId === comp.id);
+    // ถ้ามีแถวใดไม่จำกัด → ทั้งรายการถือว่าไม่จำกัด (เหมือน listCompetitions)
+    const capacity = cRows.some((r) => isUnlimited(r.capacity))
+      ? UNLIMITED_CAPACITY
+      : cRows.reduce((s, r) => s + r.capacity, 0);
+    const v = comp.venueId == null ? undefined : venueRows.find((x) => x.id === comp.venueId);
+    const venueName = v ? (v.building ? `${v.building} · ${v.name}` : v.name) : "";
+    bundles.push(await buildBundle(comp, g?.name ?? "-", year.yearBe, medalPct, { venueName, capacity }));
   }
 
   // เรียงตามหมวด แล้วตามชื่อรายการ ให้เอกสารออกมาเป็นระเบียบ

@@ -47,6 +47,7 @@ export async function GET(req: Request) {
         competitionId: competitions.id,
         competitionName: competitions.name,
         eventDate: competitions.eventDate,
+        eventId: competitions.eventId,
         groupName: subjectGroups.name,
       })
       .from(entryMembers)
@@ -70,6 +71,7 @@ export async function GET(req: Request) {
         groupName: r.groupName ?? "-",
         teamName: r.teamName,
         eventDate: r.eventDate,
+        eventId: r.eventId,
       });
     }
 

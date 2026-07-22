@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireStaff } from "@/lib/auth/guards";
-import { getActiveYear } from "@/lib/queries";
+import { getActiveYearWithSettings } from "@/lib/queries";
 import { listCompetitions } from "@/lib/listings";
 import { canViewCompetition } from "@/lib/permit";
 import { CompetitionsTable } from "@/components/CompetitionsTable";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function TeacherCompetitions() {
   const session = await requireStaff();
-  const year = await getActiveYear();
+  const { year, setting } = await getActiveYearWithSettings();
   const all = year ? await listCompetitions(year.id) : [];
   const comps = all.filter((c) => canViewCompetition(session, c.createdBy, c.groupCatalogNo));
 
@@ -31,6 +31,7 @@ export default async function TeacherCompetitions() {
           myCode={session.code}
           role={session.role}
           basePath="/teacher/competitions"
+          defaultEventId={setting?.defaultEventId ?? null}
           // ทุกแถวที่แสดงผ่าน canViewCompetition แล้ว = เป็นรายการในหมวดตัวเอง/ของตัวเอง → ประกาศผลได้
           canPublish
         />

@@ -185,6 +185,7 @@ export type RoomStudent = {
     groupName: string;
     teamName: string | null;
     eventDate: string | null;
+    eventId: number | null; // งาน (Event) ที่รายการนี้สังกัด — ใช้กรองหน้า "การสมัครรายห้อง"
   }[];
 };
 

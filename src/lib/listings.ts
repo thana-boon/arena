@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/db";
-import { competitions, subjectGroups, competitionCapacity, entries } from "@/db/schema";
+import { competitions, subjectGroups, competitionCapacity, entries, events } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { parseJsonArray, CLASS_LEVELS, UNLIMITED_CAPACITY, isUnlimited } from "@/lib/domain";
 import { listStudents } from "@/lib/external/student-api";
@@ -12,6 +12,8 @@ export type CompListItem = {
   subjectGroupId: number | null;
   groupCatalogNo: number | null;
   groupName: string;
+  eventId: number | null;
+  eventName: string;
   levels: string[];
   eventDate: string | null;
   startTime: string | null;
@@ -28,6 +30,8 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
   const comps = await db.select().from(competitions).where(eq(competitions.yearId, yearId));
   if (!comps.length) return [];
   const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, yearId));
+  const evs = await db.select().from(events).where(eq(events.yearId, yearId));
+  const eventName = (id: number | null) => (id == null ? "" : evs.find((e) => e.id === id)?.name ?? "-");
   const groupName = (id: number | null) => (id == null ? "" : groups.find((g) => g.id === id)?.name ?? "-");
   const groupCatalogNo = (id: number | null) => (id == null ? null : groups.find((g) => g.id === id)?.catalogNo ?? null);
   const compIds = comps.map((c) => c.id);
@@ -46,6 +50,8 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
       subjectGroupId: c.subjectGroupId,
       groupCatalogNo: groupCatalogNo(c.subjectGroupId),
       groupName: groupName(c.subjectGroupId),
+      eventId: c.eventId,
+      eventName: eventName(c.eventId),
       levels: parseJsonArray(c.allowedClassLevels),
       eventDate: c.eventDate,
       startTime: c.startTime,

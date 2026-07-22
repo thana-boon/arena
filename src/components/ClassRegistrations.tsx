@@ -7,13 +7,25 @@ import { useClassRooms } from "@/lib/useClassRooms";
 
 type Resp = { students: RoomStudent[]; yearBe: number | null };
 
+export type EventOption = { id: number; name: string };
+
 /** ดูรายชื่อนักเรียนทีละห้อง พร้อมรายการแข่งขันที่แต่ละคนสมัครไว้ — ครูทุกคนและ admin ดูได้ */
-export function ClassRegistrations() {
+export function ClassRegistrations({
+  events = [],
+  defaultEventId = null,
+}: {
+  events?: EventOption[];
+  defaultEventId?: number | null;
+}) {
   const [level, setLevel] = useState("");
   const [room, setRoom] = useState("");
   const [data, setData] = useState<Resp | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  // กรองตามงาน — ค่าเริ่มต้นตามที่ admin ตั้งไว้ (ถ้ามี) ไม่งั้นแสดงทุกงาน
+  const [eventFilter, setEventFilter] = useState<number | "all">(() =>
+    defaultEventId != null && events.some((e) => e.id === defaultEventId) ? defaultEventId : "all"
+  );
 
   const { rooms, loading: roomsLoading } = useClassRooms(level);
 
@@ -36,7 +48,12 @@ export function ClassRegistrations() {
     setData(res.data);
   }
 
-  const students = data?.students ?? [];
+  // กรองรายการสมัครของแต่ละคนตามงานที่เลือก (สถิติด้านล่างนับตามตัวกรองด้วย)
+  const students = (data?.students ?? []).map((s) => ({
+    ...s,
+    registrations:
+      eventFilter === "all" ? s.registrations : s.registrations.filter((r) => r.eventId === eventFilter),
+  }));
   const registeredCount = students.filter((s) => s.registrations.length > 0).length;
   const registeredPct = students.length ? Math.round((registeredCount / students.length) * 100) : 0;
 
@@ -58,6 +75,19 @@ export function ClassRegistrations() {
               {rooms.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
+          {events.length > 1 && (
+            <div className="form-group" style={{ marginBottom: 0, minWidth: 200 }}>
+              <label className="form-label">งาน</label>
+              <select
+                className="form-select"
+                value={eventFilter}
+                onChange={(e) => setEventFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
+              >
+                <option value="all">ทุกงาน</option>
+                {events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+              </select>
+            </div>
+          )}
           {busy && <div className="muted text-sm" style={{ paddingBottom: 10 }}>กำลังโหลดรายชื่อ…</div>}
         </div>
         {err && <div className="form-error mt-2">{err}</div>}

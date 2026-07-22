@@ -53,7 +53,7 @@ export async function CompetitionEditBody({
   const combinedCapacity = capacityMode === "combined" ? teamCap : 0;
 
   return (
-    <div className="stack">
+    <div className="stack form-page">
       <div>
         <Link href={returnTo} className="btn btn-ghost btn-sm">← กลับไปหน้ารายการแข่งขัน</Link>
       </div>

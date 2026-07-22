@@ -17,7 +17,7 @@ export default async function AdminNewCompetition() {
   const eventList = await db.select().from(events).where(eq(events.yearId, year.id)).orderBy(asc(events.name));
 
   return (
-    <div className="stack">
+    <div className="stack form-page">
       <div className="page-header">
         <h1>สร้างรายการแข่งขัน</h1>
         <div className="subtitle">ปีการศึกษา {year.yearBe} · กรอกข้อมูล 4 ส่วนแล้วกด “สร้างรายการ”</div>

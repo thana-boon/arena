@@ -27,7 +27,7 @@ export default async function NewCompetition() {
   const defaultGroupId = groups.length === 1 ? groups[0].id : "";
 
   return (
-    <div className="stack">
+    <div className="stack form-page">
       <div className="page-header">
         <h1>สร้างรายการแข่งขัน</h1>
         <div className="subtitle">ปีการศึกษา {year.yearBe} · กรอกข้อมูล 4 ส่วนแล้วกด “สร้างรายการ”</div>

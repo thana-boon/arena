@@ -172,7 +172,7 @@ export function CompetitionForm({
   }
 
   return (
-    <form onSubmit={submit} className="stack" style={{ maxWidth: 760 }}>
+    <form onSubmit={submit} className="stack">
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
       {locked && <div className="alert alert-warning">รายการนี้มีผู้ลงทะเบียนแล้ว แก้ไขได้เฉพาะชื่อ/วันเวลา/จำนวนรับ (ไม่สามารถเปลี่ยนประเภท ระดับชั้น หรือเกณฑ์)</div>}
 

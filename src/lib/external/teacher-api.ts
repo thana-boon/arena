@@ -74,6 +74,20 @@ export async function teacherLogin(
   };
 }
 
+// ===== ครูประจำชั้น =====
+export type TeacherHomeroom = { classLevel: string; classRoom: string };
+
+/**
+ * ห้องที่ครูคนนี้เป็นครูประจำชั้น (จาก field homerooms ของ SchoolOS)
+ * คืน [] ถ้าไม่ได้ประจำชั้น / หาแถวครูไม่เจอ — ใช้จำกัดหน้า "การสมัครรายห้อง" ของครูทั่วไป
+ */
+export async function fetchTeacherHomerooms(teacherCode: string): Promise<TeacherHomeroom[]> {
+  const row = await findTeacherByCode(teacherCode).catch(() => null);
+  return (row?.homerooms ?? [])
+    .map((h) => ({ classLevel: (h.gradeLevel ?? "").trim(), classRoom: String(h.classroom ?? "").trim() }))
+    .filter((h) => h.classLevel && h.classRoom);
+}
+
 /** รายชื่อครูทั้งหมด (admin ค้นหา/มอบสิทธิ์) — subject_group = เลข groupNo (string) */
 export async function fetchAllTeachers(): Promise<TeacherProfile[]> {
   const teachers = await sosAllTeachers("active");

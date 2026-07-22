@@ -189,6 +189,33 @@ export type RoomStudent = {
   }[];
 };
 
+/** รายการแข่งขันที่เปิดรับระดับชั้นของห้อง — ให้ครู/แอดมินกดสมัครแทนนักเรียนจากหน้า "การสมัครรายห้อง" */
+export type RoomComp = {
+  id: number;
+  name: string;
+  type: CompType;
+  eventId: number | null;
+  eventName: string;
+  groupName: string;
+  levels: string[]; // ระดับชั้นที่รายการรับ — ใช้จำกัด StudentPicker ตอนเพิ่มสมาชิกทีม
+  teamSizeMin: number | null;
+  teamSizeMax: number | null;
+  eventDate: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  capacity: number; // < 0 = ไม่จำกัด
+  registered: number;
+  open: boolean; // งานเปิดรับสมัครและอยู่ในช่วงเวลา (admin override ข้ามได้)
+};
+
+/** สถิติการสมัครของห้องหนึ่ง (ภาพรวมทุกห้องของ admin) — สมัคร ≥ 1 รายการ = นับว่าสมัครแล้ว */
+export type RoomOverviewRow = {
+  classLevel: string;
+  classRoom: string;
+  total: number;
+  registered: number;
+};
+
 export const ROLE_HOME: Record<string, string> = {
   student: "/student",
   teacher: "/teacher",

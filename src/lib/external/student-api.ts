@@ -146,6 +146,20 @@ export async function listStudentsInRoom(
   return out;
 }
 
+/** นักเรียนทุกคนทุกห้อง (ทุกหน้า) — ใช้ทำภาพรวมการสมัครรายห้องของ admin */
+export async function listAllStudents(): Promise<StudentProfile[]> {
+  const out: StudentProfile[] = [];
+  const limit = 200;
+  let page = 1;
+  for (;;) {
+    const { data, meta } = await listStudents({ page, limit });
+    out.push(...data);
+    if (data.length === 0 || page * limit >= meta.total || page >= 30) break;
+    page++;
+  }
+  return out;
+}
+
 // ===== ปีการศึกษา =====
 // SchoolOS ไม่มี endpoint "list ปีทั้งหมด" — ดึงได้เฉพาะปีปัจจุบัน (จาก field academicYear ของ /students)
 export type ApiAcademicYear = {

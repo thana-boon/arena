@@ -17,9 +17,9 @@ export default async function AdminClassRegistrations() {
     <div className="stack">
       <div className="page-header">
         <h1>การสมัครรายห้อง</h1>
-        <div className="subtitle">เลือกชั้น/ห้อง เพื่อดูว่านักเรียนแต่ละคนสมัครกิจกรรมอะไรไปแล้วบ้าง</div>
+        <div className="subtitle">เลือกชั้น/ห้อง เพื่อดูการสมัครของนักเรียน และสมัครแทนนักเรียนได้ (ติดกติกา override ได้)</div>
       </div>
-      <ClassRegistrations events={eventRows} defaultEventId={setting?.defaultEventId ?? null} />
+      <ClassRegistrations events={eventRows} defaultEventId={setting?.defaultEventId ?? null} isAdmin />
     </div>
   );
 }

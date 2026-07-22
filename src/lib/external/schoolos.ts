@@ -51,6 +51,8 @@ export type SosTeacher = {
   gradeTaught?: string;
   role?: string;
   employmentStatus?: string;
+  // ห้องที่เป็นครูประจำชั้น เช่น [{gradeLevel: "ม.1", classroom: "2"}] — [] ถ้าไม่ได้ประจำชั้น
+  homerooms?: { gradeLevel: string; classroom: string | number }[];
 };
 
 export type SosVerifyUser = {

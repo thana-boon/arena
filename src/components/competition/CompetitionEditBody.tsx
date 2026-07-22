@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { db } from "@/db";
 import { subjectGroups, competitions, competitionCapacity, criteria, entries, events } from "@/db/schema";
 import { asc, eq } from "drizzle-orm";
@@ -53,6 +54,9 @@ export async function CompetitionEditBody({
 
   return (
     <div className="stack">
+      <div>
+        <Link href={returnTo} className="btn btn-ghost btn-sm">← กลับไปหน้ารายการแข่งขัน</Link>
+      </div>
       <div className="page-header">
         <h1>แก้ไขรายการแข่งขัน</h1>
         <div className="subtitle">{comp.name}</div>

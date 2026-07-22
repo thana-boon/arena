@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
 import { useConfirm } from "@/components/ConfirmDialog";
-import { CLASS_LEVELS, UNLIMITED_CAPACITY, formatSlot, hhmm } from "@/lib/domain";
+import { CLASS_LEVELS, UNLIMITED_CAPACITY, formatSlot, hhmm, scaleMaxScoresTo100 } from "@/lib/domain";
 
 export type SlotOption = { id: number; label: string; startTime: string; endTime: string };
 export type VenueOption = { id: number; name: string; building: string };
@@ -84,13 +84,35 @@ export function CompetitionForm({
     () => f.criteria.reduce((s, c) => s + (typeof c.maxScore === "number" ? c.maxScore : 0), 0),
     [f.criteria]
   );
+  // งานอบรมไม่มีคะแนน → ไม่บังคับเกณฑ์และไม่สเกลเป็น 100
+  const isTraining = useMemo(
+    () => events.find((ev) => ev.id === Number(f.eventId))?.kind === "training",
+    [events, f.eventId]
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
     if (!f.eventId) return setMsg({ type: "error", text: "กรุณาเลือกงาน" });
     if (!f.timeSlotId) return setMsg({ type: "error", text: "กรุณาเลือกช่วงเวลาแข่งขัน" });
+
+    // เกณฑ์การให้คะแนน: ตัดแถวว่างทิ้ง, ทุกแถวที่มีข้อมูลต้องมีทั้งชื่อและคะแนน > 0
+    const filledCriteria = f.criteria.filter((c) => c.name.trim() !== "" || c.maxScore !== "");
+    for (const c of filledCriteria) {
+      if (!c.name.trim() || typeof c.maxScore !== "number" || c.maxScore <= 0)
+        return setMsg({ type: "error", text: "เกณฑ์แต่ละข้อต้องมีทั้งชื่อและคะแนนเต็มมากกว่า 0" });
+    }
+    // งานแข่งขันบังคับอย่างน้อย 1 เกณฑ์ (งานอบรมไม่ต้องมีคะแนน)
+    if (!isTraining && filledCriteria.length === 0)
+      return setMsg({ type: "error", text: "กรุณาเพิ่มเกณฑ์การให้คะแนนอย่างน้อย 1 ข้อ" });
+
     setBusy(true);
+    // สเกลคะแนนเต็มของแต่ละเกณฑ์ให้รวมกันเป็น 100 (งานอบรมส่งตามที่กรอก) — คงสัดส่วนเดิม
+    const scaledScores = isTraining
+      ? filledCriteria.map((c) => Number(c.maxScore))
+      : scaleMaxScoresTo100(filledCriteria.map((c) => Number(c.maxScore)));
+    const criteriaPayload = filledCriteria.map((c, i) => ({ name: c.name.trim(), maxScore: scaledScores[i] }));
+
     // จำนวนรับ: ไม่จำกัด → -1 ทุกช่อง; จำกัด → ใช้ค่าที่กรอก (ช่องว่าง = 0)
     const capacityPerLevel = Object.fromEntries(
       f.allowedClassLevels.map((lv) => [lv, f.unlimited ? UNLIMITED_CAPACITY : f.capacityPerLevel[lv] ?? 0])
@@ -112,7 +134,7 @@ export function CompetitionForm({
       capacityPerLevel,
       combinedCapacity: f.unlimited ? UNLIMITED_CAPACITY : f.combinedCapacity,
       teamCapacity: f.unlimited ? UNLIMITED_CAPACITY : f.teamCapacity,
-      criteria: f.criteria.map((c) => ({ name: c.name, maxScore: Number(c.maxScore) })),
+      criteria: criteriaPayload,
     };
 
     // ยิงคำขอ (force = ยืนยันใช้สถานที่ที่ชนกับรายการอื่น)
@@ -327,8 +349,13 @@ export function CompetitionForm({
       <div className="card stack">
         <div className="row between">
           <label className="form-label" style={{ marginBottom: 0 }}>เกณฑ์การให้คะแนน</label>
-          <span className="badge badge-purple">คะแนนเต็มรวม {fullScore}</span>
+          <span className="badge badge-purple">คะแนนเต็มรวม {fullScore}{!isTraining && " → 100"}</span>
         </div>
+        {!isTraining && (
+          <span className="form-hint" style={{ marginTop: 0 }}>
+            ใส่คะแนนเต็มของแต่ละเกณฑ์เท่าไรก็ได้ ระบบจะปรับให้รวมเป็น 100 อัตโนมัติเมื่อบันทึก (คงสัดส่วนเดิม) — บังคับอย่างน้อย 1 เกณฑ์
+          </span>
+        )}
         {f.criteria.map((c, i) => (
           <div key={i} className="row" style={{ alignItems: "flex-end" }}>
             <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>

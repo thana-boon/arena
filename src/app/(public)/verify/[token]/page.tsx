@@ -1,6 +1,6 @@
 import { Icon } from "@/components/Icon";
 import { verifyCertificate } from "@/lib/certificates";
-import { formatThaiDate, MEDAL_LABEL, type Medal } from "@/lib/domain";
+import { formatThaiDate, MEDAL_LABEL, rankAwardLabel, type Medal } from "@/lib/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ token: 
     ["รายการแข่งขัน", cert.competitionNameSnapshot],
     ["งาน", cert.eventNameSnapshot],
     ["รางวัล", MEDAL_LABEL[cert.medal as Medal] ?? cert.medal],
-    ...(cert.rank ? ([["อันดับ", `อันดับที่ ${cert.rank}`]] as [string, string][]) : []),
+    ...(cert.rank ? ([["อันดับ", rankAwardLabel(cert.rank)]] as [string, string][]) : []),
     ["ปีการศึกษา", String(cert.yearBeSnapshot)],
     ["วันที่ออก", formatThaiDate(cert.issuedAt)],
   ];

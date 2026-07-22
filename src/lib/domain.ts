@@ -24,6 +24,17 @@ export const MEDAL_BADGE_CLASS: Record<Medal, string> = {
   none: "badge",
 };
 
+/**
+ * ป้ายรางวัลตามอันดับ (ใช้บนเกียรติบัตร) — อันดับ 1-3 เป็นชื่อรางวัล, อันดับอื่นใช้ "อันดับที่ N"
+ * 1 = ชนะเลิศ · 2 = รองชนะเลิศอันดับ 1 · 3 = รองชนะเลิศอันดับ 2
+ */
+export function rankAwardLabel(rank: number): string {
+  if (rank === 1) return "ชนะเลิศ";
+  if (rank === 2) return "รองชนะเลิศอันดับ 1";
+  if (rank === 3) return "รองชนะเลิศอันดับ 2";
+  return rank > 0 ? `อันดับที่ ${rank}` : "";
+}
+
 /** parse json array จากคอลัมน์ text อย่างปลอดภัย */
 export function parseJsonArray(raw: string | null | undefined): string[] {
   if (!raw) return [];
@@ -33,6 +44,32 @@ export function parseJsonArray(raw: string | null | undefined): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * ปรับคะแนนเต็มของแต่ละเกณฑ์ให้รวมกันเป็น 100 พอดี โดยคงสัดส่วนเดิม
+ * คืนจำนวนเต็ม การันตีทุกข้อ ≥ 1 และผลรวม = 100 เสมอ (ถ้ามีเกณฑ์ ≤ 100 ข้อ)
+ * เช่น [30,30,30] → [33,33,34] ; [40,40,40] → [33,33,34] ; [1,1] → [50,50]
+ */
+export function scaleMaxScoresTo100(maxScores: number[]): number[] {
+  const n = maxScores.length;
+  if (n === 0) return [];
+  const sum = maxScores.reduce((a, b) => a + b, 0);
+  // ผลรวมเดิม ≤ 0 (ไม่ควรเกิด) → เฉลี่ยเท่ากันทุกข้อ
+  const raw = sum > 0 ? maxScores.map((v) => (v * 100) / sum) : maxScores.map(() => 100 / n);
+  const out = raw.map((v) => Math.max(1, Math.floor(v)));
+  let diff = 100 - out.reduce((a, b) => a + b, 0);
+  // เหลือ → แจกให้ข้อที่เศษทศนิยมมากสุดก่อน
+  const order = raw.map((v, i) => ({ i, frac: v - Math.floor(v) })).sort((a, b) => b.frac - a.frac);
+  for (let k = 0; diff > 0; k++, diff--) out[order[k % n].i]++;
+  // เกิน (เพราะดันขั้นต่ำเป็น 1) → ค่อย ๆ ลดจากข้อที่มากสุด (คงขั้นต่ำ 1)
+  while (diff < 0) {
+    let maxI = 0;
+    for (let j = 1; j < n; j++) if (out[j] > out[maxI]) maxI = j;
+    if (out[maxI] <= 1) break;
+    out[maxI]--; diff++;
+  }
+  return out;
 }
 
 /** คำนวณเปอร์เซ็นต์คะแนน */

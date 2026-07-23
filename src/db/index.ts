@@ -18,6 +18,10 @@ const pool =
     // รอ connection ว่างสูงสุด 10 วิ แล้วค่อย error — กันไม่ให้ตอนโหลดพีค request ค้างไม่มีกำหนด
     connectionTimeoutMillis: 10_000,
     idleTimeoutMillis: 30_000,
+    // ตัด query ที่รันเกิน 30 วิฝั่ง Postgres — query ช้าตัวเดียวจะได้ไม่ถือ connection ค้าง
+    // จนสะสมเต็ม pool แล้วทุก request ใหม่ตายที่ connectionTimeout พร้อมกันหมด
+    // งานที่ตั้งใจให้นานกว่านี้ (restore) ใช้ SET LOCAL statement_timeout เองใน transaction
+    statement_timeout: 30_000,
   });
 
 if (process.env.NODE_ENV !== "production") globalForDb.pool = pool;

@@ -5,6 +5,10 @@ import { ok, fail } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
+// เพดานขนาดไฟล์สำรอง — req.json() อ่านทั้งก้อนเข้า memory ถ้าไม่จำกัด ไฟล์ใหญ่ ๆ
+// จะดัน process ทะลุเพดาน memory (PM2 ตั้ง max_memory_restart 512M) แล้ว restart กลางคัน
+const MAX_RESTORE_BYTES = 100 * 1024 * 1024; // 100MB
+
 // POST: กู้คืนข้อมูลจากไฟล์สำรอง (เขียนทับข้อมูลทั้งหมด) — เฉพาะแอดมิน
 export async function POST(req: Request) {
   let code: string;
@@ -14,6 +18,11 @@ export async function POST(req: Request) {
   } catch (e) {
     if (e instanceof ApiAuthError) return fail(e.message, e.status);
     throw e;
+  }
+
+  const declared = Number(req.headers.get("content-length") ?? 0);
+  if (declared > MAX_RESTORE_BYTES) {
+    return fail("ไฟล์สำรองใหญ่เกินไป (เกิน 100MB) กรุณาติดต่อผู้ดูแลระบบเพื่อกู้คืนที่เครื่องเซิร์ฟเวอร์", 413);
   }
 
   let data: BackupFile;

@@ -18,6 +18,19 @@ const nextConfig: NextConfig = {
       { source: "/", destination: BASE_PATH, basePath: false as const, permanent: false },
     ];
   },
+  // security headers พื้นฐาน — กัน clickjacking / MIME sniffing / referrer รั่วออกนอกระบบ
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "same-origin" },
+        ],
+      },
+    ];
+  },
   reactStrictMode: true,
   serverExternalPackages: ["pg", "bcryptjs"],
   eslint: { ignoreDuringBuilds: true },

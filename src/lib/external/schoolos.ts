@@ -7,6 +7,10 @@ import { env } from "@/lib/env";
 
 const V1 = "/api/public/v1";
 
+// เพดานรอคำตอบต่อ request — ถ้าเครื่อง SchoolOS ช้า/ค้าง ให้ตัดที่ 10 วิแทนที่จะแขวนไม่มีกำหนด
+// (loop แบ่งหน้าอย่าง sosAllTeachers ยิงต่อเนื่องหลายสิบครั้ง ถ้าไม่มี timeout จะค้างคูณจำนวนรอบ)
+const SOS_TIMEOUT_MS = 10_000;
+
 async function sos(path: string, init?: RequestInit) {
   return fetch(`${env.SCHOOLOS_API_BASE}${V1}${path}`, {
     ...init,
@@ -16,6 +20,7 @@ async function sos(path: string, init?: RequestInit) {
       ...(init?.headers ?? {}),
     },
     cache: "no-store",
+    signal: AbortSignal.timeout(SOS_TIMEOUT_MS),
   });
 }
 

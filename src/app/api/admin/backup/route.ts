@@ -13,7 +13,9 @@ export async function GET() {
     await logAudit(s.code, "backup_export");
 
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    return new Response(JSON.stringify(data, null, 2), {
+    // stringify แบบ compact — ไม่ pretty-print เพราะข้อมูลส่วนใหญ่เป็น base64 รูปเกียรติบัตร
+    // (indent ช่วยอ่านไม่ได้อยู่แล้ว แต่เพิ่มขนาด string ก้อนใหญ่ใน memory โดยเปล่าประโยชน์)
+    return new Response(JSON.stringify(data), {
       status: 200,
       headers: {
         "content-type": "application/json; charset=utf-8",

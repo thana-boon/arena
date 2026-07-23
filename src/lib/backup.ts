@@ -83,6 +83,9 @@ export async function restoreDatabase(data: BackupFile): Promise<RestoreSummary>
   const summary: RestoreSummary = [];
   try {
     await client.query("BEGIN");
+    // pool ตั้ง statement_timeout 30 วิไว้กัน query ค้าง แต่ restore ตั้งใจให้ทำงานนาน
+    // — ขยายเฉพาะ transaction นี้ (SET LOCAL คืนค่าเดิมเองตอน COMMIT/ROLLBACK)
+    await client.query("SET LOCAL statement_timeout = '120s'");
 
     // ล้างข้อมูลเดิม (ย้อนลำดับ dependency)
     for (const t of [...TABLES].reverse()) {

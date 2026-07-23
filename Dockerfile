@@ -45,6 +45,11 @@ COPY --from=build /app/src ./src
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 
+# ไม่รันเป็น root — ไฟล์ที่ COPY มาเป็นของ root (อ่านได้พอ) ยกเว้น .next ที่ next start
+# ต้องเขียน cache ได้ จึง chown เฉพาะโฟลเดอร์นั้น (user "node" มากับ base image อยู่แล้ว)
+RUN chown -R node:node /app/.next
+USER node
+
 EXPOSE 3017
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["npm", "run", "start"]

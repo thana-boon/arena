@@ -3,7 +3,14 @@
 # รัน:  docker compose up -d --build
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        # basePath ถูก bake ตอน next build (ดู next.config.ts) — ต้องส่งเป็น build arg
+        # ไม่ตั้งเลย = /arena (prod หลัง reverse proxy) ; ตั้ง BASE_PATH= (ค่าว่าง) = เสิร์ฟที่ root
+        # ใช้ ${VAR-default} ไม่ใช่ :- เพื่อให้ค่าว่างที่ตั้งใจตั้งมีผลจริง
+        # (Dockerfile bake ค่านี้เป็น ENV ใน runner ด้วย เพื่อให้ build/runtime ตรงกัน)
+        BASE_PATH: ${BASE_PATH-/arena}
     container_name: arena-app
     environment:
       NODE_ENV: production

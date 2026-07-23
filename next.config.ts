@@ -10,6 +10,14 @@ const nextConfig: NextConfig = {
   // แต่ "ไม่" เติมให้ fetch() ที่เขียน path ตรง ๆ → จึง expose ให้ฝั่ง client ผ่าน env นี้
   basePath: BASE_PATH,
   env: { NEXT_PUBLIC_BASE_PATH: BASE_PATH },
+  // กัน bookmark เก่า: เมื่อเสิร์ฟใต้ /arena แล้ว root "/" จะไม่มีเพจ — เด้งไป BASE_PATH ให้
+  // (basePath: false = rule นี้ match ที่ root จริง ๆ ไม่ถูก prefix อัตโนมัติ)
+  async redirects() {
+    if (!BASE_PATH) return [];
+    return [
+      { source: "/", destination: BASE_PATH, basePath: false as const, permanent: false },
+    ];
+  },
   reactStrictMode: true,
   serverExternalPackages: ["pg", "bcryptjs"],
   eslint: { ignoreDuringBuilds: true },

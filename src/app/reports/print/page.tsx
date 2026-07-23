@@ -3,7 +3,7 @@ import { getReportBundles } from "@/lib/reportBundle";
 import { db } from "@/db";
 import { events } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { DOC_LABEL, SUMMARY_DOCS, type DocType, SummarySheet, ReportSheet } from "@/app/admin/reports/ReportSheets";
+import { DOC_LABEL, SUMMARY_DOCS, type DocType, SummarySheet, VenueUsageSheet, ReportSheet } from "@/app/admin/reports/ReportSheets";
 import { PrintControls } from "./PrintControls";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +33,9 @@ export default async function ReportPrintPage({
     <div className="report-print-root">
       <PrintControls />
       <div className="report-paper">
-        {SUMMARY_DOCS.includes(docType) ? (
+        {docType === "venues" ? (
+          <VenueUsageSheet bundles={selected} eventName={event.name} yearBe={yearBe} />
+        ) : SUMMARY_DOCS.includes(docType) ? (
           <SummarySheet
             bundles={selected}
             docType={docType as "summary" | "regcount"}

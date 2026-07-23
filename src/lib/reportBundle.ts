@@ -10,7 +10,7 @@ import { MEDAL_LABEL, parseJsonArray, isUnlimited, UNLIMITED_CAPACITY } from "@/
 export type MedalPct = { gold: number; silver: number; bronze: number };
 
 /** ข้อมูลเสริมสำหรับรายงานสรุป (สถานที่/จำนวนรับ) — คำนวณจาก getReportBundles */
-export type BundleExtras = { venueName: string; capacity: number };
+export type BundleExtras = { venueName: string; venueList: string[]; capacity: number };
 
 /** สร้างข้อมูลเอกสารของรายการแข่งขันเดียว (roster + คะแนน + อันดับ/เหรียญ) */
 export async function buildBundle(
@@ -18,7 +18,7 @@ export async function buildBundle(
   groupName: string,
   yearBe: number,
   medalPct: MedalPct,
-  extras: BundleExtras = { venueName: "", capacity: 0 }
+  extras: BundleExtras = { venueName: "", venueList: [], capacity: 0 }
 ): Promise<ReportBundle> {
   const roster = await getRoster(comp.id);
   const computed = await computeCompetitionResults(comp.id, medalPct);
@@ -31,6 +31,7 @@ export async function buildBundle(
     teamSizeMin: comp.teamSizeMin,
     teamSizeMax: comp.teamSizeMax,
     venueName: extras.venueName,
+    venueList: extras.venueList,
     capacity: extras.capacity,
     meta: {
       competitionName: comp.name,
@@ -78,7 +79,8 @@ export type ReportBundle = {
   levels: string[]; // ระดับชั้นที่รับ
   teamSizeMin: number | null;
   teamSizeMax: number | null;
-  venueName: string; // "อาคาร · ห้อง" หรือ "" ถ้าไม่ระบุ
+  venueName: string; // "อาคาร · ห้อง" หรือ "" ถ้าไม่ระบุ (หลายห้องคั่นด้วยจุลภาค)
+  venueList: string[]; // รายชื่อห้องแบบแยกรายห้อง — ใช้จัดกลุ่มในรายงานการใช้ห้อง
   capacity: number; // < 0 = ไม่จำกัดจำนวน
   meta: {
     competitionName: string;
@@ -133,15 +135,15 @@ export async function getReportBundles(): Promise<{ yearBe: number; bundles: Rep
     const capacity = cRows.some((r) => isUnlimited(r.capacity))
       ? UNLIMITED_CAPACITY
       : cRows.reduce((s, r) => s + r.capacity, 0);
-    // สถานที่ของรายการ (หลายห้องได้) — เรียงตามลำดับที่เลือกในฟอร์ม คั่นด้วยจุลภาค
-    const venueName = compVenueRows
+    // สถานที่ของรายการ (หลายห้องได้) — เรียงตามลำดับที่เลือกในฟอร์ม
+    const venueList = compVenueRows
       .filter((cv) => cv.competitionId === comp.id)
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((cv) => venueRows.find((x) => x.id === cv.venueId))
       .filter((v): v is (typeof venueRows)[number] => !!v)
-      .map((v) => (v.building ? `${v.building} · ${v.name}` : v.name))
-      .join(", ");
-    bundles.push(await buildBundle(comp, g?.name ?? "-", year.yearBe, medalPct, { venueName, capacity }));
+      .map((v) => (v.building ? `${v.building} · ${v.name}` : v.name));
+    const venueName = venueList.join(", ");
+    bundles.push(await buildBundle(comp, g?.name ?? "-", year.yearBe, medalPct, { venueName, venueList, capacity }));
   }
 
   // เรียงตามหมวด แล้วตามชื่อรายการ ให้เอกสารออกมาเป็นระเบียบ

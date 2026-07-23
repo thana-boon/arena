@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
 import type { ReportBundle } from "@/lib/reportBundle";
-import { DOC_LABEL, SUMMARY_DOCS, type DocType, SummarySheet } from "./ReportSheets";
+import { DOC_LABEL, SUMMARY_DOCS, type DocType, SummarySheet, VenueUsageSheet } from "./ReportSheets";
 
 // basePath (/arena) ไม่ถูกเติมให้ window.open อัตโนมัติ ต้อง prefix เอง
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
@@ -80,7 +80,11 @@ export function ReportsByEvent({
       {/* เอกสารสรุป: แสดงตัวอย่างบนจอ (ตัวจริงพิมพ์จากแท็บใหม่ /reports/print) */}
       {isSummaryDoc && selectedBundles.length > 0 && (
         <div className="card">
-          <SummarySheet bundles={selectedBundles} docType={docType as "summary" | "regcount"} eventName={eventName} yearBe={yearBe} />
+          {docType === "venues" ? (
+            <VenueUsageSheet bundles={selectedBundles} eventName={eventName} yearBe={yearBe} />
+          ) : (
+            <SummarySheet bundles={selectedBundles} docType={docType as "summary" | "regcount"} eventName={eventName} yearBe={yearBe} />
+          )}
         </div>
       )}
     </div>

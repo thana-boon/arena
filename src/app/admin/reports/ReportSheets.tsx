@@ -1,16 +1,17 @@
 import { formatThaiDate, formatLevels, hhmm, isUnlimited } from "@/lib/domain";
 import type { ReportBundle } from "@/lib/reportBundle";
 
-export type DocType = "roster" | "scoresheet" | "announce" | "summary" | "regcount";
+export type DocType = "roster" | "scoresheet" | "announce" | "summary" | "regcount" | "venues";
 export const DOC_LABEL: Record<DocType, string> = {
   roster: "ใบรายชื่อ",
   scoresheet: "ใบกรอกคะแนน",
   announce: "ใบประกาศผล",
   summary: "สรุปรายการแข่งขัน",
   regcount: "สรุปยอดผู้สมัคร",
+  venues: "สรุปการใช้ห้อง",
 };
 /** เอกสารสรุป = ตารางรวมฉบับเดียวทั้งงาน (ไม่แยกหน้าใหม่ต่อรายการ) — แสดงตัวอย่างบนจอได้เลย */
-export const SUMMARY_DOCS: DocType[] = ["summary", "regcount"];
+export const SUMMARY_DOCS: DocType[] = ["summary", "regcount", "venues"];
 
 /** ป้ายประเภท เช่น "เดี่ยว" / "ทีม 2–5 คน" */
 function typeLabel(b: ReportBundle): string {
@@ -158,6 +159,105 @@ function SummaryGroupRows({
           <td className="num">{group.items.reduce((s, b) => s + b.studentCount, 0)}</td>
         </tr>
       )}
+    </>
+  );
+}
+
+/** จัดกลุ่มรายการตามห้อง — รายการที่ใช้หลายห้องปรากฏใต้ทุกห้องที่ใช้, ไม่ระบุห้องไปกลุ่มท้ายสุด */
+function groupByVenue(bundles: ReportBundle[]): { venueName: string; items: ReportBundle[] }[] {
+  const map = new Map<string, ReportBundle[]>();
+  const noVenue: ReportBundle[] = [];
+  for (const b of bundles) {
+    if (!b.venueList.length) {
+      noVenue.push(b);
+      continue;
+    }
+    for (const v of b.venueList) {
+      const list = map.get(v);
+      if (list) list.push(b);
+      else map.set(v, [b]);
+    }
+  }
+  const out = [...map.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0], "th"))
+    .map(([venueName, items]) => ({ venueName, items }));
+  if (noVenue.length) out.push({ venueName: "", items: noVenue });
+  return out;
+}
+
+/** เอกสารสรุปการใช้ห้อง: จัดกลุ่มตามห้อง/สถานที่ ว่าใช้แข่งรายการอะไร ระดับชั้นไหน วัน–เวลาใด */
+export function VenueUsageSheet({
+  bundles,
+  eventName,
+  yearBe,
+}: {
+  bundles: ReportBundle[];
+  eventName: string;
+  yearBe: number;
+}) {
+  const groups = groupByVenue(bundles);
+  const venueCount = groups.filter((g) => g.venueName).length;
+
+  return (
+    <section className="report-section report-web" style={{ breakBefore: "auto" }}>
+      <div className="print-title" style={{ marginBottom: 16, textAlign: "center" }}>
+        <div style={{ fontWeight: 700 }}>โรงเรียนสุคนธีรวิทย์</div>
+        <div>{eventName}</div>
+        <h2 style={{ margin: "8px 0 4px" }}>{DOC_LABEL.venues}</h2>
+        <div className="text-sm">
+          ปีการศึกษา {yearBe} · ใช้ {venueCount} ห้อง · {bundles.length} รายการ
+        </div>
+      </div>
+
+      <div className="table-wrap" style={{ boxShadow: "none" }}>
+        <table className="table">
+          <thead>
+            <tr>
+              <th className="col-fit" style={{ width: 45 }}>ลำดับ</th>
+              <th>รายการแข่งขัน</th>
+              <th className="col-fit" style={{ width: 140 }}>หมวด</th>
+              <th className="col-fit" style={{ width: 110 }}>ระดับชั้น</th>
+              <th className="col-fit" style={{ width: 160 }}>วัน–เวลา</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groups.map((g) => (
+              <VenueGroupRows key={g.venueName || "-"} group={g} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function VenueGroupRows({ group }: { group: { venueName: string; items: ReportBundle[] } }) {
+  const label = group.venueName || "ไม่ระบุห้อง";
+  return (
+    <>
+      <tr className="report-group-row">
+        <td colSpan={5}>
+          {label} ({group.items.length} รายการ)
+        </td>
+      </tr>
+      {group.items.map((b, i) => (
+        <tr key={b.id}>
+          <td className="col-fit">{i + 1}</td>
+          <td>{b.meta.competitionName}</td>
+          <td className="col-fit">{b.groupName === "-" ? "ไม่ระบุหมวด" : b.groupName}</td>
+          <td className="col-fit">{formatLevels(b.levels) || "-"}</td>
+          <td className="col-fit">
+            {b.meta.eventDate || b.meta.startTime ? (
+              <>
+                {formatThaiDate(b.meta.eventDate)}
+                {b.meta.startTime ? ` ${hhmm(b.meta.startTime)}–${hhmm(b.meta.endTime)} น.` : ""}
+              </>
+            ) : (
+              "-"
+            )}
+          </td>
+        </tr>
+      ))}
     </>
   );
 }

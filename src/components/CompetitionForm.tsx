@@ -1,9 +1,10 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
 import { Icon } from "@/components/Icon";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { ThaiDatePicker } from "@/components/ThaiDatePicker";
 import { CLASS_LEVELS, UNLIMITED_CAPACITY, formatSlot, hhmm, scaleMaxScoresTo100 } from "@/lib/domain";
 
 export type SlotOption = { id: number; label: string; startTime: string; endTime: string };
@@ -45,7 +46,7 @@ export function CompetitionForm({
   returnTo = "/teacher/competitions",
   lockSubjectGroup = false,
 }: {
-  events: { id: number; name: string; kind: string }[];
+  events: { id: number; name: string; kind: string; eventDate: string | null }[];
   groups: { id: number; name: string }[];
   slots: SlotOption[];
   venues: VenueOption[];
@@ -61,6 +62,30 @@ export function CompetitionForm({
   const [msg, setMsg] = useState<{ type: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const locked = !!initial.locked;
+  // error ต้องมองเห็นเสมอ: เลื่อนจอขึ้นไปหากล่องข้อความ + เล่นอนิเมชันสั่นซ้ำทุกครั้งที่กดบันทึก
+  const alertRef = useRef<HTMLDivElement | null>(null);
+  const [shakeKey, setShakeKey] = useState(0);
+
+  function showError(text: string) {
+    setMsg({ type: "error", text });
+    setShakeKey((k) => k + 1); // เปลี่ยน key ให้กล่อง mount ใหม่ → อนิเมชันสั่นเล่นซ้ำแม้ข้อความเดิม
+  }
+  useEffect(() => {
+    if (msg?.type === "error") alertRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [msg, shakeKey]);
+
+  // สร้างรายการใหม่: เติม "วันที่แข่ง" อัตโนมัติจากวันจัดงานของงานที่เลือก
+  // (แทนที่เฉพาะค่าว่าง/ค่าที่ระบบเติมให้เอง — ถ้าผู้ใช้เลือกวันเองแล้วจะไม่ทับ)
+  const autoDate = useRef<string>("");
+  useEffect(() => {
+    if (initial.id) return; // หน้าแก้ไข: เคารพค่าที่บันทึกไว้
+    const def = events.find((ev) => ev.id === Number(f.eventId))?.eventDate ?? "";
+    setF((p) => {
+      if (p.eventDate && p.eventDate !== autoDate.current) return p;
+      autoDate.current = def;
+      return p.eventDate === def ? p : { ...p, eventDate: def };
+    });
+  }, [f.eventId, events, initial.id]);
 
   function set<K extends keyof CompFormInitial>(k: K, v: CompFormInitial[K]) {
     setF((p) => ({ ...p, [k]: v }));
@@ -94,18 +119,18 @@ export function CompetitionForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
-    if (!f.eventId) return setMsg({ type: "error", text: "กรุณาเลือกงาน" });
-    if (!f.timeSlotId) return setMsg({ type: "error", text: "กรุณาเลือกช่วงเวลาแข่งขัน" });
+    if (!f.eventId) return showError("กรุณาเลือกงาน");
+    if (!f.timeSlotId) return showError("กรุณาเลือกช่วงเวลาแข่งขัน");
 
     // เกณฑ์การให้คะแนน: ตัดแถวว่างทิ้ง, ทุกแถวที่มีข้อมูลต้องมีทั้งชื่อและคะแนน > 0
     const filledCriteria = f.criteria.filter((c) => c.name.trim() !== "" || c.maxScore !== "");
     for (const c of filledCriteria) {
       if (!c.name.trim() || typeof c.maxScore !== "number" || c.maxScore <= 0)
-        return setMsg({ type: "error", text: "เกณฑ์แต่ละข้อต้องมีทั้งชื่อและคะแนนเต็มมากกว่า 0" });
+        return showError("เกณฑ์แต่ละข้อต้องมีทั้งชื่อและคะแนนเต็มมากกว่า 0");
     }
     // งานแข่งขันบังคับอย่างน้อย 1 เกณฑ์ (งานอบรมไม่ต้องมีคะแนน)
     if (!isTraining && filledCriteria.length === 0)
-      return setMsg({ type: "error", text: "กรุณาเพิ่มเกณฑ์การให้คะแนนอย่างน้อย 1 ข้อ" });
+      return showError("กรุณาเพิ่มเกณฑ์การให้คะแนนอย่างน้อย 1 ข้อ");
 
     setBusy(true);
     // สเกลคะแนนเต็มของแต่ละเกณฑ์ให้รวมกันเป็น 100 (งานอบรมส่งตามที่กรอก) — คงสัดส่วนเดิม
@@ -166,14 +191,18 @@ export function CompetitionForm({
     }
 
     setBusy(false);
-    if (!res.ok) return setMsg({ type: "error", text: res.error });
+    if (!res.ok) return showError(res.error);
     router.push(returnTo);
     router.refresh();
   }
 
   return (
     <form onSubmit={submit} className="stack">
-      {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
+      {msg && (
+        <div key={shakeKey} ref={alertRef} className={`alert alert-${msg.type}${msg.type === "error" ? " alert-shake" : ""}`}>
+          {msg.text}
+        </div>
+      )}
       {locked && <div className="alert alert-warning">รายการนี้มีผู้ลงทะเบียนแล้ว แก้ไขได้เฉพาะชื่อ/วันเวลา/จำนวนรับ (ไม่สามารถเปลี่ยนประเภท ระดับชั้น หรือเกณฑ์)</div>}
 
       {/* ── ส่วนที่ 1: ข้อมูลรายการ ── */}
@@ -355,7 +384,8 @@ export function CompetitionForm({
           <div className="grid-2">
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">วันที่แข่ง</label>
-              <input type="date" lang="th" className="form-input" value={f.eventDate} onChange={(e) => set("eventDate", e.target.value)} />
+              <ThaiDatePicker value={f.eventDate} onChange={(v) => set("eventDate", v)} />
+              <span className="form-hint">ระบบเติมให้จาก “วันจัดงาน” ของงานที่เลือก — เปลี่ยนได้</span>
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">ช่วงเวลาแข่งขัน</label>

@@ -71,21 +71,21 @@ export function SummarySheet({
           <thead>
             {docType === "summary" ? (
               <tr>
-                <th style={{ width: 45 }}>ลำดับ</th>
+                <th className="col-fit" style={{ width: 45 }}>ลำดับ</th>
                 <th>รายการแข่งขัน</th>
-                <th style={{ width: 100 }}>ประเภท</th>
-                <th style={{ width: 110 }}>ระดับชั้น</th>
-                <th style={{ width: 170 }}>สถานที่ / ห้อง</th>
-                <th style={{ width: 110 }}>จำนวนรับ</th>
+                <th className="col-fit" style={{ width: 100 }}>ประเภท</th>
+                <th className="col-fit" style={{ width: 110 }}>ระดับชั้น</th>
+                <th className="col-venue" style={{ width: 170 }}>สถานที่ / ห้อง</th>
+                <th className="col-fit" style={{ width: 110 }}>จำนวนรับ</th>
               </tr>
             ) : (
               <tr>
-                <th style={{ width: 45 }}>ลำดับ</th>
+                <th className="col-fit" style={{ width: 45 }}>ลำดับ</th>
                 <th>รายการแข่งขัน</th>
-                <th style={{ width: 100 }}>ประเภท</th>
-                <th style={{ width: 110 }}>จำนวนรับ</th>
-                <th style={{ width: 100 }}>สมัครแล้ว</th>
-                <th className="num" style={{ width: 110 }}>นักเรียน (คน)</th>
+                <th className="col-fit" style={{ width: 100 }}>ประเภท</th>
+                <th className="col-fit" style={{ width: 110 }}>จำนวนรับ</th>
+                <th className="col-fit" style={{ width: 100 }}>สมัครแล้ว</th>
+                <th className="num col-fit" style={{ width: 110 }}>นักเรียน (คน)</th>
               </tr>
             )}
           </thead>
@@ -125,7 +125,7 @@ function SummaryGroupRows({
       {group.items.map((b, i) =>
         docType === "summary" ? (
           <tr key={b.id}>
-            <td>{i + 1}</td>
+            <td className="col-fit">{i + 1}</td>
             <td>
               {b.meta.competitionName}
               {(b.meta.eventDate || b.meta.startTime) && (
@@ -135,19 +135,19 @@ function SummaryGroupRows({
                 </div>
               )}
             </td>
-            <td>{typeLabel(b)}</td>
-            <td>{formatLevels(b.levels) || "-"}</td>
-            <td>{b.venueName || "-"}</td>
-            <td>{capacityLabel(b)}</td>
+            <td className="col-fit">{typeLabel(b)}</td>
+            <td className="col-fit">{formatLevels(b.levels) || "-"}</td>
+            <td className="col-venue">{b.venueName || "-"}</td>
+            <td className="col-fit">{capacityLabel(b)}</td>
           </tr>
         ) : (
           <tr key={b.id}>
-            <td>{i + 1}</td>
+            <td className="col-fit">{i + 1}</td>
             <td>{b.meta.competitionName}</td>
-            <td>{typeLabel(b)}</td>
-            <td>{capacityLabel(b)}</td>
-            <td>{b.meta.type === "team" ? `${b.rosterCount} ทีม` : `${b.rosterCount} คน`}</td>
-            <td className="num">{b.studentCount}</td>
+            <td className="col-fit">{typeLabel(b)}</td>
+            <td className="col-fit">{capacityLabel(b)}</td>
+            <td className="col-fit">{b.meta.type === "team" ? `${b.rosterCount} ทีม` : `${b.rosterCount} คน`}</td>
+            <td className="num col-fit">{b.studentCount}</td>
           </tr>
         )
       )}

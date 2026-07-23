@@ -33,6 +33,7 @@ export default async function SettingsPage() {
     name: e.name,
     kind: e.kind,
     status: e.status,
+    eventDate: e.eventDate ?? "",
     visibleToStudents: e.visibleToStudents,
     registrationOpen: e.registrationOpen,
     regStart: toLocalInput(e.regStart),

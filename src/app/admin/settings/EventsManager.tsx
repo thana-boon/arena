@@ -5,12 +5,15 @@ import Link from "next/link";
 import { api } from "@/lib/client";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Icon } from "@/components/Icon";
+import { ThaiDatePicker } from "@/components/ThaiDatePicker";
+import { formatThaiDate } from "@/lib/domain";
 
 export type EventItem = {
   id: number;
   name: string;
   kind: string;
   status: string;
+  eventDate: string; // ISO "YYYY-MM-DD" หรือ "" — ใช้เป็นค่าเริ่มต้น "วันที่แข่ง" ตอนสร้างรายการ
   visibleToStudents: boolean;
   registrationOpen: boolean;
   regStart: string; // datetime-local string หรือ ""
@@ -28,16 +31,22 @@ export function EventsManager({
   const router = useRouter();
   const [name, setName] = useState("");
   const [kind, setKind] = useState("competition");
+  const [eventDate, setEventDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ type: string; text: string } | null>(null);
 
   async function create() {
     if (!name.trim()) return setMsg({ type: "error", text: "กรุณากรอกชื่องาน" });
     setBusy(true); setMsg(null);
-    const res = await api.post<{ id: number }>("/api/admin/certificate-events", { name, kind });
+    const res = await api.post<{ id: number }>("/api/admin/certificate-events", {
+      name,
+      kind,
+      eventDate: eventDate || null,
+    });
     setBusy(false);
     if (!res.ok) return setMsg({ type: "error", text: res.error });
     setName("");
+    setEventDate("");
     setMsg({ type: "success", text: "สร้างงานแล้ว — ตั้งค่าการรับสมัครด้านล่าง" });
     router.refresh();
   }
@@ -64,6 +73,10 @@ export function EventsManager({
               <option value="competition">งานแข่งขัน</option>
               <option value="training">งานอบรม</option>
             </select>
+          </label>
+          <label className="field">
+            <span>วันจัดงาน (ไม่บังคับ)</span>
+            <ThaiDatePicker value={eventDate} onChange={setEventDate} />
           </label>
         </div>
         <div>
@@ -112,6 +125,7 @@ function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) 
     const res = await api.patch(`/api/admin/certificate-events/${ev.id}`, {
       name: f.name,
       kind: f.kind,
+      eventDate: f.eventDate || null,
       visibleToStudents: f.visibleToStudents,
       registrationOpen: f.registrationOpen,
       regStart: f.regStart || null,
@@ -144,6 +158,7 @@ function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) 
           {ev.visibleToStudents && <span className="badge badge-purple">นักเรียนเห็น</span>}
           {ev.registrationOpen && <span className="badge badge-gold">เปิดรับสมัคร</span>}
           {isDefault && <span className="badge badge-purple">ค่าเริ่มต้น</span>}
+          {ev.eventDate && <span className="muted text-sm">· จัดวันที่ {formatThaiDate(ev.eventDate)}</span>}
           <span className="muted text-sm">· {ev.competitionCount} รายการ</span>
         </div>
         <div className="row" style={{ gap: 6 }}>
@@ -167,7 +182,14 @@ function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) 
                 <option value="training">งานอบรม</option>
               </select>
             </label>
+            <label className="field">
+              <span>วันจัดงาน</span>
+              <ThaiDatePicker value={f.eventDate} onChange={(v) => set("eventDate", v)} />
+            </label>
           </div>
+          <span className="form-hint" style={{ marginTop: -8 }}>
+            วันจัดงานจะถูกเติมเป็นค่าเริ่มต้นของ “วันที่แข่ง” ตอนสร้างรายการในงานนี้
+          </span>
           <label className="form-check">
             <input type="checkbox" checked={f.visibleToStudents} onChange={(e) => set("visibleToStudents", e.target.checked)} />
             <span>ให้นักเรียนเห็นงานนี้ (แสดงในหน้าสมัคร)</span>

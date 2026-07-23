@@ -693,6 +693,122 @@ p {
   background: var(--color-info-bg);
   color: var(--color-info);
 }
+/* กล่อง error สั่นเรียกสายตาตอนบันทึกไม่ผ่าน (เล่นซ้ำได้โดย remount ด้วย key) */
+@keyframes alert-shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-8px); }
+  30% { transform: translateX(7px); }
+  45% { transform: translateX(-5px); }
+  60% { transform: translateX(4px); }
+  75% { transform: translateX(-2px); }
+}
+.alert-shake {
+  animation: alert-shake 0.5s ease-in-out;
+}
+
+/* ---------- Thai date picker (ปฏิทิน พ.ศ.) ---------- */
+.tdp {
+  position: relative;
+}
+.tdp-input {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  background: #fff;
+}
+.tdp-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.tdp-empty span:first-child {
+  color: var(--skdw-muted);
+}
+.tdp-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  width: 288px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--skdw-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 28px rgba(26, 22, 37, 0.16);
+}
+.tdp-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.tdp-head select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--skdw-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-sm);
+  background: #fff;
+}
+.tdp-nav {
+  border: none;
+  background: var(--skdw-purple-pale);
+  color: var(--skdw-purple);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  flex: none;
+}
+.tdp-nav:hover {
+  background: var(--skdw-border);
+}
+.tdp-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.tdp-week span {
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--skdw-muted);
+  padding: 4px 0;
+}
+.tdp-day {
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--skdw-dark);
+  height: 32px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.tdp-day:hover {
+  background: var(--skdw-purple-pale);
+}
+.tdp-day.today {
+  box-shadow: inset 0 0 0 1px var(--skdw-purple-light);
+}
+.tdp-day.on {
+  background: var(--skdw-purple);
+  color: #fff;
+  font-weight: 600;
+}
+.tdp-foot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px solid var(--skdw-border);
+}
 
 /* ---------- Badges ---------- */
 .badge {
@@ -1489,14 +1605,14 @@ p {
   .print-only {
     display: block !important;
   }
-  /* เอกสาร: ใช้ฟอนต์ Sarabun ขนาด 16 ทั้งหมด */
+  /* เอกสาร: ใช้ฟอนต์ Sarabun ขนาด 13 ทั้งหมด (รวมหัวเรื่อง) */
   body,
   .card,
   .card *,
   .print-title,
   .print-title * {
     font-family: "Sarabun", sans-serif !important;
-    font-size: 16px !important;
+    font-size: 13px !important;
   }
   body {
     background: #fff;
@@ -1516,19 +1632,19 @@ p {
     font-family: var(--font-th-serif);
     text-align: center;
   }
-  /* ตารางในเอกสาร: เส้นชัดเจน เห็นชัด ใช้ Sarabun ขนาด 16 ทั้งหมด */
+  /* ตารางในเอกสาร: เส้นชัดเจน เห็นชัด ใช้ Sarabun ขนาด 13 ทั้งหมด */
   .table {
     border-collapse: collapse;
     width: 100%;
     font-family: "Sarabun", sans-serif !important;
-    font-size: 16px !important;
+    font-size: 13px !important;
   }
   .table th,
   .table td,
   .table th *,
   .table td * {
     font-family: "Sarabun", sans-serif !important;
-    font-size: 16px !important;
+    font-size: 13px !important;
     color: #000 !important;
   }
   .table th,
@@ -1587,12 +1703,23 @@ p {
   }
   .report-web .text-xs.muted,
   .report-web .text-xs.muted * {
-    font-size: 13px !important;
+    font-size: 11px !important;
     color: #6b6478 !important;
   }
   .report-web .print-title h2 {
-    font-size: 22px !important;
     font-weight: 700;
+  }
+  /* กระดาษ A4: บีบคอลัมน์รอง (ลำดับ/ประเภท/ระดับชั้น/จำนวนรับ) ให้พอดีเนื้อหา
+     → ช่อง "รายการแข่งขัน" ได้พื้นที่ที่เหลือทั้งหมด ชื่อยาวไม่ถูกตัดขึ้นหลายบรรทัด */
+  .report-web .table {
+    width: 100%;
+  }
+  .report-web .table .col-fit {
+    width: 1px !important;
+    white-space: nowrap;
+  }
+  .report-web .table .col-venue {
+    width: 120px !important;
   }
 }
 

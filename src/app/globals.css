@@ -1560,12 +1560,83 @@ p {
   .report-group-row {
     break-after: avoid;
   }
+  /* เอกสารสรุป (.report-web): สไตล์เหมือนตารางบนหน้าเว็บ — เส้นแนวนอนบาง หัวหมวดม่วง */
+  .report-web .table th,
+  .report-web .table td,
+  .report-web .table tr:last-child td {
+    border: none !important;
+    border-bottom: 0.75px solid #d9d2e9 !important;
+    padding: 6px 10px !important;
+  }
+  .report-web .table th {
+    background: #f6f4fa !important;
+    text-align: left;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .report-web .table th.num,
+  .report-web .table td.num {
+    text-align: right;
+  }
+  .report-web .report-group-row td {
+    background: #f1edf7 !important;
+    color: #5b2d8e !important;
+    font-weight: 700;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .report-web .text-xs.muted,
+  .report-web .text-xs.muted * {
+    font-size: 13px !important;
+    color: #6b6478 !important;
+  }
+  .report-web .print-title h2 {
+    font-size: 22px !important;
+    font-weight: 700;
+  }
 }
 
 /* ---------- Combined report (ออกเอกสารหลายรายการรวมกัน) ---------- */
 /* เอกสารพิมพ์: ซ่อนบนจอ แสดงเฉพาะตอนพิมพ์ (ดู @media print ด้านบน) */
 .print-only {
   display: none;
+}
+
+/* ---------- หน้าพิมพ์รายงาน /reports/print (เปิดในแท็บใหม่) ---------- */
+/* บนจอ: กระดาษขาวกลางจอบนพื้นเทา + ปุ่มพิมพ์ลอยมุมขวา; เวลาพิมพ์: เหลือแต่เนื้อเอกสาร */
+.report-print-root {
+  min-height: 100vh;
+  background: #e5e7eb;
+  padding: 24px;
+}
+.report-paper {
+  background: #fff;
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 15mm;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+}
+.report-print-toolbar {
+  position: sticky;
+  top: 16px;
+  z-index: 10;
+  display: flex;
+  justify-content: flex-end;
+  max-width: 210mm;
+  margin: 0 auto 16px;
+}
+@media print {
+  .report-print-root {
+    background: #fff;
+    padding: 0;
+    min-height: 0;
+  }
+  .report-paper {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
 }
 .report-summary-list {
   list-style: none;

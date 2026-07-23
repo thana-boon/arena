@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "@/components/Icon";
 import { formatThaiDate } from "@/lib/domain";
 
@@ -33,12 +34,17 @@ export function ThaiDatePicker({
   const [viewY, setViewY] = useState(parsed ? Number(parsed[1]) : today.getFullYear());
   const [viewM, setViewM] = useState(parsed ? Number(parsed[2]) - 1 : today.getMonth()); // 0–11
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const popRef = useRef<HTMLDivElement | null>(null);
+  // ตำแหน่งป๊อปอัป (fixed, เรนเดอร์ผ่าน portal เพื่อไม่ให้โดน overflow ของการ์ดตัด)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
   // ปิดเมื่อคลิกนอกกล่อง / กด Escape
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -48,6 +54,25 @@ export function ThaiDatePicker({
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // คำนวณตำแหน่งใต้ปุ่ม และตามเมื่อเลื่อนหน้า/ย่อขยายหน้าต่าง
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = rootRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const popW = 288; // ให้ตรงกับ width ของ .tdp-pop ใน globals.css
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - popW - 8));
+      setPos({ top: r.bottom + 6, left });
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
     };
   }, [open]);
 
@@ -91,8 +116,14 @@ export function ThaiDatePicker({
         <Icon name="calendar" size={16} />
       </button>
 
-      {open && (
-        <div className="tdp-pop" role="dialog" aria-label="เลือกวันที่">
+      {open && pos && createPortal(
+        <div
+          className="tdp-pop"
+          ref={popRef}
+          style={{ top: pos.top, left: pos.left }}
+          role="dialog"
+          aria-label="เลือกวันที่"
+        >
           <div className="tdp-head">
             <button type="button" className="tdp-nav" onClick={() => moveMonth(-1)} aria-label="เดือนก่อนหน้า">‹</button>
             <select value={viewM} onChange={(e) => setViewM(Number(e.target.value))} aria-label="เดือน">
@@ -138,7 +169,8 @@ export function ThaiDatePicker({
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

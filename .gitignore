@@ -20,6 +20,9 @@ next-env.d.ts
 *.log
 npm-debug.log*
 
+# ไฟล์สำรองข้อมูลที่บันทึกลงเครื่อง (หน้า “สำรอง & กู้คืนข้อมูล”)
+/backups
+
 # misc
 .DS_Store
 *.pem

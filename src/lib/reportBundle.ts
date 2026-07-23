@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/db";
-import { competitions, subjectGroups, competitionCapacity, venues, type Competition } from "@/db/schema";
+import { competitions, subjectGroups, competitionCapacity, competitionVenues, venues, type Competition } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { computeCompetitionResults } from "@/lib/results";
@@ -121,6 +121,9 @@ export async function getReportBundles(): Promise<{ yearBe: number; bundles: Rep
     ? await db.select().from(competitionCapacity).where(inArray(competitionCapacity.competitionId, compIds))
     : [];
   const venueRows = await db.select().from(venues);
+  const compVenueRows = compIds.length
+    ? await db.select().from(competitionVenues).where(inArray(competitionVenues.competitionId, compIds))
+    : [];
 
   const bundles: ReportBundle[] = [];
   for (const comp of comps) {
@@ -130,8 +133,14 @@ export async function getReportBundles(): Promise<{ yearBe: number; bundles: Rep
     const capacity = cRows.some((r) => isUnlimited(r.capacity))
       ? UNLIMITED_CAPACITY
       : cRows.reduce((s, r) => s + r.capacity, 0);
-    const v = comp.venueId == null ? undefined : venueRows.find((x) => x.id === comp.venueId);
-    const venueName = v ? (v.building ? `${v.building} · ${v.name}` : v.name) : "";
+    // สถานที่ของรายการ (หลายห้องได้) — เรียงตามลำดับที่เลือกในฟอร์ม คั่นด้วยจุลภาค
+    const venueName = compVenueRows
+      .filter((cv) => cv.competitionId === comp.id)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((cv) => venueRows.find((x) => x.id === cv.venueId))
+      .filter((v): v is (typeof venueRows)[number] => !!v)
+      .map((v) => (v.building ? `${v.building} · ${v.name}` : v.name))
+      .join(", ");
     bundles.push(await buildBundle(comp, g?.name ?? "-", year.yearBe, medalPct, { venueName, capacity }));
   }
 

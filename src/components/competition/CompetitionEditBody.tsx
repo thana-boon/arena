@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { subjectGroups, competitions, competitionCapacity, criteria, entries, events } from "@/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { getActiveYear, getTimeSlots, getVenues } from "@/lib/queries";
+import { getCompetitionVenueIds } from "@/lib/venues";
 import { canEditCompetition } from "@/lib/permit";
 import { canPickGroup } from "@/lib/groupScope";
 import { parseJsonArray, isUnlimited } from "@/lib/domain";
@@ -40,6 +41,7 @@ export async function CompetitionEditBody({
   const locked = entRows.length > 0;
   const slots = await getTimeSlots(year.id);
   const venues = await getVenues();
+  const venueIds = await getCompetitionVenueIds(id);
   const eventList = await db.select().from(events).where(eq(events.yearId, year.id)).orderBy(asc(events.name));
 
   // ไม่จำกัดจำนวน = ทุกแถวโควตาเก็บค่า < 0 ; number field แสดง 0 แทนค่าลบ
@@ -80,7 +82,7 @@ export async function CompetitionEditBody({
           teamSizeMax: comp.teamSizeMax ?? "",
           allowedClassLevels: parseJsonArray(comp.allowedClassLevels),
           timeSlotId: comp.timeSlotId ?? "",
-          venueId: comp.venueId ?? "",
+          venueIds: venueIds.length ? venueIds : [""],
           eventDate: comp.eventDate ?? "",
           capacityMode,
           unlimited,

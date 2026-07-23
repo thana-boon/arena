@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { competitions, competitionCapacity, criteria, entries, scores, timeSlots, events } from "@/db/schema";
+import { competitions, competitionCapacity, competitionVenues, criteria, entries, scores, timeSlots, events } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
@@ -46,10 +46,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     )[0];
     if (!slot) return fail("ช่วงเวลาแข่งขันไม่ถูกต้อง กรุณาเลือกใหม่");
 
+    // ห้องซ้ำในฟอร์มนับครั้งเดียว — คงลำดับที่เลือก
+    const venueIds = [...new Set(body.venueIds)];
+
     // ตรวจสถานที่ชนกัน (ยกเว้นตัวเอง) — ถ้ายังไม่ยืนยันใช้ห้องเดียวกัน
-    if (body.venueId && body.eventDate && !body.forceVenue) {
+    if (venueIds.length && body.eventDate && !body.forceVenue) {
       const conflicts = await findVenueConflicts({
-        venueId: body.venueId,
+        venueIds,
         eventDate: body.eventDate,
         startTime: slot.startTime,
         endTime: slot.endTime,
@@ -72,7 +75,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           eventId: body.eventId,
           subjectGroupId: body.subjectGroupId ?? null,
           timeSlotId: slot.id,
-          venueId: body.venueId ?? null,
           eventDate: body.eventDate || null,
           startTime: slot.startTime,
           endTime: slot.endTime,
@@ -88,6 +90,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
               }),
         })
         .where(eq(competitions.id, id));
+
+      // สถานที่เปลี่ยนได้เสมอ (แม้มีคนลงแล้ว) → rebuild join rows
+      await tx.delete(competitionVenues).where(eq(competitionVenues.competitionId, id));
+      if (venueIds.length) {
+        await tx.insert(competitionVenues).values(
+          venueIds.map((vid, i) => ({ competitionId: id, venueId: vid, sortOrder: i }))
+        );
+      }
 
       if (!locked) {
         // rebuild capacity + criteria
@@ -151,6 +161,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
       await tx.delete(scores).where(eq(scores.entryId, id)); // no-op guard
       await tx.delete(criteria).where(eq(criteria.competitionId, id));
       await tx.delete(competitionCapacity).where(eq(competitionCapacity.competitionId, id));
+      await tx.delete(competitionVenues).where(eq(competitionVenues.competitionId, id));
       await tx.delete(competitions).where(eq(competitions.id, id));
     });
     await logAudit(s.code, "delete_competition", { competitionId: id });

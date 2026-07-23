@@ -22,8 +22,8 @@ export const competitionInput = z
     allowedClassLevels: z.array(z.enum(CLASS_LEVELS)).min(1, "เลือกระดับชั้นอย่างน้อย 1 ระดับ"),
     // ช่วงเวลาแข่งขัน — บังคับเลือกจาก time_slots (เซิร์ฟเวอร์ resolve เป็น start/end time เอง)
     timeSlotId: z.number().int().positive("กรุณาเลือกช่วงเวลาแข่งขัน"),
-    // สถานที่แข่งขัน (optional) + flag ยืนยันใช้ห้องเดียวกันเมื่อชนกับรายการอื่น
-    venueId: z.number().int().positive().nullable().optional(),
+    // สถานที่แข่งขัน (optional, เลือกได้หลายห้อง) + flag ยืนยันใช้ห้องเดียวกันเมื่อชนกับรายการอื่น
+    venueIds: z.array(z.number().int().positive()).optional().default([]),
     forceVenue: z.boolean().optional(),
     eventDate: z.string().nullable().optional(),
     // เดี่ยว: 'per_level' ที่นั่งต่อระดับ (capacityPerLevel) | 'combined' รวมทุกชั้น (combinedCapacity)

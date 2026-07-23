@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { venues, competitions } from "@/db/schema";
+import { venues, competitionVenues } from "@/db/schema";
 import { and, eq, ne } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
@@ -41,9 +41,9 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     const id = Number((await params).id);
 
     const used = await db
-      .select({ id: competitions.id })
-      .from(competitions)
-      .where(eq(competitions.venueId, id))
+      .select({ id: competitionVenues.id })
+      .from(competitionVenues)
+      .where(eq(competitionVenues.venueId, id))
       .limit(1);
     if (used.length) return fail("ลบไม่ได้ เพราะมีรายการแข่งขันใช้สถานที่นี้อยู่");
 

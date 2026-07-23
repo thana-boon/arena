@@ -54,7 +54,7 @@ export default async function NewCompetition() {
           teamSizeMax: "",
           allowedClassLevels: [],
           timeSlotId: "",
-          venueId: "",
+          venueIds: [""],
           eventDate: "",
           capacityMode: "per_level",
           unlimited: true,

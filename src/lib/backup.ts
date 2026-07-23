@@ -17,8 +17,12 @@ const TABLES = [
   "subject_groups",
   "admins_local",
   "teacher_roles",
+  "time_slots",
+  "venues",
+  "events",
   "competitions",
   "competition_capacity",
+  "competition_venues",
   "criteria",
   "entries",
   "entry_members",
@@ -26,8 +30,6 @@ const TABLES = [
   "audit_log",
   "teacher_cache",
   "certificate_assets",
-  "certificate_events",
-  "certificate_event_competitions",
   "certificate_templates",
   "certificate_signatures",
   "certificate_issues",
@@ -42,7 +44,8 @@ const NO_SERIAL_ID = new Set<string>([
   "certificate_counters",
 ]);
 
-export const BACKUP_VERSION = 1;
+// v2: ตารางชุดใหม่หลัง events refactor + competition_venues (ไฟล์ v1 สคีมาไม่ตรงแล้ว restore ไม่ได้)
+export const BACKUP_VERSION = 2;
 const APP_TAG = "skdw-arena";
 
 /** quote identifier ให้ปลอดภัย (ชื่อตาราง/คอลัมน์) */

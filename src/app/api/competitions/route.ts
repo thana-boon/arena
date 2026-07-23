@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { competitions, competitionCapacity, criteria, timeSlots, events } from "@/db/schema";
+import { competitions, competitionCapacity, competitionVenues, criteria, timeSlots, events } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
@@ -34,10 +34,13 @@ export async function POST(req: Request) {
     )[0];
     if (!slot) return fail("ช่วงเวลาแข่งขันไม่ถูกต้อง กรุณาเลือกใหม่");
 
+    // ห้องซ้ำในฟอร์มนับครั้งเดียว — คงลำดับที่เลือก
+    const venueIds = [...new Set(body.venueIds)];
+
     // ตรวจสถานที่ชนกัน (มี venue + วันที่ครบ และยังไม่ยืนยันใช้ห้องเดียวกัน)
-    if (body.venueId && body.eventDate && !body.forceVenue) {
+    if (venueIds.length && body.eventDate && !body.forceVenue) {
       const conflicts = await findVenueConflicts({
-        venueId: body.venueId,
+        venueIds,
         eventDate: body.eventDate,
         startTime: slot.startTime,
         endTime: slot.endTime,
@@ -60,7 +63,6 @@ export async function POST(req: Request) {
           teamSizeMax: body.type === "team" ? body.teamSizeMax ?? null : null,
           allowedClassLevels: JSON.stringify(body.allowedClassLevels),
           timeSlotId: slot.id,
-          venueId: body.venueId ?? null,
           eventDate: body.eventDate || null,
           startTime: slot.startTime,
           endTime: slot.endTime,
@@ -70,6 +72,13 @@ export async function POST(req: Request) {
         })
         .returning({ id: competitions.id });
       const compId = res.id;
+
+      // สถานที่ (หลายห้องได้ — sort_order คงลำดับตามฟอร์ม)
+      if (venueIds.length) {
+        await tx.insert(competitionVenues).values(
+          venueIds.map((vid, i) => ({ competitionId: compId, venueId: vid, sortOrder: i }))
+        );
+      }
 
       // capacity
       if (body.type === "individual" && body.capacityMode !== "combined") {

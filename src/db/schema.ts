@@ -131,8 +131,7 @@ export const competitions = pgTable(
     allowedClassLevels: text("allowed_class_levels").notNull().default("[]"), // json array
     // ช่วงเวลาแข่งขัน — อ้างอิง time_slots.id (บังคับเลือกตอนสร้าง; nullable ในสคีมาเพื่อรองรับข้อมูลเดิม)
     timeSlotId: integer("time_slot_id"),
-    // สถานที่แข่งขัน — อ้างอิง venues.id (nullable: venue เป็น optional + คงข้อมูลเดิม)
-    venueId: integer("venue_id"),
+    // สถานที่แข่งขัน: ย้ายไปตาราง competition_venues (รายการหนึ่งใช้ได้หลายห้อง)
     eventDate: date("event_date", { mode: "string" }),
     startTime: time("start_time"), // snapshot จาก slot ที่เลือก (ใช้ตรวจเวลาแข่งชนกัน + แสดงผล)
     endTime: time("end_time"),
@@ -146,6 +145,22 @@ export const competitions = pgTable(
     index("comp_year_idx").on(t.yearId),
     index("comp_group_idx").on(t.subjectGroupId),
     index("comp_event_idx").on(t.eventId),
+  ]
+);
+
+// ===== สถานที่ของรายการแข่งขัน (many-to-many) =====
+// รายการหนึ่งใช้ได้หลายห้อง — sort_order คงลำดับตามที่ครูเลือกในฟอร์ม
+export const competitionVenues = pgTable(
+  "competition_venues",
+  {
+    id: serial("id").primaryKey(),
+    competitionId: integer("competition_id").notNull(),
+    venueId: integer("venue_id").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex("comp_venue_uniq").on(t.competitionId, t.venueId),
+    index("comp_venue_venue_idx").on(t.venueId),
   ]
 );
 

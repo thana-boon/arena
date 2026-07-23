@@ -33,8 +33,14 @@ services:
       - "3017:3017"
     networks:
       - school-net
+    volumes:
+      # ไฟล์สำรองจากหน้า “สำรอง & กู้คืนข้อมูล” — เก็บใน named volume ให้รอดตอน pull & redeploy
+      - arena-backups:/app/backups
     restart: unless-stopped
 
 networks:
   school-net:
     external: true # สร้างไว้แล้วโดยสแตก postgres-core
+
+volumes:
+  arena-backups:

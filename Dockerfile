@@ -48,6 +48,9 @@ RUN chmod +x ./docker-entrypoint.sh
 # ไม่รันเป็น root — ไฟล์ที่ COPY มาเป็นของ root (อ่านได้พอ) ยกเว้น .next ที่ next start
 # ต้องเขียน cache ได้ จึง chown เฉพาะโฟลเดอร์นั้น (user "node" มากับ base image อยู่แล้ว)
 RUN chown -R node:node /app/.next
+# โฟลเดอร์ไฟล์สำรองบนเซิร์ฟเวอร์ (หน้า “สำรอง & กู้คืนข้อมูล”) — ต้องมีใน image และเป็นของ node
+# เพราะ named volume ที่ mount ครั้งแรกจะ copy ownership จากตรงนี้ (ไม่งั้น node เขียนไม่ได้)
+RUN mkdir -p /app/backups && chown node:node /app/backups
 USER node
 
 EXPOSE 3017

@@ -10,7 +10,7 @@ import { CLASS_LEVELS, UNLIMITED_CAPACITY, formatSlot, hhmm, scaleMaxScoresTo100
 export type SlotOption = { id: number; label: string; startTime: string; endTime: string };
 export type VenueOption = { id: number; name: string; building: string };
 
-type VenueConflict = { id: number; name: string; startTime: string | null; endTime: string | null };
+type VenueConflict = { id: number; name: string; venueName: string; startTime: string | null; endTime: string | null };
 
 export type CompFormInitial = {
   id?: number;
@@ -25,7 +25,8 @@ export type CompFormInitial = {
   teamSizeMax: number | "";
   allowedClassLevels: string[];
   timeSlotId: number | "";
-  venueId: number | "";
+  /** สถานที่แข่งขัน — เลือกได้หลายห้อง ("" = แถวที่ยังไม่ได้เลือก) */
+  venueIds: (number | "")[];
   eventDate: string;
   capacityMode: "per_level" | "combined";
   /** รับนักเรียนแบบไม่จำกัดจำนวน (ค่า default) */
@@ -96,6 +97,13 @@ export function CompetitionForm({
       return { ...p, allowedClassLevels: has ? p.allowedClassLevels.filter((x) => x !== lv) : [...p.allowedClassLevels, lv] };
     });
   }
+  function setVenue(i: number, v: number | "") {
+    setF((p) => {
+      const ids = [...p.venueIds];
+      ids[i] = v;
+      return { ...p, venueIds: ids };
+    });
+  }
   function setCap(lv: string, v: number) {
     setF((p) => ({ ...p, capacityPerLevel: { ...p.capacityPerLevel, [lv]: v } }));
   }
@@ -154,7 +162,8 @@ export function CompetitionForm({
       teamSizeMax: f.type === "team" && f.teamSizeMax !== "" ? Number(f.teamSizeMax) : null,
       allowedClassLevels: f.allowedClassLevels,
       timeSlotId: Number(f.timeSlotId),
-      venueId: f.venueId === "" ? null : Number(f.venueId),
+      // ตัดแถวที่ยังไม่ได้เลือก + ห้องซ้ำนับครั้งเดียว
+      venueIds: [...new Set(f.venueIds.filter((v): v is number => v !== ""))],
       eventDate: f.eventDate || null,
       capacityMode: f.type === "individual" ? f.capacityMode : "per_level",
       capacityPerLevel,
@@ -176,11 +185,11 @@ export function CompetitionForm({
     // สถานที่ชนกับรายการก่อนหน้า → ถามยืนยันใช้ห้องเดียวกัน
     if (res.ok && res.data.venueConflict) {
       const list = (res.data.conflicts ?? [])
-        .map((c) => `${c.name}${c.startTime && c.endTime ? ` (${hhmm(c.startTime)}–${hhmm(c.endTime)})` : ""}`)
+        .map((c) => `${c.name}${c.venueName ? ` — ${c.venueName}` : ""}${c.startTime && c.endTime ? ` (${hhmm(c.startTime)}–${hhmm(c.endTime)})` : ""}`)
         .join(", ");
       const useSame = await confirm({
         title: "สถานที่ถูกใช้ในช่วงเวลาเดียวกัน",
-        message: `สถานที่นี้มีรายการแข่งขันใช้อยู่ในวัน/เวลาเดียวกัน: ${list} — ต้องการใช้ห้องเดียวกันหรือไม่?`,
+        message: `ห้องที่เลือกมีรายการแข่งขันใช้อยู่ในวัน/เวลาเดียวกัน: ${list} — ต้องการใช้ห้องเดียวกันหรือไม่?`,
         confirmText: "ใช้ห้องเดียวกัน",
       });
       if (!useSame) {
@@ -404,12 +413,30 @@ export function CompetitionForm({
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">สถานที่แข่งขัน</label>
             {venues.length ? (
-              <select className="form-select" value={f.venueId} onChange={(e) => set("venueId", e.target.value === "" ? "" : Number(e.target.value))}>
-                <option value="">— ไม่ระบุ —</option>
-                {venues.map((v) => (
-                  <option key={v.id} value={v.id}>{v.building ? `${v.building} · ${v.name}` : v.name}</option>
+              <>
+                {f.venueIds.map((vid, i) => (
+                  <div key={i} className="row" style={{ alignItems: "center", marginBottom: 8 }}>
+                    <select
+                      className="form-select"
+                      style={{ flex: 1 }}
+                      value={vid}
+                      onChange={(e) => setVenue(i, e.target.value === "" ? "" : Number(e.target.value))}
+                    >
+                      <option value="">— ไม่ระบุ —</option>
+                      {venues.map((v) => (
+                        <option key={v.id} value={v.id}>{v.building ? `${v.building} · ${v.name}` : v.name}</option>
+                      ))}
+                    </select>
+                    {f.venueIds.length > 1 && (
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => set("venueIds", f.venueIds.filter((_, x) => x !== i))}>ลบ</button>
+                    )}
+                  </div>
                 ))}
-              </select>
+                <button type="button" className="btn btn-secondary btn-sm" style={{ alignSelf: "flex-start" }} onClick={() => set("venueIds", [...f.venueIds, ""])}>
+                  + เพิ่มห้อง
+                </button>
+                <span className="form-hint">บางรายการใช้มากกว่า 1 ห้อง — กด “+ เพิ่มห้อง” เพื่อเพิ่มแถว</span>
+              </>
             ) : (
               <div className="form-hint">ยังไม่มีสถานที่ — ผู้ดูแลระบบเพิ่มได้ที่เมนู “สถานที่แข่งขัน”</div>
             )}

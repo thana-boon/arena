@@ -3,22 +3,25 @@ import { Icon } from "@/components/Icon";
 import { db } from "@/db";
 import { competitions, subjectGroups } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getActiveYear } from "@/lib/queries";
+import { getActiveYearWithSettings } from "@/lib/queries";
 import { competitionAllowedLevels } from "@/lib/results";
 import { formatThaiDate } from "@/lib/domain";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const year = await getActiveYear();
+  const { year, setting } = await getActiveYearWithSettings();
 
   let comps: (typeof competitions.$inferSelect)[] = [];
   let groups: (typeof subjectGroups.$inferSelect)[] = [];
   if (year) {
+    // ประกาศเฉพาะ "งานเริ่มต้น" ที่ admin เลือกไว้ในหน้าตั้งค่า (ถ้ายังไม่ได้เลือก จะแสดงทุกงานของปีนั้น)
+    const conds = [eq(competitions.yearId, year.id), eq(competitions.isPublished, true)];
+    if (setting?.defaultEventId != null) conds.push(eq(competitions.eventId, setting.defaultEventId));
     comps = await db
       .select()
       .from(competitions)
-      .where(and(eq(competitions.yearId, year.id), eq(competitions.isPublished, true)));
+      .where(and(...conds));
     groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
   }
   const groupName = (id: number | null) => (id == null ? "ทั่วไป" : groups.find((g) => g.id === id)?.name ?? "-");

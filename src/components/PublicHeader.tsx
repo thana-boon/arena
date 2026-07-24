@@ -18,19 +18,13 @@ export async function PublicHeader() {
         {year ? ` · ปีการศึกษา ${year.yearBe}` : ""}
       </span>
       <div className="spacer" />
-      <div className="row" style={{ gap: "var(--space-3)" }}>
+      <div className="nav-actions">
         <Link href="/results" className="btn btn-sm btn-nav-ghost">
           ผลการแข่งขัน
         </Link>
-        {session ? (
-          <Link href={ROLE_HOME[session.role] ?? "/"} className="btn btn-accent btn-sm">
-            เข้าสู่ระบบ
-          </Link>
-        ) : (
-          <Link href="/login" className="btn btn-accent btn-sm">
-            เข้าสู่ระบบ
-          </Link>
-        )}
+        <Link href={session ? ROLE_HOME[session.role] ?? "/" : "/login"} className="btn btn-accent btn-sm">
+          เข้าสู่ระบบ
+        </Link>
       </div>
     </header>
   );

@@ -26,10 +26,13 @@ export default async function ResultsPage() {
   };
 
   const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
+  // ประกาศผลเฉพาะ "งานเริ่มต้น" ที่ admin เลือกไว้ในหน้าตั้งค่า (ถ้ายังไม่ได้เลือก จะแสดงทุกงานของปีนั้น)
+  const compConds = [eq(competitions.yearId, year.id), eq(competitions.isPublished, true)];
+  if (setting?.defaultEventId != null) compConds.push(eq(competitions.eventId, setting.defaultEventId));
   const comps = await db
     .select()
     .from(competitions)
-    .where(and(eq(competitions.yearId, year.id), eq(competitions.isPublished, true)));
+    .where(and(...compConds));
 
   const data = [];
   for (const c of comps) {

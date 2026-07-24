@@ -38,7 +38,7 @@ export function BottomNav({ items }: { items: NavItem[] }) {
   const path = usePathname();
   return (
     <nav className="bottom-nav">
-      {items.slice(0, 5).map((it) => {
+      {items.map((it) => {
         const active = path === it.href || (it.href !== "/" && path.startsWith(it.href + "/"));
         return (
           <Link key={it.href} href={it.href} className={active ? "active" : ""}>

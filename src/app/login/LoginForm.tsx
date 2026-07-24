@@ -35,23 +35,23 @@ export function LoginForm() {
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="form-group">
-        <label className="form-label">รหัสผู้ใช้ / รหัสนักเรียน</label>
+        <label className="form-label">รหัสผู้ใช้</label>
         <input
           className="form-input"
           value={identifier}
           onChange={(e) => setIdentifier(e.target.value)}
-          placeholder="รหัสครู, admin หรือรหัสนักเรียน"
+          placeholder="รหัสผู้ใช้"
           autoComplete="username"
         />
       </div>
       <div className="form-group">
-        <label className="form-label">รหัสผ่าน / เลขบัตรประชาชน</label>
+        <label className="form-label">รหัสผ่าน</label>
         <input
           type="password"
           className="form-input"
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
-          placeholder="ครู: รหัสผ่าน · นักเรียน: Skdw + เลขบัตร 13 หลัก"
+          placeholder="รหัสผ่าน"
           autoComplete="current-password"
         />
       </div>

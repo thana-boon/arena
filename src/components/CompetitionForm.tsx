@@ -276,16 +276,21 @@ export function CompetitionForm({
           </div>
 
           {f.type === "team" && (
-            <div className="grid-2">
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">จำนวนสมาชิกต่ำสุด</label>
-                <input type="number" min={1} className="form-input" value={f.teamSizeMin} disabled={locked} onChange={(e) => set("teamSizeMin", e.target.value === "" ? "" : Number(e.target.value))} />
+            <>
+              <div className="grid-2">
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">จำนวนสมาชิกต่ำสุด</label>
+                  <input type="number" min={1} className="form-input" value={f.teamSizeMin} disabled={locked} onChange={(e) => set("teamSizeMin", e.target.value === "" ? "" : Number(e.target.value))} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">จำนวนสมาชิกสูงสุด</label>
+                  <input type="number" min={1} className="form-input" value={f.teamSizeMax} disabled={locked} onChange={(e) => set("teamSizeMax", e.target.value === "" ? "" : Number(e.target.value))} />
+                </div>
               </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">จำนวนสมาชิกสูงสุด</label>
-                <input type="number" min={1} className="form-input" value={f.teamSizeMax} disabled={locked} onChange={(e) => set("teamSizeMax", e.target.value === "" ? "" : Number(e.target.value))} />
-              </div>
-            </div>
+              {f.teamSizeMax === 1 && (
+                <span className="form-hint">ทีมสมาชิกสูงสุด 1 คน ก็คือแข่งเดี่ยว — ระบบจะบันทึกรายการนี้เป็นประเภท “เดี่ยว” ให้อัตโนมัติ</span>
+              )}
+            </>
           )}
 
           <label className="switch-row">

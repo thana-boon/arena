@@ -42,6 +42,21 @@ export const competitionInput = z
       else if (v.teamSizeMin > v.teamSizeMax)
         ctx.addIssue({ code: "custom", message: "จำนวนสมาชิกต่ำสุดต้องไม่เกินสูงสุด", path: ["teamSizeMin"] });
     }
+  })
+  // ทีมที่กำหนดสมาชิกสูงสุด = 1 คน ก็คือแข่งเดี่ยว → แปลงเป็น individual ให้อัตโนมัติ
+  // (โควตา "จำนวนทีม" กลายเป็นโควตารวมทุกระดับชั้น เพราะ 1 ทีม = 1 คน)
+  .transform((v) => {
+    if (v.type === "team" && v.teamSizeMax === 1) {
+      return {
+        ...v,
+        type: "individual" as const,
+        teamSizeMin: null,
+        teamSizeMax: null,
+        capacityMode: "combined" as const,
+        combinedCapacity: v.teamCapacity ?? v.combinedCapacity,
+      };
+    }
+    return v;
   });
 
 export type CompetitionInput = z.infer<typeof competitionInput>;

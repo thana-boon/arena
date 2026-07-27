@@ -25,6 +25,18 @@ export const MEDAL_BADGE_CLASS: Record<Medal, string> = {
 };
 
 /**
+ * ค่าที่เก็บใน certificate_issues.medal ได้
+ * "activity" = รายการที่ไม่มีการแข่งขัน (competitions.no_contest) — ไม่ใช่ผลของการตัดสิน
+ * จึงแยกจาก Medal ไม่ให้ decideMedal/การจัดอันดับต้องรู้จักค่านี้
+ */
+export type CertAward = Medal | "activity";
+
+export const AWARD_LABEL: Record<CertAward, string> = {
+  ...MEDAL_LABEL,
+  activity: "เข้าร่วมกิจกรรม",
+};
+
+/**
  * ป้ายรางวัลตามอันดับ (ใช้บนเกียรติบัตร) — อันดับ 1-3 เป็นชื่อรางวัล, อันดับอื่นใช้ "อันดับที่ N"
  * 1 = ชนะเลิศ · 2 = รองชนะเลิศอันดับ 1 · 3 = รองชนะเลิศอันดับ 2
  */
@@ -218,6 +230,7 @@ export type RoomComp = {
   levels: string[]; // ระดับชั้นที่รายการรับ — ใช้จำกัด StudentPicker ตอนเพิ่มสมาชิกทีม
   teamSizeMin: number | null;
   teamSizeMax: number | null;
+  allowCrossClass: boolean; // ทีมมีสมาชิกข้ามห้องได้ (false = ต้องห้องเดียวกันทั้งทีม)
   eventDate: string | null;
   startTime: string | null;
   endTime: string | null;

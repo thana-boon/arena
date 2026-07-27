@@ -19,7 +19,8 @@ export function GroupsManager({ groups, catalog }: { groups: G[]; catalog: Cat[]
 
   async function sync() {
     setSyncing(true); setMsg(null);
-    const res = await api.post<{ catalog: Cat[] }>("/api/admin/subject-groups/sync");
+    // ซิงค์หมวดต้องกวาดรายชื่อครูทุกหน้า — เผื่อเวลามากกว่าปกติ
+    const res = await api.post<{ catalog: Cat[] }>("/api/admin/subject-groups/sync", undefined, { timeoutMs: 40_000 });
     setSyncing(false);
     if (!res.ok) return setMsg({ type: "error", text: res.error });
     setCat(res.data.catalog);

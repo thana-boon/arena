@@ -13,8 +13,9 @@ export const DOC_LABEL: Record<DocType, string> = {
 /** เอกสารสรุป = ตารางรวมฉบับเดียวทั้งงาน (ไม่แยกหน้าใหม่ต่อรายการ) — แสดงตัวอย่างบนจอได้เลย */
 export const SUMMARY_DOCS: DocType[] = ["summary", "regcount", "venues"];
 
-/** ป้ายประเภท เช่น "เดี่ยว" / "ทีม 2–5 คน" */
+/** ป้ายประเภท เช่น "เดี่ยว" / "ทีม 2–5 คน" — รายการที่ไม่มีการแข่งขันบอกไว้ให้ชัด */
 function typeLabel(b: ReportBundle): string {
+  if (b.noContest) return b.meta.type === "team" ? "ทีม (ไม่มีการแข่งขัน)" : "ไม่มีการแข่งขัน";
   if (b.meta.type !== "team") return "เดี่ยว";
   const { teamSizeMin: mn, teamSizeMax: mx } = b;
   if (mn && mx) return mn === mx ? `ทีม ${mn} คน` : `ทีม ${mn}–${mx} คน`;
@@ -263,10 +264,12 @@ function VenueGroupRows({ group }: { group: { venueName: string; items: ReportBu
 }
 
 export function ReportSheet({ bundle, docType, eventName }: { bundle: ReportBundle; docType: DocType; eventName: string }) {
-  const { meta, criteria, fullScore, roster, results } = bundle;
+  const { meta, criteria, fullScore, roster, results, noContest } = bundle;
   const timeStr = meta.eventDate
     ? `${formatThaiDate(meta.eventDate)}${meta.startTime ? ` เวลา ${meta.startTime.slice(0, 5)}–${meta.endTime?.slice(0, 5)} น.` : ""}`
     : "";
+  // รายการที่ไม่มีการแข่งขันไม่มีคะแนน/อันดับ — ใบกรอกคะแนนและใบประกาศผลจึงไม่มีความหมาย
+  const scoreDoc = docType === "scoresheet" || docType === "announce";
 
   return (
     <section className="report-section">
@@ -277,6 +280,12 @@ export function ReportSheet({ bundle, docType, eventName }: { bundle: ReportBund
         <div>รายการ: {meta.competitionName}{meta.groupName ? ` (${meta.groupName})` : ""}</div>
         {timeStr && <div className="text-sm">{timeStr}</div>}
       </div>
+
+      {noContest && scoreDoc && (
+        <p style={{ textAlign: "center", marginTop: 32 }}>
+          รายการนี้ไม่มีการแข่งขัน — ไม่มีการให้คะแนน อันดับ หรือรางวัล (ใช้ “ใบรายชื่อ” แทน)
+        </p>
+      )}
 
       {docType === "roster" && (
         <table className="table">
@@ -306,7 +315,7 @@ export function ReportSheet({ bundle, docType, eventName }: { bundle: ReportBund
         </table>
       )}
 
-      {docType === "scoresheet" && (
+      {docType === "scoresheet" && !noContest && (
         <>
           <table className="table">
             <thead>
@@ -339,7 +348,7 @@ export function ReportSheet({ bundle, docType, eventName }: { bundle: ReportBund
         </>
       )}
 
-      {docType === "announce" && (
+      {docType === "announce" && !noContest && (
         <>
           <table className="table">
             <thead>

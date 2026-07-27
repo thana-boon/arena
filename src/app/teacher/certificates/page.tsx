@@ -43,13 +43,13 @@ export default async function TeacherCertificatesPage() {
 
   const rows = viewable.map((c) => {
     const link = linkOf.get(c.id);
-    const isTraining = link?.kind === "training";
-    // อบรม: ออกได้เลยไม่ต้องประกาศผล; แข่งขัน: ต้องประกาศผลก่อน
-    const ready = link != null && link.status !== "draft" && (isTraining || c.isPublished);
+    // ไม่มีคะแนน = งานอบรม หรือรายการที่ตั้งเป็น "ไม่มีการแข่งขัน" → ออกได้เลยไม่ต้องประกาศผล
+    const noScoring = link?.kind === "training" || c.noContest;
+    const ready = link != null && link.status !== "draft" && (noScoring || c.isPublished);
     let reason = "";
     if (!link) reason = "ยังไม่ถูกจัดเข้างาน";
     else if (link.status === "draft") reason = "ผู้ดูแลยังตั้งค่าไม่เสร็จ";
-    else if (!isTraining && !c.isPublished) reason = "ยังไม่ประกาศผล";
+    else if (!noScoring && !c.isPublished) reason = "ยังไม่ประกาศผล";
     return {
       id: c.id,
       name: c.name,

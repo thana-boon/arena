@@ -19,10 +19,14 @@ export type CompFormInitial = {
   eventId: number | "";
   subjectGroupId: number | "";
   type: "individual" | "team";
+  /** ไม่มีการแข่งขัน — ลงทะเบียนรายชื่อ + ออกเกียรติบัตรอย่างเดียว (ไม่มีคะแนน/อันดับ/รางวัล) */
+  noContest: boolean;
   /** นักเรียนเห็นรายการนี้ในหน้าสมัครหรือไม่ (false = ครูลงให้อย่างเดียว) */
   visibleToStudents: boolean;
   teamSizeMin: number | "";
   teamSizeMax: number | "";
+  /** ทีมมีสมาชิกข้ามห้องเรียนได้ (false = ทุกคนต้องอยู่ห้องเดียวกัน) */
+  allowCrossClass: boolean;
   allowedClassLevels: string[];
   timeSlotId: number | "";
   /** สถานที่แข่งขัน — เลือกได้หลายห้อง ("" = แถวที่ยังไม่ได้เลือก) */
@@ -123,6 +127,8 @@ export function CompetitionForm({
     () => events.find((ev) => ev.id === Number(f.eventId))?.kind === "training",
     [events, f.eventId]
   );
+  // รายการที่ติ๊ก "ไม่มีการแข่งขัน" ก็ไม่มีคะแนนเช่นกัน — ซ่อนส่วนเกณฑ์ไปเลย
+  const noScoring = isTraining || f.noContest;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -131,18 +137,21 @@ export function CompetitionForm({
     if (!f.timeSlotId) return showError("กรุณาเลือกช่วงเวลาแข่งขัน");
 
     // เกณฑ์การให้คะแนน: ตัดแถวว่างทิ้ง, ทุกแถวที่มีข้อมูลต้องมีทั้งชื่อและคะแนน > 0
-    const filledCriteria = f.criteria.filter((c) => c.name.trim() !== "" || c.maxScore !== "");
+    // รายการที่ไม่มีการแข่งขัน = ไม่มีเกณฑ์เลย (ทิ้งของที่เคยกรอกไว้)
+    const filledCriteria = f.noContest
+      ? []
+      : f.criteria.filter((c) => c.name.trim() !== "" || c.maxScore !== "");
     for (const c of filledCriteria) {
       if (!c.name.trim() || typeof c.maxScore !== "number" || c.maxScore <= 0)
         return showError("เกณฑ์แต่ละข้อต้องมีทั้งชื่อและคะแนนเต็มมากกว่า 0");
     }
-    // งานแข่งขันบังคับอย่างน้อย 1 เกณฑ์ (งานอบรมไม่ต้องมีคะแนน)
-    if (!isTraining && filledCriteria.length === 0)
+    // งานแข่งขันบังคับอย่างน้อย 1 เกณฑ์ (งานอบรม/รายการที่ไม่มีการแข่งขัน ไม่ต้องมีคะแนน)
+    if (!noScoring && filledCriteria.length === 0)
       return showError("กรุณาเพิ่มเกณฑ์การให้คะแนนอย่างน้อย 1 ข้อ");
 
     setBusy(true);
     // สเกลคะแนนเต็มของแต่ละเกณฑ์ให้รวมกันเป็น 100 (งานอบรมส่งตามที่กรอก) — คงสัดส่วนเดิม
-    const scaledScores = isTraining
+    const scaledScores = noScoring
       ? filledCriteria.map((c) => Number(c.maxScore))
       : scaleMaxScoresTo100(filledCriteria.map((c) => Number(c.maxScore)));
     const criteriaPayload = filledCriteria.map((c, i) => ({ name: c.name.trim(), maxScore: scaledScores[i] }));
@@ -157,9 +166,11 @@ export function CompetitionForm({
       eventId: Number(f.eventId),
       subjectGroupId: f.subjectGroupId === "" ? null : Number(f.subjectGroupId),
       type: f.type,
+      noContest: f.noContest,
       visibleToStudents: f.visibleToStudents,
       teamSizeMin: f.type === "team" && f.teamSizeMin !== "" ? Number(f.teamSizeMin) : null,
       teamSizeMax: f.type === "team" && f.teamSizeMax !== "" ? Number(f.teamSizeMax) : null,
+      allowCrossClass: f.type === "team" && f.allowCrossClass,
       allowedClassLevels: f.allowedClassLevels,
       timeSlotId: Number(f.timeSlotId),
       // ตัดแถวที่ยังไม่ได้เลือก + ห้องซ้ำนับครั้งเดียว
@@ -290,8 +301,37 @@ export function CompetitionForm({
               {f.teamSizeMax === 1 && (
                 <span className="form-hint">ทีมสมาชิกสูงสุด 1 คน ก็คือแข่งเดี่ยว — ระบบจะบันทึกรายการนี้เป็นประเภท “เดี่ยว” ให้อัตโนมัติ</span>
               )}
+              <label className="switch-row">
+                <span className="switch">
+                  <input type="checkbox" checked={f.allowCrossClass} onChange={(e) => set("allowCrossClass", e.target.checked)} />
+                  <span className="knob" />
+                </span>
+                <span>
+                  <span className="switch-label">ทีมข้ามห้องได้</span>
+                  <span className="form-hint">
+                    {f.allowCrossClass
+                      ? "เลือกสมาชิกจากห้องไหนก็ได้ (ในระดับชั้นที่รายการนี้รับ)"
+                      : "สมาชิกทุกคนในทีมต้องอยู่ห้องเดียวกัน — ตอนสมัครจะเลือกได้เฉพาะเพื่อนในห้องเดียวกันเท่านั้น"}
+                  </span>
+                </span>
+              </label>
             </>
           )}
+
+          <label className="switch-row">
+            <span className="switch">
+              <input type="checkbox" checked={f.noContest} onChange={(e) => set("noContest", e.target.checked)} />
+              <span className="knob" />
+            </span>
+            <span>
+              <span className="switch-label">ไม่มีการแข่งขัน</span>
+              <span className="form-hint">
+                {f.noContest
+                  ? "ใช้ลงทะเบียนรายชื่อผู้เข้าร่วมและออกเกียรติบัตรอย่างเดียว — ไม่มีเกณฑ์คะแนน ไม่มีอันดับ ไม่มีรางวัล เกียรติบัตรจะขึ้นว่า “เข้าร่วมกิจกรรม”"
+                  : "เปิดสวิตช์นี้ถ้ารายการนี้ไม่ได้แข่งขัน แต่ต้องการเก็บรายชื่อผู้เข้าร่วมและออกเกียรติบัตร"}
+              </span>
+            </span>
+          </label>
 
           <label className="switch-row">
             <span className="switch">
@@ -449,7 +489,18 @@ export function CompetitionForm({
         </div>
       </section>
 
-      {/* ── ส่วนที่ 4: เกณฑ์การให้คะแนน ── */}
+      {/* ── ส่วนที่ 4: เกณฑ์การให้คะแนน (รายการที่ไม่มีการแข่งขันไม่มีส่วนนี้) ── */}
+      {f.noContest ? (
+        <section className="card form-section">
+          <div className="form-section-head">
+            <span className="ico"><Icon name="chart" size={20} /></span>
+            <div>
+              <h3>เกณฑ์การให้คะแนน</h3>
+              <div className="hint">รายการนี้ตั้งเป็น “ไม่มีการแข่งขัน” — ไม่ต้องกำหนดเกณฑ์คะแนน</div>
+            </div>
+          </div>
+        </section>
+      ) : (
       <section className="card form-section">
         <div className="form-section-head">
           <span className="ico"><Icon name="chart" size={20} /></span>
@@ -483,6 +534,7 @@ export function CompetitionForm({
           )}
         </div>
       </section>
+      )}
 
       <div className="row" style={{ alignItems: "center" }}>
         <button className="btn btn-primary" disabled={busy}>{busy ? "กำลังบันทึก…" : initial.id ? "บันทึกการแก้ไข" : "สร้างรายการ"}</button>

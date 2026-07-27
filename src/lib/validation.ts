@@ -15,10 +15,14 @@ export const competitionInput = z
     // หมวดสาระ — ไม่บังคับ (งานที่ไม่ใช่วิชาการไม่ต้องเลือก)
     subjectGroupId: z.number().int().positive().nullable().optional(),
     type: z.enum(["individual", "team"]),
+    // ไม่มีการแข่งขัน — ลงทะเบียนรายชื่อ + ออกเกียรติบัตรอย่างเดียว (ไม่มีคะแนน/อันดับ/รางวัล)
+    noContest: z.boolean().optional().default(false),
     // นักเรียนเห็นรายการนี้ในหน้าสมัครหรือไม่ (false = ครูลงให้อย่างเดียว)
     visibleToStudents: z.boolean().optional().default(true),
     teamSizeMin: z.number().int().positive().nullable().optional(),
     teamSizeMax: z.number().int().positive().nullable().optional(),
+    // ทีมข้ามห้อง — ไม่ส่งมา = false (ทีมต้องเป็นนักเรียนห้องเดียวกัน)
+    allowCrossClass: z.boolean().optional().default(false),
     allowedClassLevels: z.array(z.enum(CLASS_LEVELS)).min(1, "เลือกระดับชั้นอย่างน้อย 1 ระดับ"),
     // ช่วงเวลาแข่งขัน — บังคับเลือกจาก time_slots (เซิร์ฟเวอร์ resolve เป็น start/end time เอง)
     timeSlotId: z.number().int().positive("กรุณาเลือกช่วงเวลาแข่งขัน"),
@@ -52,6 +56,7 @@ export const competitionInput = z
         type: "individual" as const,
         teamSizeMin: null,
         teamSizeMax: null,
+        allowCrossClass: false, // เดี่ยวมีคนเดียว ไม่มีเรื่องข้ามห้อง
         capacityMode: "combined" as const,
         combinedCapacity: v.teamCapacity ?? v.combinedCapacity,
       };

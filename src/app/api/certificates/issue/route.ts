@@ -44,8 +44,10 @@ export async function POST(req: Request) {
       return fail("งานนี้ยังไม่เผยแพร่ กรุณารอผู้ดูแลระบบตั้งค่าเกียรติบัตรให้เสร็จ");
 
     const isTraining = event.kind === "training";
-    // งานแข่งขันต้องประกาศผลก่อน; งานอบรมออกให้ผู้เข้าร่วมได้เลย (ไม่มีการให้คะแนน)
-    if (!isTraining && !comp.isPublished)
+    // ไม่มีคะแนน = งานอบรม (ทั้งงาน) หรือรายการที่ติ๊ก "ไม่มีการแข่งขัน" (รายการเดียว)
+    const noScoring = isTraining || comp.noContest;
+    // งานแข่งขันต้องประกาศผลก่อน; ที่ไม่มีคะแนนออกให้ผู้เข้าร่วมได้เลย
+    if (!noScoring && !comp.isPublished)
       return fail("ต้องประกาศผลรายการนี้ก่อนจึงจะออกเกียรติบัตรได้");
 
     const { year, setting } = await getActiveYearWithSettings();
@@ -57,8 +59,10 @@ export async function POST(req: Request) {
     const wantEntry = entryIds && entryIds.length ? new Set(entryIds) : null;
     const targets: IssueTarget[] = [];
 
-    if (isTraining) {
-      // อบรม: ออกให้ผู้เข้าร่วมทุกคน (medal none, ไม่มีอันดับ)
+    if (noScoring) {
+      // ไม่มีคะแนน: ออกให้ผู้เข้าร่วมทุกคน ไม่มีอันดับ
+      // อบรม = "เข้าร่วม" (none) ตามเดิม · ไม่มีการแข่งขัน = "เข้าร่วมกิจกรรม" (activity)
+      const award = comp.noContest ? ("activity" as const) : ("none" as const);
       const roster = await getRoster(competitionId);
       for (const e of roster) {
         if (wantEntry && !wantEntry.has(e.entryId)) continue;
@@ -72,7 +76,7 @@ export async function POST(req: Request) {
             classSnapshot: cls,
             teamName: e.teamName,
             competitionName: comp.name,
-            medal: "none",
+            medal: award,
             rank: 0,
             percent: 0,
           });

@@ -56,7 +56,8 @@ export type CertRenderData = {
   teamName: string | null;
   competitionName: string;
   eventName: string;
-  medal: "gold" | "silver" | "bronze" | "none";
+  /** "activity" = รายการที่ไม่มีการแข่งขัน → ขึ้นว่า "เข้าร่วมกิจกรรม" และไม่มีอันดับ */
+  medal: "gold" | "silver" | "bronze" | "none" | "activity";
   rank: number;
   serialNo: string;
   verifyToken: string;

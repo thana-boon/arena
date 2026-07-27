@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { CertBlock, CertLayout, CertRenderData } from "@/lib/certificateLayout";
-import { MEDAL_LABEL, rankAwardLabel } from "@/lib/domain";
+import { AWARD_LABEL, rankAwardLabel } from "@/lib/domain";
 
 /**
  * คอมโพเนนต์เดียวใช้ทั้ง preview (บนจอ) และพิมพ์ (PDF) — ต่างกันแค่ค่า pageWidth
@@ -46,7 +46,8 @@ function blockText(kind: CertBlock["kind"], d: CertRenderData, prefix?: string):
     case "team_name": return d.teamName ? p + d.teamName : "";
     case "competition_name": return p + d.competitionName;
     case "event_name": return p + d.eventName;
-    case "medal": return d.medal === "none" ? p + MEDAL_LABEL.none : p + MEDAL_LABEL[d.medal];
+    // "activity" (ไม่มีการแข่งขัน) → "เข้าร่วมกิจกรรม" ; rank = 0 เสมอ บล็อกอันดับจึงว่างเปล่า
+    case "medal": return AWARD_LABEL[d.medal] ? p + AWARD_LABEL[d.medal] : "";
     case "rank": return d.rank ? p + rankAwardLabel(d.rank) : "";
     case "date": return p + d.dateText;
     case "serial": return (p || "เลขที่ ") + d.serialNo;

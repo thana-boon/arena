@@ -12,7 +12,7 @@ import {
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import type { PoolClient } from "pg";
-import type { Medal } from "@/lib/domain";
+import type { CertAward, Medal } from "@/lib/domain";
 import {
   type CertBlock,
   type CertLayout,
@@ -148,7 +148,8 @@ export async function getEventTemplates(eventId: number): Promise<CertTemplateVi
  * เลือกแม่แบบสำหรับเหรียญหนึ่ง ๆ — หาแม่แบบเฉพาะเหรียญก่อน ไม่เจอค่อยใช้แม่แบบหลัก (medalFilter = "")
  * งานส่วนใหญ่มีแม่แบบเดียว ฟังก์ชันนี้จึงคืนตัวหลักเป็นปกติ
  */
-export function resolveTemplate(tpls: CertTemplateView[], medal: Medal): CertTemplateView | null {
+export function resolveTemplate(tpls: CertTemplateView[], medal: CertAward): CertTemplateView | null {
+  // "activity" ไม่มีแม่แบบเฉพาะ → ตกไปใช้แม่แบบหลักเสมอ (เหมือนงานที่มีแม่แบบเดียว)
   return tpls.find((t) => t.medalFilter === medal) ?? tpls.find((t) => t.medalFilter === "") ?? null;
 }
 
@@ -183,7 +184,8 @@ export type IssueTarget = {
   classSnapshot: string;
   teamName: string | null;
   competitionName: string;
-  medal: Medal;
+  /** "activity" สำหรับรายการที่ไม่มีการแข่งขัน (ไม่มีอันดับ/รางวัล) */
+  medal: CertAward;
   rank: number;
   percent: number;
 };

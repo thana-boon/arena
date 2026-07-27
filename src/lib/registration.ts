@@ -90,6 +90,17 @@ export async function registerEntry(args: RegisterArgs): Promise<number> {
       throw new RegistrationError(`${m.name} (${m.classLevel}) ไม่อยู่ในระดับชั้นที่รายการนี้รับ`);
   }
 
+  // กติกา 2.1: ทีมที่ไม่อนุญาตข้ามห้อง — ทุกคนต้องอยู่ห้องเรียนเดียวกัน (ระดับชั้น+ห้อง)
+  // บังคับกับทุก role รวมถึง admin และไม่ยกเว้นให้ override เพราะเป็นกติกาของตัวรายการเอง
+  // ไม่ใช่ข้อจำกัดเชิงเวลา/จำนวนแบบกติกา 1,3,4
+  if (isTeam && !comp.allowCrossClass) {
+    const rooms = [...new Set(args.members.map((m) => `${m.classLevel}/${m.classRoom}`))];
+    if (rooms.length > 1)
+      throw new RegistrationError(
+        `รายการนี้ไม่อนุญาตให้ทีมข้ามห้อง — สมาชิกทุกคนต้องอยู่ห้องเดียวกัน (พบ ${rooms.join(", ")})`
+      );
+  }
+
   // ดึง active entries ของสมาชิกเหล่านี้ในปีนี้ (ใช้ตรวจกติกา 3,4 และกันลงซ้ำ)
   const compsThisYear = await db.select().from(competitions).where(eq(competitions.yearId, year.id));
   const compIds = compsThisYear.map((c) => c.id);

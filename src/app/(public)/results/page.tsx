@@ -27,7 +27,12 @@ export default async function ResultsPage() {
 
   const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
   // ประกาศผลเฉพาะ "งานเริ่มต้น" ที่ admin เลือกไว้ในหน้าตั้งค่า (ถ้ายังไม่ได้เลือก จะแสดงทุกงานของปีนั้น)
-  const compConds = [eq(competitions.yearId, year.id), eq(competitions.isPublished, true)];
+  // รายการที่ "ไม่มีการแข่งขัน" ไม่มีผล/อันดับให้ประกาศ — ตัดออกจากหน้าผลการแข่งขันสาธารณะ
+  const compConds = [
+    eq(competitions.yearId, year.id),
+    eq(competitions.isPublished, true),
+    eq(competitions.noContest, false),
+  ];
   if (setting?.defaultEventId != null) compConds.push(eq(competitions.eventId, setting.defaultEventId));
   const comps = await db
     .select()

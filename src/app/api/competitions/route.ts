@@ -58,9 +58,12 @@ export async function POST(req: Request) {
           name: body.name.trim(),
           description: body.description.trim(),
           type: body.type,
+          noContest: body.noContest,
           capacityMode: body.type === "individual" ? body.capacityMode ?? "per_level" : "per_level",
           teamSizeMin: body.type === "team" ? body.teamSizeMin ?? null : null,
           teamSizeMax: body.type === "team" ? body.teamSizeMax ?? null : null,
+          // เดี่ยวมีคนเดียวอยู่แล้ว → บังคับ false กันค่าค้างจากฟอร์มตอนสลับประเภท
+          allowCrossClass: body.type === "team" ? body.allowCrossClass : false,
           allowedClassLevels: JSON.stringify(body.allowedClassLevels),
           timeSlotId: slot.id,
           eventDate: body.eventDate || null,

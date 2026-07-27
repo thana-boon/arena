@@ -128,6 +128,13 @@ export const competitions = pgTable(
     capacityMode: varchar("capacity_mode", { length: 16 }).notNull().default("per_level"),
     teamSizeMin: integer("team_size_min"),
     teamSizeMax: integer("team_size_max"),
+    // ประเภททีม: true = สมาชิกในทีมมาจากคนละห้องเรียนได้ (ข้ามห้อง)
+    // false (ค่าเริ่มต้น) = ทุกคนในทีมต้องอยู่ห้องเดียวกัน (ระดับชั้น+ห้องเดียวกัน)
+    // — ทั้งตอนนักเรียนสมัครเอง ครูลงให้ และ admin ลงให้ (บังคับทั้ง UI และ server)
+    allowCrossClass: boolean("allow_cross_class").notNull().default(false),
+    // true = รายการนี้ไม่มีการแข่งขัน ใช้ลงทะเบียนรายชื่อผู้เข้าร่วม + ออกเกียรติบัตรอย่างเดียว
+    // → ไม่มีเกณฑ์คะแนน ไม่มีอันดับ ไม่มีเหรียญ/รางวัล ; เกียรติบัตรใช้คำว่า "เข้าร่วมกิจกรรม"
+    noContest: boolean("no_contest").notNull().default(false),
     allowedClassLevels: text("allowed_class_levels").notNull().default("[]"), // json array
     // ช่วงเวลาแข่งขัน — อ้างอิง time_slots.id (บังคับเลือกตอนสร้าง; nullable ในสคีมาเพื่อรองรับข้อมูลเดิม)
     timeSlotId: integer("time_slot_id"),

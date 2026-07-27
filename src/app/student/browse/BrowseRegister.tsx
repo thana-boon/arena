@@ -19,6 +19,8 @@ export type BrowseComp = {
   levels: string[];
   teamSizeMin: number | null;
   teamSizeMax: number | null;
+  /** ทีมมีสมาชิกข้ามห้องได้ (false = ต้องเป็นเพื่อนห้องเดียวกันเท่านั้น) */
+  allowCrossClass: boolean;
   eventDate: string | null;
   startTime: string | null;
   endTime: string | null;
@@ -238,6 +240,9 @@ export function BrowseRegister({
                   <div className="mt-4">
                     <StudentPicker
                       excludeCodes={members.map((m) => m.studentCode)}
+                      levels={c.levels}
+                      // ไม่ให้ข้ามห้อง → เลือกได้เฉพาะเพื่อนห้องเดียวกับตัวเอง
+                      restrictRoom={c.allowCrossClass ? null : { classLevel: self.classLevel, classRoom: self.classRoom }}
                       remaining={(c.teamSizeMax ?? 99) - members.length}
                       onPick={(s) => setMembers((prev) => (prev.length >= (c.teamSizeMax ?? 99) || prev.some((x) => x.studentCode === s.studentCode) ? prev : [...prev, s]))}
                     />

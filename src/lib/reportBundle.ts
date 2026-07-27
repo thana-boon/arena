@@ -27,6 +27,7 @@ export async function buildBundle(
     eventId: comp.eventId,
     subjectGroupId: comp.subjectGroupId,
     groupName,
+    noContest: comp.noContest,
     levels: parseJsonArray(comp.allowedClassLevels),
     teamSizeMin: comp.teamSizeMin,
     teamSizeMax: comp.teamSizeMax,
@@ -76,6 +77,7 @@ export type ReportBundle = {
   eventId: number | null;
   subjectGroupId: number | null;
   groupName: string;
+  noContest: boolean; // true = ไม่มีการแข่งขัน (ไม่มีใบกรอกคะแนน/ใบประกาศผล)
   levels: string[]; // ระดับชั้นที่รับ
   teamSizeMin: number | null;
   teamSizeMax: number | null;

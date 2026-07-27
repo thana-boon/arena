@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/client";
+import { api, NO_TIMEOUT } from "@/lib/client";
 import { Icon } from "@/components/Icon";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
@@ -38,7 +38,8 @@ export function BackupRestore({ initialFiles }: { initialFiles: ServerBackup[] }
     setBusy("save");
     setMsg(null);
     setResult(null);
-    const res = await api.post<{ file: ServerBackup }>("/api/admin/backup/files");
+    // สำรอง/กู้คืนใช้เวลานานตามขนาดข้อมูล — ไม่ตัดเวลา (ตัดกลางคันแย่กว่ารอ)
+    const res = await api.post<{ file: ServerBackup }>("/api/admin/backup/files", undefined, NO_TIMEOUT);
     if (!res.ok) setMsg({ type: "error", text: res.error });
     else {
       setMsg({ type: "success", text: `สำรองข้อมูลลงเซิร์ฟเวอร์แล้ว · ${res.data.file.name}` });
@@ -75,7 +76,7 @@ export function BackupRestore({ initialFiles }: { initialFiles: ServerBackup[] }
     setBusy(name);
     setMsg(null);
     setResult(null);
-    const res = await api.post<RestoreResult>(`/api/admin/backup/files/${encodeURIComponent(name)}`);
+    const res = await api.post<RestoreResult>(`/api/admin/backup/files/${encodeURIComponent(name)}`, undefined, NO_TIMEOUT);
     applyRestoreResult(res);
     await refreshFiles(); // มีไฟล์ -before-restore เพิ่มเข้ามา
     setBusy(null);
@@ -102,7 +103,7 @@ export function BackupRestore({ initialFiles }: { initialFiles: ServerBackup[] }
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      const res = await api.post<RestoreResult>("/api/admin/backup/restore", data);
+      const res = await api.post<RestoreResult>("/api/admin/backup/restore", data, NO_TIMEOUT);
       applyRestoreResult(res);
       if (res.ok) {
         setFile(null);

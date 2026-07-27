@@ -32,6 +32,20 @@ export function studentFullName(s: { first_name: string; last_name: string }): s
   return `${s.first_name} ${s.last_name}`.trim();
 }
 
+/**
+ * งบเวลารวมของ loop ที่ยิงหลายหน้า — คืนฟังก์ชันเช็คที่โยน error เมื่อใช้เวลาเกิน
+ *
+ * แต่ละ request มี timeout ของตัวเอง (8 วิ) แต่ loop 30 หน้าที่ทุกหน้าช้าจะกลายเป็น 4 นาที
+ * ผู้ใช้เห็นแค่หน้าจอค้าง — ตัดที่งบเวลารวมแล้วขึ้น error ให้กดใหม่ ดีกว่าปล่อยให้รอ
+ * (ผู้เรียกทุกที่ครอบ try/catch แล้วตอบ 502 พร้อมข้อความไทยอยู่แล้ว)
+ */
+function deadline(totalMs: number): () => void {
+  const until = Date.now() + totalMs;
+  return () => {
+    if (Date.now() > until) throw new Error(`student api budget exceeded (${totalMs}ms)`);
+  };
+}
+
 /** ดึงข้อมูลนักเรียน 1 คนจากรหัส (ค้นด้วย q แล้วกรองรหัสตรงเป๊ะ) */
 export async function fetchStudent(studentCode: string): Promise<StudentProfile | null> {
   const code = studentCode.trim();
@@ -110,8 +124,10 @@ export async function listStudents(params: {
 export async function listClassRooms(classLevel: string): Promise<string[]> {
   const rooms = new Set<string>();
   const limit = 200;
+  const checkTime = deadline(15_000);
   let page = 1;
   for (;;) {
+    checkTime();
     const { data, meta } = await listStudents({ class_level: classLevel, page, limit });
     for (const s of data) if (s.class_room) rooms.add(String(s.class_room).trim());
     if (data.length === 0 || page * limit >= meta.total || page >= 20) break;
@@ -131,8 +147,10 @@ export async function listStudentsInRoom(
 ): Promise<StudentProfile[]> {
   const out: StudentProfile[] = [];
   const limit = 200;
+  const checkTime = deadline(15_000);
   let page = 1;
   for (;;) {
+    checkTime();
     const { data, meta } = await listStudents({
       class_level: classLevel,
       class_room: classRoom,
@@ -150,8 +168,11 @@ export async function listStudentsInRoom(
 export async function listAllStudents(): Promise<StudentProfile[]> {
   const out: StudentProfile[] = [];
   const limit = 200;
+  // งานกวาดทั้งโรงเรียน (ผู้ใช้กดเอง รู้ว่านาน) — ให้งบมากกว่างานอื่น แต่ยังมีเพดาน
+  const checkTime = deadline(45_000);
   let page = 1;
   for (;;) {
+    checkTime();
     const { data, meta } = await listStudents({ page, limit });
     out.push(...data);
     if (data.length === 0 || page * limit >= meta.total || page >= 30) break;

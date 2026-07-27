@@ -43,14 +43,18 @@ export async function CompetitionDetailBody({
         <div className="page-header" style={{ marginBottom: 0 }}>
           <h1>{comp.name}</h1>
           <div className="subtitle">
-            {group?.name} · {comp.type === "team" ? `ทีม ${comp.teamSizeMin}-${comp.teamSizeMax} คน` : "เดี่ยว"} · คะแนนเต็ม {fullScore}
+            {group?.name} ·{" "}
+            {comp.type === "team"
+              ? `ทีม ${comp.teamSizeMin}-${comp.teamSizeMax} คน (${comp.allowCrossClass ? "ข้ามห้องได้" : "ห้ามข้ามห้อง"})`
+              : "เดี่ยว"}
+            {comp.noContest ? " · ไม่มีการแข่งขัน" : ` · คะแนนเต็ม ${fullScore}`}
             {eventDateTh && ` · ${eventDateTh}${comp.startTime ? ` ${comp.startTime.slice(0, 5)}–${comp.endTime?.slice(0, 5)} น.` : ""}`}
           </div>
         </div>
         <div className="row">
           <Link href={`${basePath}/${id}/reports`} className="btn btn-ghost"><Icon name="printer" size={18} /> เอกสาร</Link>
           <Link href={`${basePath}/${id}/edit`} className="btn btn-secondary">แก้ไข</Link>
-          {canScore(session, comp.createdBy, group?.catalogNo) && (
+          {!comp.noContest && canScore(session, comp.createdBy, group?.catalogNo) && (
             <Link href={`${scoreBasePath}/${id}`} className="btn btn-primary">บันทึกผล</Link>
           )}
         </div>
@@ -104,6 +108,7 @@ export async function CompetitionDetailBody({
         roster={roster}
         canOverride={session.role === "admin"}
         allowedLevels={levels}
+        allowCrossClass={comp.allowCrossClass}
       />
     </div>
   );

@@ -80,7 +80,8 @@ export function ClassRegistrations({
     setOvBusy(true);
     setErr("");
     const sp = eventFilter === "all" ? "" : `?event_id=${eventFilter}`;
-    const res = await api.get<Overview>(`/api/registrations/overview${sp}`);
+    // กวาดนักเรียนทั้งโรงเรียนจาก SchoolOS — นานกว่า request ทั่วไป (ฝั่ง server มีงบเวลา 45 วิของมันเอง)
+    const res = await api.get<Overview>(`/api/registrations/overview${sp}`, { timeoutMs: 60_000 });
     setOvBusy(false);
     if (!res.ok) return setErr(res.error);
     setOverview(res.data);
@@ -567,6 +568,12 @@ function RegisterModal({
                     <div className="mt-4">
                       <StudentPicker
                         levels={comp.levels}
+                        // ไม่ให้ข้ามห้อง → ล็อกห้องตามนักเรียนที่กำลังสมัครให้
+                        restrictRoom={
+                          comp.allowCrossClass
+                            ? null
+                            : { classLevel: student.classLevel, classRoom: student.classRoom }
+                        }
                         excludeCodes={members.map((m) => m.studentCode)}
                         remaining={(comp.teamSizeMax ?? 99) - members.length}
                         onPick={(s) =>

@@ -2,7 +2,7 @@ import { requireStaff } from "@/lib/auth/guards";
 import { getIssuesByIds, loadTemplatesForPrint, type CertRenderData } from "@/lib/certificates";
 import { CertificateCanvas } from "@/components/certificate/CertificateCanvas";
 import { formatThaiDate } from "@/lib/domain";
-import type { Medal } from "@/lib/domain";
+import type { CertAward } from "@/lib/domain";
 import { headers } from "next/headers";
 import QRCode from "qrcode";
 import { PrintTrigger } from "./PrintTrigger";
@@ -64,7 +64,7 @@ export default async function CertificatePrintPage({
           teamName: iss.teamNameSnapshot,
           competitionName: iss.competitionNameSnapshot,
           eventName: iss.eventNameSnapshot,
-          medal: iss.medal as Medal,
+          medal: iss.medal as CertAward,
           rank: iss.rank,
           serialNo: iss.serialNo,
           verifyToken: iss.verifyToken,

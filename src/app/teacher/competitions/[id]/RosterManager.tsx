@@ -15,6 +15,7 @@ export function RosterManager({
   roster,
   canOverride,
   allowedLevels,
+  allowCrossClass,
 }: {
   competitionId: number;
   type: "individual" | "team";
@@ -23,6 +24,8 @@ export function RosterManager({
   roster: RosterEntry[];
   canOverride: boolean;
   allowedLevels: string[];
+  /** ทีมข้ามห้องได้หรือไม่ — false = สมาชิกคนถัดไปถูกล็อกให้อยู่ห้องเดียวกับคนแรก */
+  allowCrossClass: boolean;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -65,6 +68,11 @@ export function RosterManager({
 
   const maxMembers = type === "team" ? teamSizeMax ?? 99 : 1;
   const minMembers = type === "team" ? teamSizeMin ?? 1 : 1;
+  // ทีมห้ามข้ามห้อง: คนแรกเลือกได้อิสระ จากนั้นล็อกห้องตามคนแรก
+  const roomLock =
+    type === "team" && !allowCrossClass && members[0]
+      ? { classLevel: members[0].classLevel, classRoom: members[0].classRoom }
+      : null;
 
   return (
     <div className="card">
@@ -86,6 +94,11 @@ export function RosterManager({
             </div>
           )}
           <label className="form-label">สมาชิก ({members.length}/{maxMembers})</label>
+          {type === "team" && !allowCrossClass && !members.length && (
+            <div className="form-hint" style={{ marginBottom: 8 }}>
+              รายการนี้ไม่อนุญาตให้ทีมข้ามห้อง — เลือกสมาชิกคนแรกก่อน แล้วระบบจะให้เลือกได้เฉพาะเพื่อนห้องเดียวกัน
+            </div>
+          )}
           <div className="stack" style={{ gap: 6 }}>
             {members.map((m) => (
               <div key={m.studentCode} className="row between" style={{ background: "#fff", padding: "6px 12px", borderRadius: 6 }}>
@@ -97,6 +110,7 @@ export function RosterManager({
           {members.length < maxMembers && (
             <div className="mt-4">
               <StudentPicker excludeCodes={members.map((m) => m.studentCode)} levels={allowedLevels}
+                restrictRoom={roomLock}
                 remaining={maxMembers - members.length}
                 onPick={(s) => setMembers((prev) => (prev.length >= maxMembers || prev.some((x) => x.studentCode === s.studentCode) ? prev : [...prev, s]))} />
             </div>

@@ -7,9 +7,10 @@ import { env } from "@/lib/env";
 
 const V1 = "/api/public/v1";
 
-// เพดานรอคำตอบต่อ request — ถ้าเครื่อง SchoolOS ช้า/ค้าง ให้ตัดที่ 10 วิแทนที่จะแขวนไม่มีกำหนด
-// (loop แบ่งหน้าอย่าง sosAllTeachers ยิงต่อเนื่องหลายสิบครั้ง ถ้าไม่มี timeout จะค้างคูณจำนวนรอบ)
-const SOS_TIMEOUT_MS = 10_000;
+// เพดานรอคำตอบต่อ request — ถ้าเครื่อง SchoolOS ช้า/ค้าง ให้ตัดแทนที่จะแขวนไม่มีกำหนด
+// (loop แบ่งหน้าอย่าง sosAllTeachers ยิงต่อเนื่องหลายสิบครั้ง ถ้าไม่มี timeout จะค้างคูณจำนวนรอบ
+//  — ฝั่ง loop มี "งบเวลารวม" คุมอีกชั้น ดู deadline() ใน student-api.ts)
+const SOS_TIMEOUT_MS = 8_000;
 
 async function sos(path: string, init?: RequestInit) {
   return fetch(`${env.SCHOOLOS_API_BASE}${V1}${path}`, {
@@ -147,8 +148,11 @@ export async function sosListTeachers(params: {
 export async function sosAllTeachers(status = "active"): Promise<SosTeacher[]> {
   const out: SosTeacher[] = [];
   const pageSize = 200;
+  // งบเวลารวมของทั้ง loop — ทุกหน้าช้าพร้อมกันจะได้ไม่กลายเป็นค้างยาวคูณจำนวนหน้า
+  const until = Date.now() + 30_000;
   let page = 1;
   for (;;) {
+    if (Date.now() > until) throw new Error("SchoolOS teachers: เกินงบเวลารวม");
     const { data, total } = await sosListTeachers({ status, page, pageSize });
     out.push(...data);
     if (data.length === 0 || page * pageSize >= total || page >= 20) break;

@@ -24,7 +24,9 @@ export function TeacherCertificates({ rows }: { rows: Row[] }) {
     setMsg(null);
     const res = await api.post<{ issueIds: number[]; count: number; newCount: number }>(
       "/api/certificates/issue",
-      { competitionId: r.id }
+      { competitionId: r.id },
+      // ออกเกียรติบัตรทั้งรายการทีเดียว (จองเลขทะเบียน + สร้าง QR ทุกใบ) — เผื่อเวลามากกว่าปกติ
+      { timeoutMs: 60_000 }
     );
     setBusyId(null);
     if (!res.ok) return setMsg({ type: "error", text: res.error });

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
 import { useConfirm } from "@/components/ConfirmDialog";
@@ -44,6 +44,43 @@ export function CompetitionsTable({
     defaultEventId != null && comps.some((c) => c.eventId === defaultEventId) ? defaultEventId : "all"
   );
 
+  // ===== จำตัวกรองไว้ใน sessionStorage =====
+  // เข้าไปหน้าแก้ไขแล้วกลับออกมา (router.push/back) component ถูก mount ใหม่ state จึงหายหมด
+  // — เก็บไว้ต่อ tab แยกตาม basePath (ครู/แอดมินมีมุมมองคนละชุด)
+  const storageKey = `arena.compFilters.${basePath}`;
+  // กันเขียนทับค่าที่เก็บไว้ด้วยค่า default ก่อนที่จะได้อ่านของเดิมขึ้นมา
+  const [restored, setRestored] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(storageKey);
+      if (raw) {
+        const saved = JSON.parse(raw) as { event?: number | "all"; group?: number | "all" };
+        // ใช้ค่าเดิมเฉพาะเมื่อยังมีรายการที่เข้าเงื่อนไขนั้นอยู่จริง (รายการอาจถูกลบ/ย้ายงานไปแล้ว)
+        const ev = saved.event;
+        const evOk = ev === "all" || (typeof ev === "number" && comps.some((c) => (c.eventId ?? -1) === ev));
+        if (evOk && ev !== undefined) setEventFilter(ev);
+        const gr = saved.group;
+        const inEv = evOk && ev !== "all" && ev !== undefined ? comps.filter((c) => (c.eventId ?? -1) === ev) : comps;
+        if (gr !== undefined && (gr === "all" || inEv.some((c) => (c.subjectGroupId ?? -1) === gr))) setGroupFilter(gr);
+      }
+    } catch {
+      // sessionStorage ใช้ไม่ได้ (โหมดส่วนตัว/ปิดคุกกี้) — ใช้ค่า default ไปตามปกติ
+    }
+    setRestored(true);
+    // อ่านครั้งเดียวตอน mount เท่านั้น
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!restored) return;
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify({ event: eventFilter, group: groupFilter }));
+    } catch {
+      // เขียนไม่ได้ก็ไม่เป็นไร แค่ไม่จำตัวกรอง
+    }
+  }, [eventFilter, groupFilter, restored, storageKey]);
+
   const canEdit = (c: CompListItem) => role === "admin" || c.createdBy === myCode;
 
   // รายการหลังกรองตามงาน — ใช้เป็นฐานของปุ่มกรองหมวดด้วย
@@ -65,8 +102,9 @@ export function CompetitionsTable({
     );
   }, [inEvent]);
 
+  // เทียบด้วย (subjectGroupId ?? -1) ให้ตรงกับ id ที่ปุ่มกรองใช้ — ไม่งั้นปุ่ม "ทั่วไป" (ไม่ระบุหมวด = -1) กรองแล้วว่างเปล่า
   const filtered = useMemo(
-    () => (groupFilter === "all" ? inEvent : inEvent.filter((c) => c.subjectGroupId === groupFilter)),
+    () => (groupFilter === "all" ? inEvent : inEvent.filter((c) => (c.subjectGroupId ?? -1) === groupFilter)),
     [inEvent, groupFilter]
   );
 
@@ -136,7 +174,7 @@ export function CompetitionsTable({
             ทั้งหมด ({inEvent.length})
           </button>
           {groups.map((g) => {
-            const count = inEvent.filter((c) => c.subjectGroupId === g.id).length;
+            const count = inEvent.filter((c) => (c.subjectGroupId ?? -1) === g.id).length;
             return (
               <button
                 key={g.id}
@@ -172,13 +210,19 @@ export function CompetitionsTable({
                   <div className="text-xs muted">{c.levels.join(", ")}{c.eventDate ? ` · ${formatThaiDate(c.eventDate)}` : ""}</div>
                 </td>
                 <td className="text-sm">{c.groupName}</td>
-                <td><span className="badge">{c.type === "team" ? "ทีม" : "เดี่ยว"}</span></td>
+                <td>
+                  <span className="badge">{c.type === "team" ? "ทีม" : "เดี่ยว"}</span>
+                  {c.noContest && <span className="badge badge-purple" style={{ marginLeft: 4 }}>ไม่มีการแข่งขัน</span>}
+                </td>
                 <td className="num">{isUnlimited(c.capacity) ? "ไม่จำกัด" : c.capacity} / {c.registered}</td>
                 <td>
                   <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
-                    {c.isPublished
-                      ? <span className="badge badge-success">ประกาศผลแล้ว</span>
-                      : <span className="badge badge-warning">ยังไม่ประกาศ</span>}
+                    {/* ไม่มีการแข่งขัน = ไม่มีสถานะประกาศผล (ออกเกียรติบัตรได้เลย) */}
+                    {c.noContest
+                      ? <span className="badge">ออกเกียรติบัตรได้</span>
+                      : c.isPublished
+                        ? <span className="badge badge-success">ประกาศผลแล้ว</span>
+                        : <span className="badge badge-warning">ยังไม่ประกาศ</span>}
                     {!c.visibleToStudents && <span className="badge">ซ่อนจากนักเรียน</span>}
                   </div>
                 </td>
@@ -186,7 +230,8 @@ export function CompetitionsTable({
                   <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
                     <Link href={`${basePath}/${c.id}`} className="btn btn-ghost btn-sm">จัดการ</Link>
                     {canEdit(c) && <Link href={`${basePath}/${c.id}/edit`} className="btn btn-secondary btn-sm">แก้ไข</Link>}
-                    {canPublish && (
+                    {/* ไม่มีการแข่งขัน = ไม่มีผลให้ประกาศ */}
+                    {canPublish && !c.noContest && (
                       <button className="btn btn-accent btn-sm" disabled={busy === c.id} onClick={() => togglePublish(c)}>
                         {c.isPublished ? "ยกเลิกประกาศ" : "ประกาศผล"}
                       </button>

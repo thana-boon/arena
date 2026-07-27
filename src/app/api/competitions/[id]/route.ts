@@ -78,6 +78,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           eventDate: body.eventDate || null,
           startTime: slot.startTime,
           endTime: slot.endTime,
+          // ไม่มีการแข่งขัน — แก้ได้เสมอ (มีผลกับการออกเกียรติบัตร/การแสดงผล ไม่แตะข้อมูลที่ลงไว้แล้ว)
+          noContest: body.noContest,
+          // ทีมข้ามห้อง — แก้ได้เสมอ (ไม่กระทบทีมที่ลงไปแล้ว มีผลกับการลงทะเบียนครั้งต่อไปเท่านั้น)
+          // ประเภทถูกล็อกเมื่อมีคนลงแล้ว จึงยึด comp.type เดิมในกรณีนั้น
+          allowCrossClass: (locked ? comp.type : body.type) === "team" ? body.allowCrossClass : false,
           // เปลี่ยนโครงสร้างได้เฉพาะยังไม่มีคนลง
           ...(locked
             ? {}

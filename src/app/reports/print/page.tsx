@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function ReportPrintPage({
   searchParams,
 }: {
-  searchParams: Promise<{ event?: string; doc?: string }>;
+  searchParams: Promise<{ event?: string; doc?: string; groups?: string; levels?: string }>;
 }) {
   await requireAdmin();
   const sp = await searchParams;
@@ -21,9 +21,26 @@ export default async function ReportPrintPage({
     ? (sp.doc as DocType)
     : "roster";
 
+  // ตัวกรองจากหน้าออกรายงาน (ไม่ส่งมา = เอาทุกหมวด/ทุกชั้น) — ต้องกรองแบบเดียวกับที่หน้านั้นแสดง
+  // -1 = "ไม่ระบุหมวด" จึงรับค่าติดลบด้วย ไม่ใช่แค่ id บวก
+  const groupIds = new Set(
+    (sp.groups ?? "")
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean)
+      .map(Number)
+      .filter(Number.isInteger)
+  );
+  const levels = new Set((sp.levels ?? "").split(",").map((v) => v.trim()).filter(Boolean));
+
   const [event] = eventId ? await db.select().from(events).where(eq(events.id, eventId)) : [];
   const { yearBe, bundles } = await getReportBundles();
-  const selected = bundles.filter((b) => b.eventId === eventId);
+  const selected = bundles.filter(
+    (b) =>
+      b.eventId === eventId &&
+      (groupIds.size === 0 || groupIds.has(b.subjectGroupId ?? -1)) &&
+      (levels.size === 0 || b.levels.some((lv) => levels.has(lv)))
+  );
 
   if (!event || !selected.length) {
     return <div style={{ padding: 40 }}>ไม่พบรายการที่ต้องการพิมพ์</div>;

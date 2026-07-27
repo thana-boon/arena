@@ -26,6 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!comp) return fail("ไม่พบรายการแข่งขัน", 404);
     const group = comp.subjectGroupId == null ? undefined : (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0];
     if (!canScore(s, comp.createdBy, group?.catalogNo)) return fail("บันทึกคะแนนได้เฉพาะรายการในหมวดของท่าน", 403);
+    if (comp.noContest) return fail("รายการนี้ตั้งไว้ว่าไม่มีการแข่งขัน จึงบันทึกคะแนนไม่ได้");
 
     const body = schema.parse(await req.json());
     const crits = await db.select().from(criteria).where(eq(criteria.competitionId, compId));

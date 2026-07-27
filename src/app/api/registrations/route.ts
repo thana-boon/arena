@@ -13,24 +13,26 @@ const schema = z.object({
   override: z.boolean().optional(),
 });
 
-/** resolve snapshot จาก Student API (ยกเว้นตัวนักเรียนเองใช้ session ได้) */
+/**
+ * resolve snapshot จาก Student API (ยกเว้นตัวนักเรียนเองใช้ session ได้)
+ * ยิงขนานทุกคน — ทีม 6 คนแบบยิงทีละคนคือรอ SchoolOS 6 รอบต่อกัน (ช้าสุดถึงเกือบนาที)
+ */
 async function resolveMembers(codes: string[], selfSnapshot?: MemberInput): Promise<MemberInput[]> {
-  const out: MemberInput[] = [];
-  for (const code of codes) {
-    if (selfSnapshot && code === selfSnapshot.studentCode) {
-      out.push(selfSnapshot);
-      continue;
-    }
-    const s = await fetchStudent(code);
-    if (!s) throw new RegistrationError(`ไม่พบข้อมูลนักเรียนรหัส ${code}`, 404);
-    out.push({
-      studentCode: s.student_code,
-      name: studentFullName(s),
-      classLevel: s.class_level,
-      classRoom: s.class_room,
-    });
-  }
-  return out;
+  return Promise.all(
+    codes.map(async (code) => {
+      if (selfSnapshot && code === selfSnapshot.studentCode) return selfSnapshot;
+      const s = await fetchStudent(code).catch(() => {
+        throw new RegistrationError(`ดึงข้อมูลนักเรียนรหัส ${code} ไม่สำเร็จ กรุณาลองใหม่`, 502);
+      });
+      if (!s) throw new RegistrationError(`ไม่พบข้อมูลนักเรียนรหัส ${code}`, 404);
+      return {
+        studentCode: s.student_code,
+        name: studentFullName(s),
+        classLevel: s.class_level,
+        classRoom: s.class_room,
+      };
+    })
+  );
 }
 
 export async function POST(req: Request) {

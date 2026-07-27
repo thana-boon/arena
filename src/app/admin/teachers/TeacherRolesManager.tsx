@@ -32,7 +32,8 @@ export function TeacherRolesManager({
 
   async function loadTeachers() {
     setLoadingList(true); setMsg(null);
-    const res = await api.get<{ teachers: ApiTeacher[] }>("/api/admin/teachers");
+    // ดึงครูทุกหน้าจาก SchoolOS — เผื่อเวลามากกว่าปกติ
+    const res = await api.get<{ teachers: ApiTeacher[] }>("/api/admin/teachers", { timeoutMs: 40_000 });
     setLoadingList(false);
     if (!res.ok) return setMsg({ type: "error", text: res.error });
     setApiTeachers(res.data.teachers);

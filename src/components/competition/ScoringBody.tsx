@@ -15,6 +15,13 @@ export async function ScoringBody({ id, session }: { id: number; session: Sessio
   const group = comp.subjectGroupId == null ? undefined : (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0];
   if (!canScore(session, comp.createdBy, group?.catalogNo))
     return <div className="alert alert-error">บันทึกคะแนนได้เฉพาะรายการในหมวดของท่าน</div>;
+  // เข้าตรงด้วย URL ได้แม้ปุ่ม "บันทึกผล" ถูกซ่อนไว้ — กันหน้าเปล่า/สับสน
+  if (comp.noContest)
+    return (
+      <div className="alert alert-warning">
+        รายการนี้ตั้งไว้ว่า “ไม่มีการแข่งขัน” จึงไม่มีคะแนนให้บันทึก — ใช้สำหรับลงทะเบียนรายชื่อและออกเกียรติบัตรเท่านั้น
+      </div>
+    );
 
   const crits = await db.select().from(criteria).where(eq(criteria.competitionId, id));
   crits.sort((a, b) => a.sortOrder - b.sortOrder);

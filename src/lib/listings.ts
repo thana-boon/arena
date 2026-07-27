@@ -9,6 +9,7 @@ export type CompListItem = {
   id: number;
   name: string;
   type: "individual" | "team";
+  noContest: boolean; // true = ไม่มีการแข่งขัน (ไม่มีคะแนน/อันดับ/รางวัล)
   subjectGroupId: number | null;
   groupCatalogNo: number | null;
   groupName: string;
@@ -47,6 +48,7 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
       id: c.id,
       name: c.name,
       type: c.type as "individual" | "team",
+      noContest: c.noContest,
       subjectGroupId: c.subjectGroupId,
       groupCatalogNo: groupCatalogNo(c.subjectGroupId),
       groupName: groupName(c.subjectGroupId),

@@ -133,6 +133,7 @@ export async function GET(req: Request) {
         levels: parseJsonArray(c.allowedClassLevels),
         teamSizeMin: c.teamSizeMin,
         teamSizeMax: c.teamSizeMax,
+        allowCrossClass: c.allowCrossClass,
         eventDate: c.eventDate,
         startTime: c.startTime,
         endTime: c.endTime,

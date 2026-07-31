@@ -1325,17 +1325,37 @@ p {
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
-.side-user .avatar {
+/* รูปโปรไฟล์ผู้ใช้ — เป็นได้ทั้ง <img> (มีรูป) และ <span> ตัวอักษรย่อ (ไม่มีรูป) */
+.avatar {
   width: 38px;
   height: 38px;
   flex-shrink: 0;
   border-radius: var(--radius-full);
-  background: var(--sidebar-primary);
-  color: #241b04;
+  background: var(--skdw-purple-pale);
+  color: var(--skdw-purple);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
+  overflow: hidden;
+}
+.avatar-img {
+  object-fit: cover;
+  background: var(--skdw-purple-pale);
+}
+.avatar-sm {
+  width: 30px;
+  height: 30px;
+  font-size: var(--text-sm);
+}
+.side-user .avatar {
+  background: var(--sidebar-primary);
+  color: #241b04;
+}
+.side-user .avatar-img {
+  /* มีรูปแล้วไม่ต้องมีวงกลมทอง — เหลือแค่ขอบบางให้ตัดกับพื้นหลังเข้ม */
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 .side-user .who {
   min-width: 0;

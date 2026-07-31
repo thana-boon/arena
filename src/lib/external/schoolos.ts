@@ -43,6 +43,8 @@ export type SosStudent = {
   classroom?: string | number;
   classNumber?: number;
   citizenId?: string; // เฉพาะเมื่อ key มี scope students:pii
+  hasPhoto?: boolean;
+  photoUrl?: string | null; // path บน SchoolOS เช่น /api/public/v1/students/1920/photo (ต้องมี API key)
 };
 
 export type SosTeacher = {
@@ -59,6 +61,8 @@ export type SosTeacher = {
   employmentStatus?: string;
   // ห้องที่เป็นครูประจำชั้น เช่น [{gradeLevel: "ม.1", classroom: "2"}] — [] ถ้าไม่ได้ประจำชั้น
   homerooms?: { gradeLevel: string; classroom: string | number }[];
+  hasPhoto?: boolean;
+  photoUrl?: string | null; // path บน SchoolOS เช่น /api/public/v1/teachers/2/photo (ต้องมี API key)
 };
 
 export type SosVerifyUser = {
@@ -188,6 +192,23 @@ export async function sosVerify(
   const data = await res.json();
   if (!data?.valid || !data.user) return null;
   return data.user as SosVerifyUser;
+}
+
+// ===== รูปโปรไฟล์ =====
+/**
+ * ดึงไฟล์รูปจาก SchoolOS (photoUrl ที่มากับ student/teacher)
+ *
+ * endpoint นี้ต้องแนบ X-API-Key เหมือน endpoint อื่น → เบราว์เซอร์เรียกตรงไม่ได้
+ * (key ห้ามหลุด) ต้องผ่าน proxy ฝั่งเรา ดู /api/me/photo
+ */
+export async function sosPhoto(photoPath: string): Promise<Response> {
+  // รับเฉพาะ path ใต้ /api/public/v1/ ที่ API ส่งมาเอง — กันไม่ให้กลายเป็น proxy ยิงที่ไหนก็ได้
+  if (!photoPath.startsWith(`${V1}/`)) throw new Error("bad photo path");
+  return fetch(`${env.SCHOOLOS_API_BASE}${photoPath}`, {
+    headers: { "X-API-Key": env.SCHOOLOS_API_KEY },
+    cache: "no-store",
+    signal: AbortSignal.timeout(SOS_TIMEOUT_MS),
+  });
 }
 
 /** ปีการศึกษาปัจจุบัน — SchoolOS ไม่มี endpoint list ปี จึงอ่านจาก field academicYear ของ /students */

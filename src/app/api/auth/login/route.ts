@@ -52,6 +52,8 @@ export async function POST(req: Request) {
         role: "student",
         code: student.student_code,
         name: studentFullName(student),
+        firstName: student.first_name,
+        photo: student.photo_url ?? undefined,
         classLevel: student.class_level,
         classRoom: student.class_room,
       });
@@ -88,6 +90,8 @@ export async function POST(req: Request) {
         role,
         code: profile.teacher_code,
         name: teacherFullName(profile),
+        firstName: profile.first_name,
+        photo: profile.photo_url ?? undefined,
         subjectGroupId: Number.isFinite(sg) ? sg : undefined,
       });
       return ok({ role, redirect: role === "admin" ? "/admin" : "/teacher" });

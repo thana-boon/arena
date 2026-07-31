@@ -19,6 +19,7 @@ export type TeacherProfile = {
   email?: string;
   subject_group?: string; // เลข groupNo (เก็บเป็น string) — map มาจากชื่อหมวดของ SchoolOS
   role?: string; // role ดิบจาก SchoolOS: "teacher" | "teacher-admin" — ใช้ตัดสินสิทธิ์ admin
+  photo_url?: string | null; // path รูปบน SchoolOS (ต้อง proxy ผ่านฝั่งเรา)
   [k: string]: unknown;
 };
 
@@ -37,6 +38,7 @@ function toProfile(t: SosTeacher, subjectGroupNo?: number | null): TeacherProfil
     email: t.email ?? undefined,
     subject_group: subjectGroupNo != null ? String(subjectGroupNo) : undefined,
     role: t.role,
+    photo_url: t.photoUrl ?? null,
   };
 }
 

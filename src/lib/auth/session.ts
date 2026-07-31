@@ -9,6 +9,8 @@ export type SessionPayload = {
   role: Role;
   code: string; // student_code / teacher_code / admin username
   name: string;
+  firstName?: string; // ชื่อจริงล้วน (ไม่มีคำนำหน้า) — ใช้ทำตัวอักษรย่อบน avatar
+  photo?: string; // path รูปบน SchoolOS — ไม่มีรูป = undefined (ดู /api/me/photo)
   classLevel?: string; // สำหรับนักเรียน
   classRoom?: string;
   subjectGroupId?: number; // หมวด (กลุ่มสาระ) ของครู — ใช้กรองรายการที่เห็น

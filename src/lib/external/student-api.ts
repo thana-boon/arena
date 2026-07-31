@@ -15,6 +15,7 @@ export type StudentProfile = {
   last_name: string;
   class_level: string; // เช่น "ม.1"
   class_room: string;
+  photo_url?: string | null; // path รูปบน SchoolOS (ต้อง proxy ผ่านฝั่งเรา)
   [k: string]: unknown;
 };
 
@@ -25,6 +26,7 @@ function toProfile(s: SosStudent): StudentProfile {
     last_name: s.lastName,
     class_level: s.gradeLevel ?? "",
     class_room: s.classroom != null ? String(s.classroom) : "",
+    photo_url: s.photoUrl ?? null,
   };
 }
 

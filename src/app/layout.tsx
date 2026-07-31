@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "User - SchoolOS | โรงเรียนสุคนธรวิทย์",
+  title: "Arena - SchoolOS | โรงเรียนสุคนธรวิทย์",
   description: "ระบบรับสมัครและบันทึกผลการแข่งขันทางวิชาการ โรงเรียนสุคนธีรวิทย์",
 };
 

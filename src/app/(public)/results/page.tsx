@@ -2,7 +2,7 @@ import { Icon } from "@/components/Icon";
 import { db } from "@/db";
 import { competitions, subjectGroups } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getActiveYearWithSettings } from "@/lib/queries";
+import { getDefaultEvent } from "@/lib/queries";
 import { computeCompetitionResults, competitionAllowedLevels } from "@/lib/results";
 import { MEDAL_LABEL } from "@/lib/domain";
 import { ResultsBrowser } from "./ResultsBrowser";
@@ -10,7 +10,7 @@ import { ResultsBrowser } from "./ResultsBrowser";
 export const dynamic = "force-dynamic";
 
 export default async function ResultsPage() {
-  const { year, setting } = await getActiveYearWithSettings();
+  const { year, setting, event } = await getDefaultEvent();
   if (!year) {
     return (
       <div className="empty-state card">
@@ -69,7 +69,9 @@ export default async function ResultsPage() {
     <div className="stack">
       <div className="page-header">
         <h1>ผลการแข่งขัน</h1>
-        <div className="subtitle">ปีการศึกษา {year.yearBe}</div>
+        <div className="subtitle">
+          {event ? `${event.name} · ` : ""}ปีการศึกษา {year.yearBe}
+        </div>
       </div>
       <ResultsBrowser groups={groups.map((g) => ({ id: g.id, name: g.name }))} competitions={data} />
     </div>

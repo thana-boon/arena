@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
-import { getActiveYear } from "@/lib/queries";
+import { getDefaultEvent } from "@/lib/queries";
 import { ROLE_HOME } from "@/lib/domain";
 import { BrandLogo } from "@/components/BrandLogo";
 import { Wordmark } from "@/components/Wordmark";
 
 export async function PublicHeader() {
-  const [session, year] = await Promise.all([getSession(), getActiveYear()]);
+  const [session, { year, event }] = await Promise.all([getSession(), getDefaultEvent()]);
+  // ชื่องานตาม "งานเริ่มต้น" ในหน้าตั้งค่า — ยังไม่ได้เลือกงานค่อยใช้ข้อความกลาง ๆ
+  const title = event?.name ?? "งานแข่งขันทางวิชาการ โรงเรียนสุคนธีรวิทย์";
   return (
     <header className="navbar">
       <Link href="/" className="brand">
@@ -14,7 +16,7 @@ export async function PublicHeader() {
         <Wordmark />
       </Link>
       <span className="brand-sub">
-        งานแข่งขันทางวิชาการ โรงเรียนสุคนธีรวิทย์
+        {title}
         {year ? ` · ปีการศึกษา ${year.yearBe}` : ""}
       </span>
       <div className="spacer" />

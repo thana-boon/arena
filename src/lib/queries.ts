@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/db";
-import { academicYears, settings, teacherRoles, timeSlots, venues } from "@/db/schema";
-import { asc, eq } from "drizzle-orm";
+import { academicYears, events, settings, teacherRoles, timeSlots, venues } from "@/db/schema";
+import { and, asc, eq } from "drizzle-orm";
 
 export async function getActiveYear() {
   const rows = await db.select().from(academicYears).where(eq(academicYears.isActive, true)).limit(1);
@@ -18,6 +18,21 @@ export async function getActiveYearWithSettings() {
   if (!year) return { year: null, setting: null };
   const setting = await getYearSettings(year.id);
   return { year, setting };
+}
+
+/**
+ * "งานเริ่มต้น" ที่ admin เลือกไว้ในหน้าตั้งค่า — ใช้เป็นงานที่หน้าสาธารณะแสดง
+ * คืน null ถ้ายังไม่ได้เลือก (หน้าสาธารณะจะถือว่าแสดงทุกงานของปีนั้น)
+ */
+export async function getDefaultEvent() {
+  const { year, setting } = await getActiveYearWithSettings();
+  if (!year || setting?.defaultEventId == null) return { year, setting, event: null };
+  const rows = await db
+    .select()
+    .from(events)
+    .where(and(eq(events.id, setting.defaultEventId), eq(events.yearId, year.id)))
+    .limit(1);
+  return { year, setting, event: rows[0] ?? null };
 }
 
 /** ช่วงเวลาแข่งขันของปี เรียงตาม sortOrder → เวลาเริ่ม */

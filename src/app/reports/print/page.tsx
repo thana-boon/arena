@@ -3,7 +3,7 @@ import { getReportBundles } from "@/lib/reportBundle";
 import { db } from "@/db";
 import { events } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { DOC_LABEL, SUMMARY_DOCS, type DocType, SummarySheet, VenueUsageSheet, ReportSheet } from "@/app/admin/reports/ReportSheets";
+import { CatalogSheet, DOC_LABEL, SUMMARY_DOCS, type DocType, SummarySheet, VenueUsageSheet, ReportSheet } from "@/app/admin/reports/ReportSheets";
 import { PrintControls } from "./PrintControls";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function ReportPrintPage({
   searchParams,
 }: {
-  searchParams: Promise<{ event?: string; doc?: string; groups?: string; levels?: string }>;
+  searchParams: Promise<{ event?: string; doc?: string; groups?: string; levels?: string; split?: string }>;
 }) {
   await requireAdmin();
   const sp = await searchParams;
@@ -52,6 +52,14 @@ export default async function ReportPrintPage({
       <div className="report-paper">
         {docType === "venues" ? (
           <VenueUsageSheet bundles={selected} eventName={event.name} yearBe={yearBe} />
+        ) : docType === "catalog" ? (
+          <CatalogSheet
+            bundles={selected}
+            eventName={event.name}
+            yearBe={yearBe}
+            splitByGroup={sp.split === "group"}
+            levelFilter={[...levels]}
+          />
         ) : SUMMARY_DOCS.includes(docType) ? (
           <SummarySheet
             bundles={selected}

@@ -1780,6 +1780,10 @@ p {
   .report-web .table .col-venue {
     width: 120px !important;
   }
+  /* ใบรายการให้นักเรียน: รายละเอียดยาวหลายบรรทัดได้ แต่อย่าให้แถวถูกตัดคาหน้ากระดาษ */
+  .report-catalog .table tr {
+    break-inside: avoid;
+  }
 }
 
 /* ---------- Combined report (ออกเอกสารหลายรายการรวมกัน) ---------- */
@@ -1844,6 +1848,66 @@ p {
   padding-top: var(--space-8);
   border-top: 1px dashed var(--skdw-border);
 }
+/* ---------- ตัวเลือกประเภทเอกสาร (หน้าออกรายงาน) ---------- */
+/* การ์ดเรียงเป็นกริด แยกเป็นกลุ่ม "รายรายการ" / "สรุปทั้งงาน" — ชื่อยาวไม่ถูกบีบจนตัดคำ */
+.doc-picker-section + .doc-picker-section {
+  margin-top: var(--space-4);
+}
+.doc-picker-title {
+  font-size: var(--text-xs);
+  color: var(--skdw-muted);
+  margin-bottom: 6px;
+}
+.doc-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-2);
+}
+.doc-opt {
+  display: block;
+  text-align: left;
+  padding: 10px var(--space-3);
+  border: 0.5px solid var(--skdw-border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  cursor: pointer;
+  font-family: var(--font-th-sans);
+  transition: border-color 0.15s, background 0.15s;
+}
+.doc-opt:hover {
+  border-color: var(--skdw-purple);
+  background: var(--skdw-bg);
+}
+.doc-opt:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+.doc-opt.active {
+  border-color: var(--skdw-purple);
+  background: var(--skdw-purple-pale);
+}
+.doc-opt-name {
+  display: block;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--skdw-dark);
+}
+.doc-opt.active .doc-opt-name {
+  color: var(--skdw-purple);
+}
+.doc-opt-hint {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--skdw-muted);
+  line-height: 1.35;
+  margin-top: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .doc-opt {
+    transition: none;
+  }
+}
+
 .report-select-group {
   border: 0.5px solid var(--skdw-border);
   border-radius: var(--radius-md);

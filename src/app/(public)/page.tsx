@@ -3,14 +3,14 @@ import { Icon } from "@/components/Icon";
 import { db } from "@/db";
 import { competitions, subjectGroups } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getActiveYearWithSettings } from "@/lib/queries";
+import { getDefaultEvent } from "@/lib/queries";
 import { competitionAllowedLevels } from "@/lib/results";
 import { formatThaiDate } from "@/lib/domain";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const { year, setting } = await getActiveYearWithSettings();
+  const { year, setting, event } = await getDefaultEvent();
 
   let comps: (typeof competitions.$inferSelect)[] = [];
   let groups: (typeof subjectGroups.$inferSelect)[] = [];
@@ -30,6 +30,7 @@ export default async function HomePage() {
     <div className="stack">
       <div className="page-header">
         <h2>รายการแข่งขันที่เปิดประกาศ</h2>
+        {event && <div className="subtitle">{event.name}</div>}
       </div>
 
       {!comps.length ? (

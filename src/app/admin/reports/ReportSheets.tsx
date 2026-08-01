@@ -1,7 +1,7 @@
 import { formatThaiDate, formatLevels, hhmm, isUnlimited } from "@/lib/domain";
 import type { ReportBundle } from "@/lib/reportBundle";
 
-export type DocType = "roster" | "scoresheet" | "announce" | "summary" | "regcount" | "venues";
+export type DocType = "roster" | "scoresheet" | "announce" | "summary" | "regcount" | "venues" | "catalog";
 export const DOC_LABEL: Record<DocType, string> = {
   roster: "ใบรายชื่อ",
   scoresheet: "ใบกรอกคะแนน",
@@ -9,9 +9,25 @@ export const DOC_LABEL: Record<DocType, string> = {
   summary: "สรุปรายการแข่งขัน",
   regcount: "สรุปยอดผู้สมัคร",
   venues: "สรุปการใช้ห้อง",
+  catalog: "รายละเอียดงานแข่งขัน",
 };
+/** คำอธิบายสั้น ๆ ใต้ชื่อเอกสารในหน้าออกรายงาน — กันเลือกผิดประเภท */
+export const DOC_HINT: Record<DocType, string> = {
+  roster: "รายชื่อผู้สมัครของแต่ละรายการ",
+  scoresheet: "ตารางเปล่าให้กรรมการกรอกคะแนน",
+  announce: "ผลการแข่งขัน อันดับ และเหรียญ",
+  summary: "ตารางรวมทุกรายการ ประเภท ห้อง จำนวนรับ",
+  regcount: "ยอดผู้สมัครรายรายการและรวมทั้งงาน",
+  venues: "รายการแข่งขันแยกตามห้อง/สถานที่",
+  catalog: "ชื่อรายการ ระดับชั้น รายละเอียด — เอาไว้แจกนักเรียน",
+};
+/** จัดกลุ่มปุ่มเลือกเอกสารในหน้าออกรายงาน ให้เห็นชัดว่าอันไหนพิมพ์ทีละรายการ อันไหนเป็นตารางรวม */
+export const DOC_SECTIONS: { title: string; docs: DocType[] }[] = [
+  { title: "เอกสารรายรายการ — แต่ละรายการขึ้นหน้าใหม่", docs: ["roster", "scoresheet", "announce"] },
+  { title: "เอกสารสรุปทั้งงาน — ตารางรวมฉบับเดียว", docs: ["summary", "regcount", "venues", "catalog"] },
+];
 /** เอกสารสรุป = ตารางรวมฉบับเดียวทั้งงาน (ไม่แยกหน้าใหม่ต่อรายการ) — แสดงตัวอย่างบนจอได้เลย */
-export const SUMMARY_DOCS: DocType[] = ["summary", "regcount", "venues"];
+export const SUMMARY_DOCS: DocType[] = ["summary", "regcount", "venues", "catalog"];
 
 /** ป้ายประเภท เช่น "เดี่ยว" / "ทีม 2–5 คน" — รายการที่ไม่มีการแข่งขันบอกไว้ให้ชัด */
 function typeLabel(b: ReportBundle): string {
@@ -257,6 +273,138 @@ function VenueGroupRows({ group }: { group: { venueName: string; items: ReportBu
               "-"
             )}
           </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
+/**
+ * ใบรายการให้นักเรียน: ชื่อรายการ + ระดับชั้น + รายละเอียด เท่านั้น (ไม่มีคะแนน/ห้อง/ยอดสมัคร)
+ * splitByGroup = ขึ้นหน้าใหม่ทีละหมวด เอาไว้แจกแยกกลุ่มสาระ
+ */
+export function CatalogSheet({
+  bundles,
+  eventName,
+  yearBe,
+  splitByGroup = false,
+  levelFilter = [],
+}: {
+  bundles: ReportBundle[];
+  eventName: string;
+  yearBe: number;
+  splitByGroup?: boolean;
+  levelFilter?: string[];
+}) {
+  const groups = groupBySubject(bundles);
+  const levelNote = levelFilter.length ? `เฉพาะ ${formatLevels(levelFilter)}` : "";
+
+  if (splitByGroup) {
+    return (
+      <>
+        {groups.map((g) => (
+          <CatalogPage
+            key={g.groupName}
+            groups={[g]}
+            eventName={eventName}
+            yearBe={yearBe}
+            levelNote={levelNote}
+            showGroupRows={false}
+            pageBreak
+          />
+        ))}
+      </>
+    );
+  }
+  return (
+    <CatalogPage
+      groups={groups}
+      eventName={eventName}
+      yearBe={yearBe}
+      levelNote={levelNote}
+      showGroupRows={groups.length > 1}
+    />
+  );
+}
+
+function CatalogPage({
+  groups,
+  eventName,
+  yearBe,
+  levelNote,
+  showGroupRows,
+  pageBreak = false,
+}: {
+  groups: { groupName: string; items: ReportBundle[] }[];
+  eventName: string;
+  yearBe: number;
+  levelNote: string;
+  showGroupRows: boolean;
+  pageBreak?: boolean;
+}) {
+  const count = groups.reduce((s, g) => s + g.items.length, 0);
+  // แบบแยกหมวด: ชื่อหมวดขึ้นไปอยู่หัวเอกสารแทนแถวคั่นในตาราง
+  const soleGroup = groups.length === 1 && !showGroupRows ? groups[0].groupName : "";
+
+  return (
+    <section className="report-section report-web report-catalog" style={pageBreak ? undefined : { breakBefore: "auto" }}>
+      {/* หัวเอกสารแบบกระชับ: ตัวอักษรขนาดเดียวกันทั้งหมด 2 บรรทัด ไม่กินพื้นที่กระดาษ */}
+      <div className="print-title report-catalog-head" style={{ marginBottom: 8, textAlign: "center" }}>
+        <div style={{ fontWeight: 700 }}>
+          {DOC_LABEL.catalog} · {eventName}
+          {soleGroup ? ` · ${soleGroup === "-" ? "ไม่ระบุหมวด" : soleGroup}` : ""}
+        </div>
+        <div>
+          โรงเรียนสุคนธีรวิทย์ · ปีการศึกษา {yearBe} · {count} รายการ
+          {levelNote ? ` · ${levelNote}` : ""}
+        </div>
+      </div>
+
+      <div className="table-wrap" style={{ boxShadow: "none" }}>
+        <table className="table">
+          <thead>
+            <tr>
+              <th className="col-fit" style={{ width: 45 }}>ลำดับ</th>
+              <th style={{ width: "30%" }}>รายการแข่งขัน</th>
+              <th className="col-fit" style={{ width: 110 }}>ระดับชั้น</th>
+              <th>รายละเอียด</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groups.map((g) => (
+              <CatalogGroupRows key={g.groupName} group={g} showGroupRow={showGroupRows} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function CatalogGroupRows({
+  group,
+  showGroupRow,
+}: {
+  group: { groupName: string; items: ReportBundle[] };
+  showGroupRow: boolean;
+}) {
+  const label = group.groupName === "-" ? "ไม่ระบุหมวด" : group.groupName;
+  return (
+    <>
+      {showGroupRow && (
+        <tr className="report-group-row">
+          <td colSpan={4}>
+            {label} ({group.items.length} รายการ)
+          </td>
+        </tr>
+      )}
+      {group.items.map((b, i) => (
+        <tr key={b.id}>
+          <td className="col-fit">{i + 1}</td>
+          <td>{b.meta.competitionName}</td>
+          <td className="col-fit">{formatLevels(b.levels) || "-"}</td>
+          {/* รายละเอียดเก็บเป็นข้อความหลายบรรทัด — คงย่อหน้าเดิมไว้ */}
+          <td style={{ whiteSpace: "pre-wrap" }}>{b.description?.trim() || "-"}</td>
         </tr>
       ))}
     </>

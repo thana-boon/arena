@@ -74,6 +74,12 @@ export default async function StudentDashboard() {
                       {formatThaiDate(e.eventDate)} {e.startTime?.slice(0, 5)}–{e.endTime?.slice(0, 5)}
                     </div>
                   )}
+                  {e.venues.length > 0 && (
+                    <div className="text-sm muted row" style={{ gap: 4, marginTop: 2 }}>
+                      <Icon name="pin" size={13} />
+                      <span>{e.venues.join(", ")}</span>
+                    </div>
+                  )}
                 </div>
                 <WithdrawButton entryId={e.entryId} disabled={!setting.registrationOpen} />
               </div>

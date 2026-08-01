@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/db";
 import { competitions, entries, entryMembers, subjectGroups } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
+import { getVenueLabelsByCompetition } from "@/lib/venues";
 
 export type StudentEntry = {
   entryId: number;
@@ -13,6 +14,8 @@ export type StudentEntry = {
   eventDate: string | null;
   startTime: string | null;
   endTime: string | null;
+  /** สถานที่แข่งขัน ("อาคาร · ห้อง") — ว่างถ้ายังไม่ระบุ */
+  venues: string[];
   members: { studentCode: string; name: string }[];
 };
 
@@ -38,6 +41,7 @@ export async function getStudentEntries(studentCode: string, yearId: number): Pr
   const groupName = (id: number | null) => (id == null ? "" : groups.find((g) => g.id === id)?.name ?? "-");
 
   const allMembers = await db.select().from(entryMembers).where(inArray(entryMembers.entryId, entRows.map((e) => e.id)));
+  const venueLabels = await getVenueLabelsByCompetition(compIds);
 
   return entRows
     .filter((e) => compById.get(e.competitionId)?.yearId === yearId)
@@ -53,6 +57,7 @@ export async function getStudentEntries(studentCode: string, yearId: number): Pr
         eventDate: c.eventDate,
         startTime: c.startTime,
         endTime: c.endTime,
+        venues: venueLabels.get(e.competitionId) ?? [],
         members: allMembers
           .filter((m) => m.entryId === e.id)
           .map((m) => ({ studentCode: m.studentCode, name: m.nameSnapshot })),

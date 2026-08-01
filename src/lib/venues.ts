@@ -54,6 +54,32 @@ export async function findVenueConflicts(opts: {
   }));
 }
 
+/**
+ * ชื่อสถานที่แบบอ่านง่าย ("อาคาร · ห้อง") ของหลายรายการพร้อมกัน
+ * คืน Map: competitionId → รายชื่อห้อง เรียงตามลำดับที่เลือกในฟอร์ม (รายการที่ไม่ระบุห้องจะไม่มีคีย์)
+ */
+export async function getVenueLabelsByCompetition(compIds: number[]): Promise<Map<number, string[]>> {
+  const out = new Map<number, string[]>();
+  if (!compIds.length) return out;
+  const rows = await db
+    .select({
+      competitionId: competitionVenues.competitionId,
+      sortOrder: competitionVenues.sortOrder,
+      name: venues.name,
+      building: venues.building,
+    })
+    .from(competitionVenues)
+    .innerJoin(venues, eq(venues.id, competitionVenues.venueId))
+    .where(inArray(competitionVenues.competitionId, compIds));
+  for (const r of rows.sort((a, b) => a.sortOrder - b.sortOrder)) {
+    const label = r.building ? `${r.building} · ${r.name}` : r.name;
+    const list = out.get(r.competitionId);
+    if (list) list.push(label);
+    else out.set(r.competitionId, [label]);
+  }
+  return out;
+}
+
 /** venue ids ของรายการหนึ่ง เรียงตามลำดับที่เลือกในฟอร์ม */
 export async function getCompetitionVenueIds(competitionId: number): Promise<number[]> {
   const rows = await db

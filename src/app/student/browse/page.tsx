@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { competitions, competitionCapacity, subjectGroups, entryMembers, entries, events } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
+import { getVenueLabelsByCompetition } from "@/lib/venues";
 import { parseJsonArray } from "@/lib/domain";
 import { BrowseRegister, type BrowseComp } from "./BrowseRegister";
 
@@ -47,13 +48,17 @@ export default async function BrowsePage() {
   const eligible = comps.filter((c) => parseJsonArray(c.allowedClassLevels).includes(myLevel));
 
   const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
-  const groupName = (id: number | null) => (id == null ? "ทั่วไป" : groups.find((g) => g.id === id)?.name ?? "-");
+  const groupById = new Map(groups.map((g) => [g.id, g]));
+  const groupName = (id: number | null) => (id == null ? "ทั่วไป" : groupById.get(id)?.name ?? "-");
+  // ลำดับหมวดตามที่แอดมินจัดไว้ (รายการที่ไม่ระบุหมวด → ไปท้ายสุด)
+  const groupSort = (id: number | null) => (id == null ? 9999 : groupById.get(id)?.sortOrder ?? 9998);
   const eventName = (id: number | null) => (id == null ? "ทั่วไป" : eventById.get(id)?.name ?? "-");
 
   const compIds = eligible.map((c) => c.id);
   const caps = compIds.length
     ? await db.select().from(competitionCapacity).where(inArray(competitionCapacity.competitionId, compIds))
     : [];
+  const venueLabels = await getVenueLabelsByCompetition(compIds);
 
   // รายการที่ตัวเองลงแล้ว
   const myEntryIdsRows = await db
@@ -87,6 +92,8 @@ export default async function BrowsePage() {
       eventName: eventName(c.eventId),
       subjectGroupId: c.subjectGroupId,
       groupName: groupName(c.subjectGroupId),
+      groupSortOrder: groupSort(c.subjectGroupId),
+      venues: venueLabels.get(c.id) ?? [],
       levels: parseJsonArray(c.allowedClassLevels),
       teamSizeMin: c.teamSizeMin,
       teamSizeMax: c.teamSizeMax,

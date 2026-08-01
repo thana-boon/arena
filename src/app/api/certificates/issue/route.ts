@@ -5,7 +5,7 @@ import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
 import { canViewCompetition } from "@/lib/permit";
 import { certIssueInput } from "@/lib/validation";
-import { getActiveYearWithSettings } from "@/lib/queries";
+import { getYearWithSettings } from "@/lib/queries";
 import { computeCompetitionResults } from "@/lib/results";
 import { getRoster } from "@/lib/roster";
 import {
@@ -50,8 +50,11 @@ export async function POST(req: Request) {
     if (!noScoring && !comp.isPublished)
       return fail("ต้องประกาศผลรายการนี้ก่อนจึงจะออกเกียรติบัตรได้");
 
-    const { year, setting } = await getActiveYearWithSettings();
-    if (!year) return fail("ไม่พบปีการศึกษาที่เปิดใช้งาน");
+    // ปีและเกณฑ์เหรียญต้องมาจาก "ปีของรายการแข่งขัน" ไม่ใช่ปีที่เปิดใช้งานอยู่
+    // ไม่งั้นการออกใบย้อนหลังจะได้เลขทะเบียน/ปี พ.ศ. บนใบเป็นปีปัจจุบัน (งานปี 2567 ได้เลข 2569/xxxx)
+    // และตัดเหรียญด้วยเกณฑ์ของปีผิด — ปีปัจจุบันให้ผลเหมือนเดิมทุกประการ
+    const { year, setting } = await getYearWithSettings(comp.yearId);
+    if (!year) return fail("ไม่พบปีการศึกษาของรายการนี้");
 
     const templates = await getEventTemplates(event.id);
     if (!templates.length) return fail("งานนี้ยังไม่มีแม่แบบเกียรติบัตร");
@@ -130,6 +133,8 @@ export async function POST(req: Request) {
 
     return ok({
       issueIds: issued.map((i) => i.id),
+      // แยกรายคน — หน้าทะเบียนออกใบให้ทีมทั้งทีม (ต้องออกครบ) แต่พิมพ์เฉพาะใบของคนที่ขอ
+      issues: issued.map((i) => ({ id: i.id, studentCode: i.studentCode, entryId: i.entryId })),
       count: issued.length,
       newCount: issued.filter((i) => !i.reused).length,
     });

@@ -28,7 +28,8 @@ export type IconName =
   | "warning"
   | "clock"
   | "pin"
-  | "chart";
+  | "chart"
+  | "chevron";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   dashboard: (
@@ -197,6 +198,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <path d="M8 17v-3" />
     </>
   ),
+  chevron: <path d="m6 9 6 6 6-6" />,
 };
 
 type IconProps = {

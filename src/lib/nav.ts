@@ -29,6 +29,9 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/reports", label: "ออกรายงาน", icon: "file" },
       { href: "/admin/certificates", label: "เกียรติบัตร", icon: "trophy" },
+      // อยู่นอก /admin/certificates โดยตั้งใจ — Nav ไฮไลต์ด้วย startsWith(href + "/")
+      // ถ้าเป็น path ลูก เมนู "เกียรติบัตร" จะสว่างพร้อมกันทั้งคู่
+      { href: "/admin/cert-registry", label: "ทะเบียนเกียรติบัตร", icon: "search" },
     ],
   },
   {
@@ -48,6 +51,7 @@ export const TEACHER_NAV_GROUPS: NavGroup[] = [
       // ครูทุกคนบันทึกคะแนนรายการในหมวดตัวเองได้ (admin/recorder ได้ทุกรายการ)
       { href: "/teacher/scoring", label: "บันทึกผล", icon: "pencil" },
       { href: "/teacher/certificates", label: "ออกเกียรติบัตร", icon: "file" },
+      { href: "/teacher/cert-registry", label: "ทะเบียนเกียรติบัตร", icon: "search" },
       { href: "/teacher/class-registrations", label: "การสมัครรายห้อง", icon: "graduation" },
     ],
   },

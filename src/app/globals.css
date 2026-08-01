@@ -1273,12 +1273,51 @@ p {
   flex-direction: column;
   gap: 2px;
 }
+/* หัวข้อหมวด = ปุ่มพับ/กางรายการในหมวดนั้น */
 .side-section {
-  font-size: var(--text-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(243, 239, 250, 0.5);
-  padding: var(--space-3) var(--space-3) var(--space-1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  appearance: none;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-md);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  /* ภาษาไทยไม่มีตัวพิมพ์ใหญ่ — uppercase/letter-spacing ไม่ช่วยอะไร มีแต่ทำให้อ่านยาก */
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: rgba(243, 239, 250, 0.72);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  transition: color var(--transition-fast);
+}
+.side-section:hover {
+  color: #fff;
+}
+.side-section:focus-visible {
+  outline: 2px solid var(--sidebar-primary);
+  outline-offset: -2px;
+}
+.side-section .side-caret {
+  flex-shrink: 0;
+  opacity: 0.75;
+  transition: transform var(--transition-fast);
+}
+/* หมวดที่ถูกพับ — ลูกศรชี้ไปทางซ้าย (ยังไม่กาง) */
+.side-group.collapsed .side-caret {
+  transform: rotate(-90deg);
+}
+.side-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* class ชนะ [hidden] ของ UA stylesheet — ต้องประกาศเองไม่งั้นพับแล้วยังโชว์ */
+.side-items[hidden] {
+  display: none;
 }
 .side-item {
   position: relative;

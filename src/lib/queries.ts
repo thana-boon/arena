@@ -8,6 +8,11 @@ export async function getActiveYear() {
   return rows[0] ?? null;
 }
 
+export async function getYearById(yearId: number) {
+  const rows = await db.select().from(academicYears).where(eq(academicYears.id, yearId)).limit(1);
+  return rows[0] ?? null;
+}
+
 export async function getYearSettings(yearId: number) {
   const rows = await db.select().from(settings).where(eq(settings.yearId, yearId)).limit(1);
   return rows[0] ?? null;
@@ -15,6 +20,18 @@ export async function getYearSettings(yearId: number) {
 
 export async function getActiveYearWithSettings() {
   const year = await getActiveYear();
+  if (!year) return { year: null, setting: null };
+  const setting = await getYearSettings(year.id);
+  return { year, setting };
+}
+
+/**
+ * ปี + ตั้งค่าของ "ปีที่ระบุ" (ไม่ใช่ปีที่เปิดใช้งาน)
+ * ใช้ตอนออกเกียรติบัตรย้อนหลัง: เลขทะเบียน/ปี พ.ศ. บนใบ และเกณฑ์เหรียญ ต้องเป็นของปีที่แข่งจริง
+ * ไม่ใช่ปีปัจจุบัน ไม่งั้นงานปี 2567 จะได้เลข "2569/xxxx" และตัดเหรียญด้วยเกณฑ์ผิดปี
+ */
+export async function getYearWithSettings(yearId: number) {
+  const year = await getYearById(yearId);
   if (!year) return { year: null, setting: null };
   const setting = await getYearSettings(year.id);
   return { year, setting };

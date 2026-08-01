@@ -809,6 +809,45 @@ p {
   border-top: 0.5px solid var(--skdw-border);
 }
 
+/* ---------- Thai date+time picker ---------- */
+.tdt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tdt-date {
+  flex: 1;
+  min-width: 0;
+}
+.tdt-time {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+.tdt-time select {
+  padding: 8px 4px 8px 8px;
+  border: 1px solid var(--skdw-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  background: #fff;
+  cursor: pointer;
+}
+.tdt-time select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  background: var(--skdw-bg);
+}
+.tdt-colon {
+  font-weight: 700;
+  color: var(--skdw-muted);
+}
+.tdt-unit {
+  margin-left: 4px;
+  font-size: var(--text-sm);
+  color: var(--skdw-muted);
+}
+
 /* ---------- Badges ---------- */
 .badge {
   display: inline-flex;

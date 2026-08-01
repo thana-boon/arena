@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { competitions, subjectGroups } from "@/db/schema";
+import { competitions, subjectGroups, events } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { computeCompetitionResults } from "@/lib/results";
@@ -24,6 +24,8 @@ export async function ReportsBody({
   const comp = (await db.select().from(competitions).where(eq(competitions.id, id)).limit(1))[0];
   if (!comp) return <div className="alert alert-error">ไม่พบรายการแข่งขัน</div>;
   const group = comp.subjectGroupId == null ? undefined : (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0];
+  // ชื่องานบนหัวกระดาษ = ชื่อ "งาน" ที่ตั้งไว้ในหน้าตั้งค่า (ไม่ใช่ข้อความตายตัว)
+  const event = comp.eventId == null ? undefined : (await db.select().from(events).where(eq(events.id, comp.eventId)).limit(1))[0];
   if (!canViewCompetition(session, comp.createdBy, group?.catalogNo))
     return <div className="alert alert-error">คุณไม่มีสิทธิ์เข้าถึงรายการนี้</div>;
 
@@ -43,6 +45,7 @@ export async function ReportsBody({
         groupName: group?.name ?? "",
         type: comp.type as "individual" | "team",
         yearBe: year?.yearBe ?? 0,
+        eventName: event?.name ?? "",
         eventDate: comp.eventDate,
         startTime: comp.startTime,
         endTime: comp.endTime,

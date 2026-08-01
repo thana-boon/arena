@@ -10,6 +10,8 @@ type Meta = {
   groupName: string;
   type: "individual" | "team";
   yearBe: number;
+  /** ชื่องานที่ตั้งไว้ในหน้าตั้งค่า — "" ถ้ารายการยังไม่ผูกกับงานใด */
+  eventName: string;
   eventDate: string | null;
   startTime: string | null;
   endTime: string | null;
@@ -53,7 +55,7 @@ export function ReportsView({
   const SchoolHeader = () => (
     <div className="print-title" style={{ marginBottom: 16 }}>
       <div style={{ fontFamily: "var(--font-th-serif)", fontSize: 16, fontWeight: 700 }}>โรงเรียนสุคนธีรวิทย์</div>
-      <div style={{ fontSize: 16 }}>งานแข่งขันทางวิชาการ ปีการศึกษา {meta.yearBe}</div>
+      <div style={{ fontSize: 16 }}>{meta.eventName || `ปีการศึกษา ${meta.yearBe}`}</div>
     </div>
   );
 

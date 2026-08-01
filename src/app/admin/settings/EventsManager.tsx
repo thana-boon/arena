@@ -6,6 +6,7 @@ import { api } from "@/lib/client";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Icon } from "@/components/Icon";
 import { ThaiDatePicker } from "@/components/ThaiDatePicker";
+import { ThaiDateTimePicker } from "@/components/ThaiDateTimePicker";
 import { formatThaiDate } from "@/lib/domain";
 
 export type EventItem = {
@@ -199,15 +200,18 @@ function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) 
             <span>เปิดรับสมัคร</span>
           </label>
           <div className="grid-2">
-            <label className="field">
-              <span>เปิดรับสมัคร (เวลา)</span>
-              <input type="datetime-local" value={f.regStart} onChange={(e) => set("regStart", e.target.value)} />
-            </label>
-            <label className="field">
-              <span>ปิดรับสมัคร (เวลา)</span>
-              <input type="datetime-local" value={f.regEnd} onChange={(e) => set("regEnd", e.target.value)} />
-            </label>
+            <div className="field">
+              <span>เปิดรับสมัคร (วัน-เวลา)</span>
+              <ThaiDateTimePicker value={f.regStart} onChange={(v) => set("regStart", v)} defaultTime="08:00" />
+            </div>
+            <div className="field">
+              <span>ปิดรับสมัคร (วัน-เวลา)</span>
+              <ThaiDateTimePicker value={f.regEnd} onChange={(v) => set("regEnd", v)} defaultTime="16:30" />
+            </div>
           </div>
+          <span className="form-hint" style={{ marginTop: -8 }}>
+            เวลาเป็นแบบ 24 ชั่วโมง (00–23 น.) · เว้นว่างไว้ = ไม่จำกัดช่วงเวลา
+          </span>
           <div className="row" style={{ gap: 8 }}>
             <button className="btn btn-primary btn-sm" onClick={save} disabled={busy}>บันทึก</button>
             {ev.competitionCount === 0 && <button className="btn btn-sm btn-danger" onClick={del}>ลบงาน</button>}

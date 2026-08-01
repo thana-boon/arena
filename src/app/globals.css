@@ -983,19 +983,26 @@ p {
 }
 
 /* ---------- Toast ---------- */
-.toast {
+.toast-stack {
   position: fixed;
   bottom: 24px;
   right: 24px;
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+.toast {
   padding: 12px 20px;
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-xl);
   font-size: var(--text-md);
-  z-index: var(--z-toast);
   animation: slideUp 0.2s ease;
   background: #fff;
   border-left: 4px solid var(--skdw-purple);
   max-width: 360px;
+  cursor: pointer;
 }
 .toast.success {
   border-left-color: var(--color-success);
@@ -1793,6 +1800,7 @@ p {
   .topbar,
   .sidebar,
   .bottom-nav,
+  .toast-stack,
   .no-print {
     display: none !important;
   }

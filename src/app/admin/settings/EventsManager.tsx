@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/client";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { useToast } from "@/components/Toast";
 import { Icon } from "@/components/Icon";
 import { ThaiDatePicker } from "@/components/ThaiDatePicker";
 import { ThaiDateTimePicker } from "@/components/ThaiDateTimePicker";
@@ -30,6 +31,7 @@ export function EventsManager({
   defaultEventId: number | null;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [name, setName] = useState("");
   const [kind, setKind] = useState("competition");
   const [eventDate, setEventDate] = useState("");
@@ -37,7 +39,10 @@ export function EventsManager({
   const [msg, setMsg] = useState<{ type: string; text: string } | null>(null);
 
   async function create() {
-    if (!name.trim()) return setMsg({ type: "error", text: "กรุณากรอกชื่องาน" });
+    if (!name.trim()) {
+      setMsg({ type: "error", text: "กรุณากรอกชื่องาน" });
+      return toast("กรุณากรอกชื่องาน", "error");
+    }
     setBusy(true); setMsg(null);
     const res = await api.post<{ id: number }>("/api/admin/certificate-events", {
       name,
@@ -45,16 +50,24 @@ export function EventsManager({
       eventDate: eventDate || null,
     });
     setBusy(false);
-    if (!res.ok) return setMsg({ type: "error", text: res.error });
+    if (!res.ok) {
+      setMsg({ type: "error", text: res.error });
+      return toast(res.error, "error");
+    }
     setName("");
     setEventDate("");
     setMsg({ type: "success", text: "สร้างงานแล้ว — ตั้งค่าการรับสมัครด้านล่าง" });
+    toast("สร้างงานแล้ว — ตั้งค่าการรับสมัครด้านล่าง");
     router.refresh();
   }
 
   async function setDefault(id: number | null) {
     const res = await api.patch("/api/admin/settings", { defaultEventId: id });
-    if (!res.ok) return setMsg({ type: "error", text: res.error });
+    if (!res.ok) {
+      setMsg({ type: "error", text: res.error });
+      return toast(res.error, "error");
+    }
+    toast(id ? "ตั้งเป็นงานเริ่มต้นแล้ว" : "ยกเลิกงานเริ่มต้นแล้ว");
     router.refresh();
   }
 
@@ -111,6 +124,7 @@ export function EventsManager({
 function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const toast = useToast();
   const [f, setF] = useState(ev);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
@@ -121,7 +135,10 @@ function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) 
   }
 
   async function save() {
-    if (!f.name.trim()) return setMsg("กรุณากรอกชื่องาน");
+    if (!f.name.trim()) {
+      setMsg("กรุณากรอกชื่องาน");
+      return toast("กรุณากรอกชื่องาน", "error");
+    }
     setBusy(true); setMsg(null);
     const res = await api.patch(`/api/admin/certificate-events/${ev.id}`, {
       name: f.name,
@@ -133,7 +150,11 @@ function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) 
       regEnd: f.regEnd || null,
     });
     setBusy(false);
-    if (!res.ok) return setMsg(res.error);
+    if (!res.ok) {
+      setMsg(res.error);
+      return toast(res.error, "error");
+    }
+    toast(`บันทึก “${f.name}” เรียบร้อยแล้ว`);
     router.refresh();
   }
 
@@ -146,7 +167,11 @@ function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) 
     });
     if (!ok) return;
     const res = await api.del(`/api/admin/certificate-events/${ev.id}`);
-    if (!res.ok) return setMsg(res.error);
+    if (!res.ok) {
+      setMsg(res.error);
+      return toast(res.error, "error");
+    }
+    toast(`ลบงาน “${ev.name}” แล้ว`);
     router.refresh();
   }
 
@@ -213,7 +238,7 @@ function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) 
             เวลาเป็นแบบ 24 ชั่วโมง (00–23 น.) · เว้นว่างไว้ = ไม่จำกัดช่วงเวลา
           </span>
           <div className="row" style={{ gap: 8 }}>
-            <button className="btn btn-primary btn-sm" onClick={save} disabled={busy}>บันทึก</button>
+            <button className="btn btn-primary btn-sm" onClick={save} disabled={busy}>{busy ? "กำลังบันทึก…" : "บันทึก"}</button>
             {ev.competitionCount === 0 && <button className="btn btn-sm btn-danger" onClick={del}>ลบงาน</button>}
           </div>
         </div>

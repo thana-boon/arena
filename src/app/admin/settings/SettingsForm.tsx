@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
+import { useToast } from "@/components/Toast";
 
 type S = {
   maxEntriesPerStudent: number;
@@ -12,6 +13,7 @@ type S = {
 
 export function SettingsForm({ initial }: { initial: S }) {
   const router = useRouter();
+  const toast = useToast();
   const [f, setF] = useState<S>(initial);
   const [msg, setMsg] = useState<{ type: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -26,8 +28,12 @@ export function SettingsForm({ initial }: { initial: S }) {
     setMsg(null);
     const res = await api.patch("/api/admin/settings", f);
     setBusy(false);
-    if (!res.ok) return setMsg({ type: "error", text: res.error });
+    if (!res.ok) {
+      setMsg({ type: "error", text: res.error });
+      return toast(res.error, "error");
+    }
     setMsg({ type: "success", text: "บันทึกข้อมูลเรียบร้อยแล้ว" });
+    toast("บันทึกข้อมูลเรียบร้อยแล้ว");
     router.refresh();
   }
 

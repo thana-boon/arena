@@ -4,11 +4,17 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Icon } from "@/components/Icon";
+import { ThaiTimePicker } from "@/components/ThaiTimePicker";
 import { hhmm } from "@/lib/domain";
 
 type Slot = { id: number; label: string; startTime: string; endTime: string };
 
 const EMPTY = { label: "", startTime: "09:00", endTime: "12:00" };
+
+/** ตรวจซ้ำฝั่ง client เพื่อเตือนทันที (server ตรวจอีกชั้นด้วย slotInput) */
+function timeError(v: { startTime: string; endTime: string }): string {
+  return v.startTime < v.endTime ? "" : "เวลาเริ่มต้องก่อนเวลาสิ้นสุด";
+}
 
 export function TimeSlotsManager({ slots }: { slots: Slot[] }) {
   const router = useRouter();
@@ -22,6 +28,8 @@ export function TimeSlotsManager({ slots }: { slots: Slot[] }) {
 
   async function add() {
     if (!form.label.trim()) return setMsg({ type: "error", text: "กรุณากรอกชื่อช่วงเวลา" });
+    const bad = timeError(form);
+    if (bad) return setMsg({ type: "error", text: bad });
     setBusy(true); setMsg(null);
     const res = await api.post("/api/admin/timeslots", form);
     setBusy(false);
@@ -37,6 +45,9 @@ export function TimeSlotsManager({ slots }: { slots: Slot[] }) {
   }
 
   async function saveEdit(id: number) {
+    if (!edit.label.trim()) return setMsg({ type: "error", text: "กรุณากรอกชื่อช่วงเวลา" });
+    const bad = timeError(edit);
+    if (bad) return setMsg({ type: "error", text: bad });
     setBusy(true); setMsg(null);
     const res = await api.patch(`/api/admin/timeslots/${id}`, edit);
     setBusy(false);
@@ -70,8 +81,8 @@ export function TimeSlotsManager({ slots }: { slots: Slot[] }) {
             <thead>
               <tr>
                 <th>ชื่อช่วงเวลา</th>
-                <th style={{ width: 140 }}>เริ่ม</th>
-                <th style={{ width: 140 }}>ถึง</th>
+                <th style={{ width: 170 }}>เริ่ม</th>
+                <th style={{ width: 170 }}>ถึง</th>
                 <th style={{ width: 180 }}></th>
               </tr>
             </thead>
@@ -83,10 +94,10 @@ export function TimeSlotsManager({ slots }: { slots: Slot[] }) {
                       <input className="form-input" value={edit.label} onChange={(e) => setEdit({ ...edit, label: e.target.value })} />
                     </td>
                     <td>
-                      <input type="time" className="form-input" value={edit.startTime} onChange={(e) => setEdit({ ...edit, startTime: e.target.value })} />
+                      <ThaiTimePicker label="เริ่ม" value={edit.startTime} onChange={(v) => setEdit({ ...edit, startTime: v })} />
                     </td>
                     <td>
-                      <input type="time" className="form-input" value={edit.endTime} onChange={(e) => setEdit({ ...edit, endTime: e.target.value })} />
+                      <ThaiTimePicker label="ถึง" value={edit.endTime} onChange={(v) => setEdit({ ...edit, endTime: v })} />
                     </td>
                     <td className="num">
                       <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
@@ -126,11 +137,11 @@ export function TimeSlotsManager({ slots }: { slots: Slot[] }) {
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">เริ่ม</label>
-            <input type="time" className="form-input" style={{ width: 140 }} value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
+            <ThaiTimePicker label="เริ่ม" value={form.startTime} onChange={(v) => setForm({ ...form, startTime: v })} />
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">ถึง</label>
-            <input type="time" className="form-input" style={{ width: 140 }} value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
+            <ThaiTimePicker label="ถึง" value={form.endTime} onChange={(v) => setForm({ ...form, endTime: v })} />
           </div>
           <button className="btn btn-primary" onClick={add} disabled={busy}>
             <Icon name="plus" size={18} /> เพิ่มช่วงเวลา

@@ -76,7 +76,7 @@ export function TimeSlotsManager({ slots }: { slots: Slot[] }) {
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
 
       <div className="card mb-4">
-        <div className="table-wrap">
+        <div className="table-wrap table-cards">
           <table className="table">
             <thead>
               <tr>
@@ -90,16 +90,16 @@ export function TimeSlotsManager({ slots }: { slots: Slot[] }) {
               {slots.map((s) =>
                 editId === s.id ? (
                   <tr key={s.id}>
-                    <td>
+                    <td className="td-block" data-label="ชื่อช่วงเวลา">
                       <input className="form-input" value={edit.label} onChange={(e) => setEdit({ ...edit, label: e.target.value })} />
                     </td>
-                    <td>
+                    <td className="td-block" data-label="เริ่ม">
                       <ThaiTimePicker label="เริ่ม" value={edit.startTime} onChange={(v) => setEdit({ ...edit, startTime: v })} />
                     </td>
-                    <td>
+                    <td className="td-block" data-label="ถึง">
                       <ThaiTimePicker label="ถึง" value={edit.endTime} onChange={(v) => setEdit({ ...edit, endTime: v })} />
                     </td>
-                    <td className="num">
+                    <td className="num td-actions">
                       <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
                         <button className="btn btn-primary btn-sm" onClick={() => saveEdit(s.id)} disabled={busy}>บันทึก</button>
                         <button className="btn btn-ghost btn-sm" onClick={() => setEditId(null)} disabled={busy}>ยกเลิก</button>
@@ -108,10 +108,10 @@ export function TimeSlotsManager({ slots }: { slots: Slot[] }) {
                   </tr>
                 ) : (
                   <tr key={s.id}>
-                    <td style={{ fontWeight: 500 }}>{s.label}</td>
-                    <td className="num">{hhmm(s.startTime)}</td>
-                    <td className="num">{hhmm(s.endTime)}</td>
-                    <td className="num">
+                    <td className="td-title" style={{ fontWeight: 500 }}>{s.label}</td>
+                    <td className="num" data-label="เริ่ม">{hhmm(s.startTime)}</td>
+                    <td className="num" data-label="ถึง">{hhmm(s.endTime)}</td>
+                    <td className="num td-actions">
                       <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
                         <button className="btn btn-secondary btn-sm" onClick={() => startEdit(s)} disabled={busy}>แก้ไข</button>
                         <button className="btn btn-danger btn-sm" onClick={() => del(s)} disabled={busy}>ลบ</button>

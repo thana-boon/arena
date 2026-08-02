@@ -27,6 +27,9 @@ services:
       SCHOOLOS_API_BASE: ${SCHOOLOS_API_BASE:-http://192.168.200.56:3002}
       SCHOOLOS_API_KEY: ${SCHOOLOS_API_KEY:?ต้องตั้ง SCHOOLOS_API_KEY ใน Portainer stack env}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # อายุ session (นาที) — IDLE = ไม่ใช้งานนานเท่านี้แล้วหลุด, ABSOLUTE = เพดานนับจากตอน login
+      SESSION_IDLE_MINUTES: ${SESSION_IDLE_MINUTES:-30}
+      SESSION_ABSOLUTE_MINUTES: ${SESSION_ABSOLUTE_MINUTES:-720}
       # ไม่มี env admin แล้ว — สิทธิ์ admin มาจาก role "teacher-admin" ของ SchoolOS โดยตรง
       # (ครูที่ SchoolOS กำหนดเป็น teacher-admin ล็อกอินเข้าเป็น admin ของระบบเอง)
     ports:

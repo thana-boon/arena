@@ -69,15 +69,15 @@ export function YearsManager({
         </div>
         {source && (
           available.length ? (
-            <div className="table-wrap">
+            <div className="table-wrap table-cards">
               <table className="table">
                 <thead><tr><th>ปีการศึกษา</th><th>สถานะที่ต้นทาง</th><th style={{ width: 120 }}></th></tr></thead>
                 <tbody>
                   {available.map((y) => (
                     <tr key={y.yearBe}>
-                      <td>{y.title || y.yearBe}</td>
-                      <td>{y.isActiveAtSource ? <span className="badge badge-success">ปีปัจจุบัน</span> : <span className="badge">-</span>}</td>
-                      <td className="num">
+                      <td className="td-title">{y.title || y.yearBe}</td>
+                      <td data-label="สถานะที่ต้นทาง">{y.isActiveAtSource ? <span className="badge badge-success">ปีปัจจุบัน</span> : <span className="badge">-</span>}</td>
+                      <td className="num td-actions">
                         <button className="btn btn-primary btn-sm" onClick={() => importYear(y.yearBe)} disabled={busy}>นำเข้า</button>
                       </td>
                     </tr>
@@ -92,7 +92,7 @@ export function YearsManager({
         <div className="form-hint mt-2">ปีการศึกษาสร้างเองไม่ได้ — เลือกนำเข้าจาก Student API เท่านั้น</div>
       </div>
 
-      <div className="table-wrap">
+      <div className="table-wrap table-cards">
         <table className="table">
           <thead>
             <tr><th>ปีการศึกษา</th><th>สถานะ</th><th></th></tr>
@@ -100,9 +100,10 @@ export function YearsManager({
           <tbody>
             {years.map((y) => (
               <tr key={y.id}>
-                <td>{y.yearBe}</td>
-                <td>{y.isActive ? <span className="badge badge-success">กำลังใช้งาน</span> : <span className="badge">ปิด</span>}</td>
-                <td className="num">
+                <td className="td-title"><span className="only-sm">ปีการศึกษา </span>{y.yearBe}</td>
+                <td data-label="สถานะ">{y.isActive ? <span className="badge badge-success">กำลังใช้งาน</span> : <span className="badge">ปิด</span>}</td>
+                {/* ปีที่เปิดใช้งานอยู่ไม่มีปุ่ม — ไม่ต้องใส่ td-actions ไม่งั้นบนมือถือได้เส้นคั่นเปล่า ๆ */}
+                <td className={y.isActive ? "num" : "num td-actions"}>
                   {!y.isActive && <button className="btn btn-secondary btn-sm" onClick={() => activate(y.id)} disabled={busy}>เปิดใช้งาน</button>}
                 </td>
               </tr>

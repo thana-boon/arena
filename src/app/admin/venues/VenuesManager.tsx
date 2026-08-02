@@ -93,7 +93,7 @@ export function VenuesManager({ venues }: { venues: Venue[] }) {
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
 
       <div className="card mb-4">
-        <div className="table-wrap">
+        <div className="table-wrap table-cards">
           <table className="table">
             <thead>
               <tr>
@@ -107,16 +107,16 @@ export function VenuesManager({ venues }: { venues: Venue[] }) {
               {venues.map((v) =>
                 editId === v.id ? (
                   <tr key={v.id}>
-                    <td>
+                    <td className="td-block" data-label="ชื่อสถานที่">
                       <input className="form-input" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
                     </td>
-                    <td>
+                    <td className="td-block" data-label="อาคาร">
                       <input className="form-input" value={edit.building} onChange={(e) => setEdit({ ...edit, building: e.target.value })} />
                     </td>
-                    <td>
+                    <td className="td-block" data-label="หมายเหตุ">
                       <input className="form-input" value={edit.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} />
                     </td>
-                    <td className="num">
+                    <td className="num td-actions">
                       <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
                         <button className="btn btn-primary btn-sm" onClick={() => saveEdit(v.id)} disabled={busy}>บันทึก</button>
                         <button className="btn btn-ghost btn-sm" onClick={() => setEditId(null)} disabled={busy}>ยกเลิก</button>
@@ -125,10 +125,10 @@ export function VenuesManager({ venues }: { venues: Venue[] }) {
                   </tr>
                 ) : (
                   <tr key={v.id}>
-                    <td style={{ fontWeight: 500 }}>{v.name}</td>
-                    <td>{v.building || <span className="muted">—</span>}</td>
-                    <td>{v.note || <span className="muted">—</span>}</td>
-                    <td className="num">
+                    <td className="td-title" style={{ fontWeight: 500 }}>{v.name}</td>
+                    <td data-label="อาคาร">{v.building || <span className="muted">—</span>}</td>
+                    <td data-label="หมายเหตุ">{v.note || <span className="muted">—</span>}</td>
+                    <td className="num td-actions">
                       <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
                         <button className="btn btn-secondary btn-sm" onClick={() => startEdit(v)} disabled={busy}>แก้ไข</button>
                         <button className="btn btn-danger btn-sm" onClick={() => del(v)} disabled={busy}>ลบ</button>

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/client";
 
@@ -7,6 +8,8 @@ export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const nextUrl = params.get("next");
+  // เด้งมาจากการหมดเวลาใช้งาน (ดู SessionTimeout.tsx) — บอกเหตุผล ไม่งั้นดูเหมือนระบบเตะออกเฉย ๆ
+  const reason = params.get("reason");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [identifier, setIdentifier] = useState("");
@@ -33,6 +36,13 @@ export function LoginForm() {
   return (
     <form onSubmit={submit}>
       {error && <div className="alert alert-error">{error}</div>}
+      {!error && reason && (
+        <div className="alert alert-warning">
+          {reason === "expired"
+            ? "หมดเวลาใช้งานสูงสุดของรอบนี้ กรุณาเข้าสู่ระบบใหม่"
+            : "ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งานเป็นเวลานาน"}
+        </div>
+      )}
 
       <div className="form-group">
         <label className="form-label">รหัสผู้ใช้</label>
@@ -42,6 +52,11 @@ export function LoginForm() {
           onChange={(e) => setIdentifier(e.target.value)}
           placeholder="รหัสผู้ใช้"
           autoComplete="username"
+          // มือถือชอบขึ้นตัวใหญ่/แก้คำให้เอง — รหัสผู้ใช้เป็นตัวเลข/ตัวอักษรตรง ๆ ห้ามแก้
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="next"
         />
       </div>
       <div className="form-group">
@@ -53,6 +68,10 @@ export function LoginForm() {
           onChange={(e) => setSecret(e.target.value)}
           placeholder="รหัสผ่าน"
           autoComplete="current-password"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="go"
         />
       </div>
 
@@ -61,7 +80,8 @@ export function LoginForm() {
       </button>
 
       <div className="text-center mt-4">
-        <a href="/" className="text-sm muted">← กลับหน้าหลัก / ดูผลการแข่งขัน</a>
+        {/* Link เติม basePath (/arena) ให้เอง — <a href="/"> ตรง ๆ จะวิ่งออกนอก basePath */}
+        <Link href="/" className="text-sm muted">← กลับหน้าหลัก / ดูผลการแข่งขัน</Link>
       </div>
     </form>
   );

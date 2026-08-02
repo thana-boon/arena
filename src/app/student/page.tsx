@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
+import { CompTypeBadge } from "@/components/CompTypeBadge";
 import { requireRole } from "@/lib/auth/guards";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { getStudentEntries } from "@/lib/student";
@@ -60,7 +61,13 @@ export default async function StudentDashboard() {
                 <div>
                   <div className="row" style={{ gap: 8 }}>
                     <span className="badge badge-purple">{e.groupName}</span>
-                    <span className="badge">{e.type === "team" ? "ทีม" : "เดี่ยว"}</span>
+                    {/* ทีมที่ลงไปแล้ว — บอกจำนวนคนจริงในทีม ไม่ใช่ช่วงที่รายการกำหนด */}
+                    <CompTypeBadge
+                      type={e.type === "team" ? "team" : "individual"}
+                      teamSizeMin={e.members.length}
+                      teamSizeMax={e.members.length}
+                      size="sm"
+                    />
                   </div>
                   <h3 style={{ margin: "8px 0 4px" }}>{e.competitionName}</h3>
                   {e.type === "team" && (

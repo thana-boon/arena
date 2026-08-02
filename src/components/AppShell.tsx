@@ -5,9 +5,10 @@ import { RouteTransition } from "./RouteTransition";
 import { BrandLogo } from "./BrandLogo";
 import { Wordmark } from "./Wordmark";
 import { Avatar } from "./Avatar";
+import { SessionTimeout } from "./SessionTimeout";
 import { bottomNavItems, type NavGroup } from "@/lib/nav";
 import { nameInitial } from "@/lib/initials";
-import type { SessionPayload, Role } from "@/lib/auth/session";
+import { IDLE_SECONDS, type SessionPayload, type Role } from "@/lib/auth/session";
 
 const ROLE_LABEL: Record<Role, string> = {
   student: "นักเรียน",
@@ -30,6 +31,8 @@ export function AppShell({
   const bottom = bottomNavItems(groups);
   return (
     <div className="app-shell-nav">
+      {/* เตือน + พากลับหน้า login เมื่อไม่มีการใช้งานนานเกินกำหนด */}
+      <SessionTimeout idleSeconds={IDLE_SECONDS} />
       <aside className="sidebar">
         <Link href="/" className="side-brand">
           <BrandLogo />

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import { Icon } from "@/components/Icon";
+import { CompTypeBadge } from "@/components/CompTypeBadge";
 import type { Medal } from "@/lib/domain";
 
 type Member = { studentCode: string; name: string; classLevel: string; classRoom: string };
@@ -59,7 +60,8 @@ export function ResultsBrowser({
   return (
     <>
       <div className="card mb-4">
-        <div className="row">
+        {/* filter-bar = ช่องค้นหา/ตัวกรองยืดเต็มจอบนมือถือแทนที่จะค้างที่ 280px */}
+        <div className="filter-bar">
           <input
             className="form-input"
             style={{ maxWidth: 280 }}
@@ -87,7 +89,7 @@ export function ResultsBrowser({
             <div className="card" key={c.id} id={`comp-${c.id}`}>
               <div className="row between mb-2">
                 <h3 style={{ margin: 0 }}>{c.name}</h3>
-                <span className="badge badge-purple">{c.type === "team" ? "ประเภททีม" : "ประเภทเดี่ยว"}</span>
+                <CompTypeBadge type={c.type} size="sm" />
               </div>
               <div className="text-sm muted mb-4">
                 ระดับ {c.levels.join(", ") || "-"} · คะแนนเต็ม {c.fullScore}
@@ -95,7 +97,7 @@ export function ResultsBrowser({
               {!c.results.length ? (
                 <div className="alert alert-info">ยังไม่มีการประกาศผลของรายการนี้</div>
               ) : (
-                <div className="table-wrap">
+                <div className="table-wrap table-cards">
                   <table className="table">
                     <thead>
                       <tr>
@@ -109,16 +111,18 @@ export function ResultsBrowser({
                     <tbody>
                       {c.results.map((r) => (
                         <tr key={r.entryId}>
-                          <td className={medalClass[r.medal]} style={{ fontWeight: 700 }}>{r.rank}</td>
-                          <td>
+                          <td className={`${medalClass[r.medal]} hide-sm`} style={{ fontWeight: 700 }}>{r.rank}</td>
+                          {/* มือถือ: อันดับย้ายมานำหน้าชื่อ (คอลัมน์ซ้ายถูกซ่อน) */}
+                          <td className="td-title">
+                            <span className={`only-sm ${medalClass[r.medal]}`}>อันดับ {r.rank} · </span>
                             {c.type === "team" && r.teamName && <div style={{ fontWeight: 600 }}>{r.teamName}</div>}
-                            <div className="text-sm">
+                            <div className="text-sm" style={{ fontWeight: 400 }}>
                               {r.members.map((m) => `${m.name} (${m.classLevel}/${m.classRoom})`).join(", ")}
                             </div>
                           </td>
-                          <td className="num">{r.total.toFixed(2)}</td>
-                          <td className="num">{r.percent.toFixed(1)}%</td>
-                          <td><span className={`badge ${medalBadge[r.medal]}`}>{r.medalLabel}</span></td>
+                          <td className="num" data-label="คะแนน">{r.total.toFixed(2)}</td>
+                          <td className="num" data-label="ร้อยละ">{r.percent.toFixed(1)}%</td>
+                          <td data-label="เหรียญ"><span className={`badge ${medalBadge[r.medal]}`}>{r.medalLabel}</span></td>
                         </tr>
                       ))}
                     </tbody>

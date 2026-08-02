@@ -185,6 +185,8 @@ h4 {
   line-height: 1.3;
   font-weight: 600;
   letter-spacing: -0.01em;
+  /* ชื่อรายการภาษาไทยไม่มีช่องว่างให้ตัดบรรทัด — ถ้าไม่บังคับ จะทะลุกรอบการ์ดบนจอแคบ */
+  overflow-wrap: break-word;
 }
 h1 {
   font-size: var(--text-2xl);
@@ -886,6 +888,51 @@ p {
   color: var(--color-info);
 }
 
+/* ---------- ป้ายประเภทรายการ "เดี่ยว / ทีม" (ดู CompTypeBadge.tsx) ----------
+   ตั้งใจให้เด่นกว่า .badge ทั่วไป — ตัวหนา ขอบหนา สีต่างกันชัด เพราะผู้ใช้สะท้อนว่า
+   ป้าย "ทีม" แบบเดิม (เทาเล็ก) มองไม่ออกในทันทีตอนเลือกสมัคร */
+.type-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid transparent;
+  font-family: var(--font-th-sans);
+  font-size: var(--text-sm);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.type-pill b {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.type-pill .n {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+/* ลงสีเต็มใบทั้งคู่ — ให้แยกออกจากกันตั้งแต่เหลือบตา ไม่ต้องอ่านตัวหนังสือ
+   เดี่ยว = ม่วง (สีหลักของระบบ) / ทีม = ทอง (สีรอง) ตัดกันชัดทั้งเฉดและความสว่าง */
+.type-pill-solo {
+  background: var(--skdw-purple);
+  border-color: var(--skdw-purple);
+  color: #fff;
+}
+.type-pill-team {
+  background: var(--skdw-gold);
+  border-color: #d4a800;
+  color: #3d2f00;
+}
+/* พื้นทึบแล้วไอคอนจะกลืน — ดันความคมขึ้นอีกนิด */
+.type-pill .icon {
+  stroke-width: 2.2;
+}
+.type-pill-sm {
+  padding: 1px 8px;
+  gap: 4px;
+  font-size: var(--text-xs);
+}
+
 /* ---------- Subject-group sections (มุมนักเรียน: แบ่งรายการแข่งขันตามกลุ่มสาระ) ---------- */
 /* แถวปุ่มลัดกลุ่มสาระ — เลื่อนแนวนอนได้บนจอเล็กแทนที่จะดันหน้าจนล้น */
 .group-chips {
@@ -1186,13 +1233,28 @@ p {
   .grid-4 {
     grid-template-columns: 1fr;
   }
+  /* ป้ายยาว ๆ (ชื่อกลุ่มสาระ) ยอมตัดบรรทัดบนจอแคบ ดีกว่าดันการ์ดจนล้นจอ */
+  .badge {
+    white-space: normal;
+  }
+}
+/* การ์ดในกริดต้องยอมแคบกว่าเนื้อหาข้างในได้ — ไม่งั้น min-width:auto ของ grid item
+   จะขยายคอลัมน์จนหน้าเลื่อนซ้าย-ขวาได้ (ชื่อรายการ/ชื่อกลุ่มสาระยาว ๆ) */
+.grid-2 > *,
+.grid-3 > *,
+.grid-4 > * {
+  min-width: 0;
 }
 
 /* ---------- Layout: Navbar + Sidebar + Bottom nav ---------- */
 .app-shell {
+  /* dvh = ความสูงที่มองเห็นจริงบนมือถือ (หัก address bar) — 100vh บน iOS Safari สูงเกินจอเสมอ */
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  /* กันหน้าเลื่อนซ้าย-ขวาได้เมื่อมีอะไรกว้างเกินจอ — ใช้ clip ไม่ใช่ hidden เพื่อไม่ให้ position:sticky ของแถบบนพัง */
+  overflow-x: clip;
 }
 .navbar {
   height: 64px;
@@ -1336,6 +1398,7 @@ p {
 /* ===== App shell หลังล็อกอิน: sidebar ม่วงเข้ม + topbar สว่าง ===== */
 .app-shell-nav {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
 }
 .sidebar {
@@ -1638,8 +1701,16 @@ p {
 @media (max-width: 768px) {
   .navbar {
     height: 56px;
-    padding: 0 var(--space-3);
+    /* max() = อย่างน้อยเท่าระยะปกติ แต่ถ้าเครื่องมีรอยบาก (แนวนอน) ให้หลบให้พอดี */
+    padding: 0 max(var(--space-3), env(safe-area-inset-right)) 0 max(var(--space-3), env(safe-area-inset-left));
     gap: var(--space-2);
+  }
+  /* โลโก้ยอมย่อ/ตัดคำได้ ไม่งั้นมันดันปุ่มขวาจนแถบกว้างเกินจอ (เจอบน iPhone 16 Pro) */
+  .navbar .brand {
+    font-size: var(--text-lg);
+    min-width: 0;
+    flex-shrink: 1;
+    overflow: hidden;
   }
   .navbar .nav-actions {
     gap: var(--space-2);
@@ -1653,17 +1724,37 @@ p {
   }
   .topbar {
     height: 56px;
-    padding: 0 var(--space-4);
+    padding: 0 max(var(--space-4), env(safe-area-inset-right)) 0 max(var(--space-4), env(safe-area-inset-left));
   }
   .topbar .tb-brand {
     display: inline-flex;
   }
   .bottom-nav {
     display: flex;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
   .main-content {
-    padding: var(--space-4);
-    padding-bottom: calc(62px + var(--space-4));
+    padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right)) var(--space-4)
+      max(var(--space-4), env(safe-area-inset-left));
+    padding-bottom: calc(62px + var(--space-4) + env(safe-area-inset-bottom));
+  }
+  /* iOS ซูมหน้าจออัตโนมัติเมื่อโฟกัสช่องกรอกที่ตัวอักษร < 16px แล้ว "ไม่ซูมกลับ"
+     → หน้าค้างอยู่สภาพล้นขอบเลื่อนซ้าย-ขวาได้ (อาการที่แจ้งมาจากหน้า login) */
+  .form-input,
+  .form-select,
+  .form-textarea {
+    font-size: 16px;
+  }
+}
+/* จอแคบมาก — ปุ่ม "ผลการแข่งขัน" เหลือแค่ไอคอนถ้วยรางวัล */
+@media (max-width: 430px) {
+  .navbar .nav-label {
+    display: none;
+  }
+  .navbar .nav-actions .btn {
+    padding-left: 10px;
+    padding-right: 10px;
   }
 }
 
@@ -1737,10 +1828,13 @@ p {
 /* auth card */
 .auth-wrap {
   min-height: 100vh;
+  min-height: 100dvh; /* iOS: 100vh สูงเกินจอ → การ์ดถูกดันจนต้องเลื่อน */
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-4);
+  /* viewportFit:cover → ต้องเผื่อรอยบาก/แถบ home เอง ไม่งั้นการ์ดชิดขอบจนดูล้น */
+  padding: max(var(--space-4), env(safe-area-inset-top)) max(var(--space-4), env(safe-area-inset-right))
+    max(var(--space-4), env(safe-area-inset-bottom)) max(var(--space-4), env(safe-area-inset-left));
   background: linear-gradient(135deg, var(--skdw-purple) 0%, #3a1a5e 100%);
 }
 .auth-card {
@@ -1750,6 +1844,11 @@ p {
   padding: var(--space-8);
   width: 100%;
   max-width: 420px;
+}
+@media (max-width: 420px) {
+  .auth-card {
+    padding: var(--space-6) var(--space-4);
+  }
 }
 .auth-tabs {
   display: flex;
@@ -2370,6 +2469,16 @@ p {
   }
   .table-cards td.td-actions .btn {
     flex: 1 1 auto;
+  }
+  /* ช่องติ๊กในการ์ด (เช่นตารางมอบสิทธิ์ครู) — ขนาด default เล็กเกินกดด้วยนิ้ว */
+  .table-cards td input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+  /* เซลล์ที่ก๊อบ max-width จากดีไซน์จอใหญ่มา ห้ามล้นการ์ด */
+  .table-cards td {
+    max-width: 100% !important;
   }
   /* แถว "ไม่พบข้อมูล" ที่ใช้ colspan — ไม่ต้องทำเป็นการ์ด */
   .table-cards td[colspan] {

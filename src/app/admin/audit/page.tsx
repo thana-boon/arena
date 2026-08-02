@@ -34,16 +34,28 @@ export default async function AuditPage() {
       {!logs.length ? (
         <div className="empty-state card"><Icon name="log" size={44} className="empty-ico" /><p>ยังไม่มีบันทึก</p></div>
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap table-cards">
           <table className="table">
             <thead><tr><th>เวลา</th><th>ผู้ทำ</th><th>การกระทำ</th><th>รายละเอียด</th></tr></thead>
             <tbody>
               {logs.map((l) => (
                 <tr key={l.id}>
-                  <td className="text-sm nowrap">{new Date(l.createdAt).toLocaleString("th-TH")}</td>
-                  <td className="text-sm">{l.who}</td>
-                  <td><span className="badge badge-purple">{ACTION_LABEL[l.action] ?? l.action}</span></td>
-                  <td className="text-xs muted" style={{ maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis" }}>{l.detail}</td>
+                  {/* มือถือ: ชื่อการกระทำเป็นหัวการ์ด เวลา/ผู้ทำ/รายละเอียดเรียงลงมา */}
+                  <td className="text-sm nowrap hide-sm">{new Date(l.createdAt).toLocaleString("th-TH")}</td>
+                  <td className="text-sm hide-sm">{l.who}</td>
+                  <td className="td-title">
+                    <span className="badge badge-purple">{ACTION_LABEL[l.action] ?? l.action}</span>
+                    <div className="only-sm text-xs muted" style={{ fontWeight: 400, marginTop: 4 }}>
+                      {new Date(l.createdAt).toLocaleString("th-TH")} · {l.who}
+                    </div>
+                  </td>
+                  <td
+                    className="text-xs muted td-block"
+                    data-label="รายละเอียด"
+                    style={{ maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis" }}
+                  >
+                    {l.detail}
+                  </td>
                 </tr>
               ))}
             </tbody>

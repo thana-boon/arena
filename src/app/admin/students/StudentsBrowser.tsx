@@ -44,7 +44,8 @@ export function StudentsBrowser() {
   return (
     <div className="stack">
       <div className="card">
-        <form onSubmit={submit} className="row" style={{ alignItems: "flex-end", gap: 8 }}>
+        {/* filter-bar = บนมือถือช่องที่ล็อกความกว้างไว้ (110px) จะยืดเต็มจอให้เอง */}
+        <form onSubmit={submit} className="filter-bar" style={{ gap: 8 }}>
           <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: 160 }}>
             <label className="form-label">ค้นหาชื่อ/รหัส</label>
             <input className="form-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ชื่อ หรือ รหัสนักเรียน" />
@@ -73,16 +74,22 @@ export function StudentsBrowser() {
           <div className="row between mb-4">
             <div className="muted text-sm">พบ {data.total.toLocaleString("th-TH")} คน · หน้า {data.page}/{totalPages}</div>
           </div>
-          <div className="table-wrap">
+          <div className="table-wrap table-cards">
             <table className="table">
               <thead><tr><th>รหัสนักเรียน</th><th>ชื่อ-สกุล</th><th>ระดับชั้น</th><th>ห้อง</th></tr></thead>
               <tbody>
                 {data.students.map((s) => (
                   <tr key={s.studentCode}>
-                    <td>{s.studentCode}</td>
-                    <td>{s.name}</td>
-                    <td>{s.classLevel}</td>
-                    <td>{s.classRoom}</td>
+                    <td className="hide-sm">{s.studentCode}</td>
+                    {/* มือถือ: ชื่อเป็นหัวการ์ด แล้วยุบรหัส/ชั้น/ห้องเป็นบรรทัดเดียวใต้ชื่อ */}
+                    <td className="td-title">
+                      {s.name}
+                      <div className="only-sm text-xs muted">
+                        รหัส {s.studentCode} · {s.classLevel}/{s.classRoom}
+                      </div>
+                    </td>
+                    <td className="hide-sm">{s.classLevel}</td>
+                    <td className="hide-sm">{s.classRoom}</td>
                   </tr>
                 ))}
                 {!data.students.length && <tr><td colSpan={4} className="text-center muted">ไม่พบนักเรียน</td></tr>}

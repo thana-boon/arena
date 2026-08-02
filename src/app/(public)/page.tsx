@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
+import { CompTypeBadge } from "@/components/CompTypeBadge";
 import { db } from "@/db";
 import { competitions, subjectGroups } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -45,7 +46,12 @@ export default async function HomePage() {
             <div key={c.id} className="card">
               <div className="row between mb-2">
                 <span className="badge badge-purple">{groupName(c.subjectGroupId)}</span>
-                <span className="badge">{c.type === "team" ? "ทีม" : "เดี่ยว"}</span>
+                <CompTypeBadge
+                  type={c.type === "team" ? "team" : "individual"}
+                  teamSizeMin={c.teamSizeMin}
+                  teamSizeMax={c.teamSizeMax}
+                  size="sm"
+                />
               </div>
               <h3 style={{ fontSize: "var(--text-lg)" }}>{c.name}</h3>
               <div className="text-sm muted">

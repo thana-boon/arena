@@ -58,14 +58,14 @@ export function GroupsManager({ groups, catalog }: { groups: G[]; catalog: Cat[]
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
 
       <div className="card mb-4">
-        <div className="table-wrap">
+        <div className="table-wrap table-cards">
           <table className="table">
             <thead><tr><th>หมวดวิชาที่ใช้ในปีนี้</th><th style={{ width: 160 }}></th></tr></thead>
             <tbody>
               {groups.map((g) => (
                 <tr key={g.id}>
-                  <td>{g.name}{g.catalogNo == null && <span className="badge ml-2">สร้างเอง</span>}</td>
-                  <td className="num">
+                  <td className="td-title">{g.name}{g.catalogNo == null && <span className="badge ml-2">สร้างเอง</span>}</td>
+                  <td className="num td-actions">
                     <button className="btn btn-danger btn-sm" onClick={() => del(g.id)} disabled={busy}>นำออก</button>
                   </td>
                 </tr>
@@ -87,15 +87,18 @@ export function GroupsManager({ groups, catalog }: { groups: G[]; catalog: Cat[]
         {!cat.length ? (
           <div className="text-center muted">กดปุ่ม “ซิงค์รายการหมวดจาก Teacher API” เพื่อดึงหมวดที่มีอยู่จริง</div>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap table-cards">
             <table className="table">
               <thead><tr><th style={{ width: 80 }}>เลขหมวด</th><th>ชื่อหมวด</th><th style={{ width: 120 }}></th></tr></thead>
               <tbody>
                 {available.map((c) => (
                   <tr key={c.groupNo}>
-                    <td className="muted">{c.groupNo}</td>
-                    <td>{c.name || <span className="muted">(ยังไม่มีชื่อ)</span>}</td>
-                    <td className="num">
+                    <td className="muted hide-sm">{c.groupNo}</td>
+                    <td className="td-title">
+                      {c.name || <span className="muted">(ยังไม่มีชื่อ)</span>}
+                      <div className="only-sm text-xs muted">หมวดที่ {c.groupNo}</div>
+                    </td>
+                    <td className="num td-actions">
                       <button className="btn btn-primary btn-sm" onClick={() => add(c.groupNo)} disabled={busy}>เพิ่ม</button>
                     </td>
                   </tr>

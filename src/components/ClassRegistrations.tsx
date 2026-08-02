@@ -5,6 +5,7 @@ import { api } from "@/lib/client";
 import { Icon } from "@/components/Icon";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { StudentPicker, type PickedStudent } from "@/components/StudentPicker";
+import { CompTypeBadge, teamSizeLabel } from "@/components/CompTypeBadge";
 import {
   CLASS_LEVELS,
   formatThaiDate,
@@ -343,11 +344,20 @@ export function ClassRegistrations({
                         <div className="stack" style={{ gap: 4 }}>
                           {s.registrations.map((r) => {
                             // ครูทั่วไปยกเลิกได้เฉพาะตอนงานยังเปิดรับสมัคร (เหมือนนักเรียนยกเลิกเอง) — admin ยกเลิกได้เสมอ
-                            const canCancel = isAdmin || compById.get(r.competitionId)?.open === true;
+                            const rc = compById.get(r.competitionId);
+                            const canCancel = isAdmin || rc?.open === true;
+                            // ไม่รู้จักรายการ (คนละงาน/ปิดไปแล้ว) ก็ยังเดาจากการมีชื่อทีมได้
+                            const rType = rc?.type ?? (r.teamName ? "team" : "individual");
                             return (
                               <div key={r.entryId} className="text-sm row" style={{ gap: 6, alignItems: "center" }}>
                                 <span>
                                   <span className="badge badge-purple">{r.groupName}</span>{" "}
+                                  <CompTypeBadge
+                                    type={rType}
+                                    teamSizeMin={rc?.teamSizeMin}
+                                    teamSizeMax={rc?.teamSizeMax}
+                                    size="sm"
+                                  />{" "}
                                   {r.competitionName}
                                   {r.teamName && <span className="muted"> · ทีม {r.teamName}</span>}
                                   {r.eventDate && <span className="muted"> · {formatThaiDate(r.eventDate)}</span>}
@@ -533,8 +543,11 @@ function RegisterModal({
                 <option value="">— เลือกรายการ —</option>
                 {available.map((c) => (
                   <option key={c.id} value={c.id} disabled={!c.open && !isAdmin}>
-                    [{c.groupName}] {c.name}
-                    {c.type === "team" ? " · ทีม" : ""}
+                    {/* บอกประเภทเสมอ (เดิมบอกเฉพาะทีม → รายการเดี่ยวไม่มีอะไรให้เทียบ เลยดูไม่ออกว่าอันไหนเป็นทีม) */}
+                    [{c.groupName}] {c.name} ·{" "}
+                    {c.type === "team"
+                      ? `ทีม ${teamSizeLabel("team", c.teamSizeMin, c.teamSizeMax)}`.trim()
+                      : "เดี่ยว 1 คน"}
                     {!c.open ? " · ปิดรับสมัคร" : ""}
                   </option>
                 ))}
@@ -542,12 +555,15 @@ function RegisterModal({
             </div>
 
             {comp && (
-              <div className="text-sm" style={{ background: "var(--skdw-bg)", padding: "8px 12px", borderRadius: 8 }}>
-                <span className="badge badge-purple">{comp.eventName}</span>{" "}
-                {comp.type === "team" ? `ทีม ${comp.teamSizeMin}–${comp.teamSizeMax} คน` : "เดี่ยว"} · ที่นั่ง {formatSeats(comp.registered, comp.capacity)}
+              <div className="text-sm" style={{ background: "var(--skdw-bg)", padding: "10px 12px", borderRadius: 8 }}>
+                <div className="row mb-2" style={{ gap: 8 }}>
+                  <CompTypeBadge type={comp.type} teamSizeMin={comp.teamSizeMin} teamSizeMax={comp.teamSizeMax} />
+                  <span className="badge badge-purple">{comp.eventName}</span>
+                  {full && <span className="badge badge-error">เต็ม</span>}
+                  {closed && <span className="badge badge-warning">ปิดรับสมัคร</span>}
+                </div>
+                ที่นั่ง {formatSeats(comp.registered, comp.capacity)}
                 {comp.eventDate && ` · ${formatThaiDate(comp.eventDate)} ${hhmm(comp.startTime)}–${hhmm(comp.endTime)}`}
-                {full && <span className="badge badge-error" style={{ marginLeft: 6 }}>เต็ม</span>}
-                {closed && <span className="badge badge-warning" style={{ marginLeft: 6 }}>ปิดรับสมัคร</span>}
               </div>
             )}
 
@@ -558,7 +574,12 @@ function RegisterModal({
                   <input className="form-input" style={{ maxWidth: 320 }} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="เช่น ทีมดาวรุ่ง" />
                 </div>
                 <div>
-                  <label className="form-label">สมาชิกในทีม ({members.length}/{comp.teamSizeMax})</label>
+                  <label className="form-label">
+                    สมาชิกในทีม ({members.length}/{comp.teamSizeMax}){" "}
+                    <span className="muted" style={{ fontWeight: 400 }}>
+                      — รายการนี้ต้องมี {teamSizeLabel("team", comp.teamSizeMin, comp.teamSizeMax)} (รวม {student.name})
+                    </span>
+                  </label>
                   <div className="stack" style={{ gap: 6 }}>
                     {members.map((m) => (
                       <div key={m.studentCode} className="row between" style={{ background: "var(--skdw-bg)", padding: "6px 12px", borderRadius: 6 }}>

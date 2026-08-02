@@ -5,6 +5,7 @@ import { api } from "@/lib/client";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { Icon } from "@/components/Icon";
 import { StudentPicker, type PickedStudent } from "@/components/StudentPicker";
+import { CompTypeBadge, teamSizeLabel } from "@/components/CompTypeBadge";
 import { formatThaiDate, formatSeats, seatsFull } from "@/lib/domain";
 
 export type BrowseComp = {
@@ -189,7 +190,7 @@ export function BrowseRegister({
         <div className="row between">
           <div>
             <div className="row" style={{ gap: 8 }}>
-              <span className="badge">{c.type === "team" ? `ทีม ${c.teamSizeMin}-${c.teamSizeMax} คน` : "เดี่ยว"}</span>
+              <CompTypeBadge type={c.type} teamSizeMin={c.teamSizeMin} teamSizeMax={c.teamSizeMax} />
             </div>
             <h3 style={{ margin: "8px 0 4px" }}>{c.name}</h3>
             <div className="text-sm muted">
@@ -242,7 +243,12 @@ export function BrowseRegister({
               <label className="form-label">ชื่อทีม (ถ้ามี)</label>
               <input className="form-input" style={{ maxWidth: 320 }} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="เช่น ทีมดาวรุ่ง" />
             </div>
-            <label className="form-label">สมาชิกในทีม ({members.length}/{c.teamSizeMax})</label>
+            <label className="form-label">
+              สมาชิกในทีม ({members.length}/{c.teamSizeMax}){" "}
+              <span className="muted" style={{ fontWeight: 400 }}>
+                — รายการนี้ต้องมี {teamSizeLabel("team", c.teamSizeMin, c.teamSizeMax)} (รวมตัวคุณเอง)
+              </span>
+            </label>
             <div className="stack" style={{ gap: 6 }}>
               {members.map((m) => (
                 <div key={m.studentCode} className="row between" style={{ background: "var(--skdw-bg)", padding: "6px 12px", borderRadius: 6 }}>

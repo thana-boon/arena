@@ -67,21 +67,25 @@ export function TeacherRolesManager({
 
       <div className="card mb-4">
         <div className="card-header" style={{ padding: 0, border: "none", marginBottom: 12 }}>ครูที่มีสิทธิ์พิเศษ</div>
-        <div className="table-wrap">
+        <div className="table-wrap table-cards">
           <table className="table">
             <thead><tr><th>รหัสครู</th><th>ชื่อ</th><th>Admin</th><th>ผู้บันทึกผล</th><th></th></tr></thead>
             <tbody>
               {special.map((r) => (
                 <tr key={r.teacherCode}>
-                  <td>{r.teacherCode}</td>
-                  <td>{r.name || "-"}</td>
-                  <td>
+                  <td className="hide-sm">{r.teacherCode}</td>
+                  {/* มือถือ: ชื่อเป็นหัวการ์ด รหัสครูไปอยู่บรรทัดรองใต้ชื่อ */}
+                  <td className="td-title">
+                    {r.name || "-"}
+                    <div className="only-sm text-xs muted">รหัส {r.teacherCode}</div>
+                  </td>
+                  <td data-label="Admin">
                     {r.isAdmin ? (
                       <span className="badge badge-purple">Admin{r.viaApi ? " · SchoolOS" : ""}</span>
                     ) : "-"}
                   </td>
-                  <td>{r.isRecorder ? <span className="badge badge-info">Recorder</span> : "-"}</td>
-                  <td className="num">
+                  <td data-label="ผู้บันทึกผล">{r.isRecorder ? <span className="badge badge-info">Recorder</span> : "-"}</td>
+                  <td className="num td-actions">
                     {r.apiOnly ? (
                       <span className="text-sm muted">จาก SchoolOS</span>
                     ) : (
@@ -111,7 +115,7 @@ export function TeacherRolesManager({
         {apiTeachers && (
           <>
             <input className="form-input mb-4" style={{ maxWidth: 320 }} placeholder="ค้นหาชื่อ/รหัสครู" value={search} onChange={(e) => setSearch(e.target.value)} />
-            <div className="table-wrap">
+            <div className="table-wrap table-cards">
               <table className="table">
                 <thead><tr><th>รหัสครู</th><th>ชื่อ</th><th>หมวด</th><th>Admin</th><th>Recorder</th></tr></thead>
                 <tbody>
@@ -123,15 +127,18 @@ export function TeacherRolesManager({
                     const isRecorder = cur?.isRecorder ?? false;
                     return (
                       <tr key={t.teacherCode}>
-                        <td>{t.teacherCode}</td>
-                        <td>{t.name}</td>
-                        <td className="text-sm muted">{t.subjectGroup}</td>
-                        <td>
+                        <td className="hide-sm">{t.teacherCode}</td>
+                        <td className="td-title">
+                          {t.name}
+                          <div className="only-sm text-xs muted">รหัส {t.teacherCode}</div>
+                        </td>
+                        <td className="text-sm muted" data-label="หมวด">{t.subjectGroup}</td>
+                        <td data-label="Admin">
                           <input type="checkbox" checked={isAdmin} disabled={busy || viaApi}
                             title={viaApi ? "admin จาก SchoolOS (teacher-admin) — แก้ที่นี่ไม่ได้" : undefined}
                             onChange={(e) => setRole(t.teacherCode, t.name, e.target.checked, isRecorder)} />
                         </td>
-                        <td>
+                        <td data-label="Recorder">
                           <input type="checkbox" checked={isRecorder} disabled={busy}
                             onChange={(e) => setRole(t.teacherCode, t.name, cur?.isAdmin ?? false, e.target.checked)} />
                         </td>

@@ -14,17 +14,39 @@ export type SessionPayload = {
   classLevel?: string; // สำหรับนักเรียน
   classRoom?: string;
   subjectGroupId?: number; // หมวด (กลุ่มสาระ) ของครู — ใช้กรองรายการที่เห็น
+  /** เพดานเวลาสัมบูรณ์ของ session นี้ (epoch วินาที) — ต่ออายุได้ไม่เกินเวลานี้ ต้อง login ใหม่ */
+  abs?: number;
+  /** exp ของ JWT (epoch วินาที) — jose ใส่มาให้ตอน verify ไม่ต้องเซ็ตเอง */
+  exp?: number;
 };
 
 const COOKIE = "arena_session";
 const secret = () => new TextEncoder().encode(env.JWT_SECRET);
-const MAX_AGE = 60 * 60 * 12; // 12 ชม.
 
-export async function createSession(payload: SessionPayload): Promise<void> {
-  const token = await new SignJWT({ ...payload })
+/**
+ * อายุ session แบ่งเป็นสองชั้น
+ * - IDLE: ไม่มีการใช้งานเกินเท่านี้ → หลุดเอง (ค่า exp ของ JWT + maxAge ของ cookie)
+ *   ทุกครั้งที่ยังใช้งานอยู่ ฝั่งหน้าเว็บจะ ping มาต่ออายุให้ (ดู SessionTimeout.tsx)
+ * - ABSOLUTE: นับจากตอน login ครั้งแรก ต่ออายุได้ไม่เกินเท่านี้ ต้อง login ใหม่เสมอ
+ * ปรับได้ผ่าน env — ค่าเริ่มต้น 30 นาที / 12 ชม.
+ */
+export const IDLE_SECONDS = minutesFromEnv("SESSION_IDLE_MINUTES", 30);
+export const ABSOLUTE_SECONDS = minutesFromEnv("SESSION_ABSOLUTE_MINUTES", 60 * 12);
+
+function minutesFromEnv(name: string, fallbackMinutes: number): number {
+  const n = Number(process.env[name]);
+  return (Number.isFinite(n) && n > 0 ? n : fallbackMinutes) * 60;
+}
+
+const nowSec = () => Math.floor(Date.now() / 1000);
+
+async function writeCookie(payload: SessionPayload, maxAge: number): Promise<void> {
+  // exp/iat มาจาก token ใบเก่า — ต้องไม่ติดไปกับใบใหม่ (jose จะเซ็ตให้เองด้านล่าง)
+  const { exp: _exp, ...rest } = payload;
+  const token = await new SignJWT({ ...rest })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${MAX_AGE}s`)
+    .setExpirationTime(`${maxAge}s`)
     .sign(secret());
 
   const jar = await cookies();
@@ -35,8 +57,30 @@ export async function createSession(payload: SessionPayload): Promise<void> {
     // เปิดเป็น true เฉพาะเมื่อ deploy หลัง HTTPS จริง (ตั้ง COOKIE_SECURE=true)
     secure: process.env.COOKIE_SECURE === "true",
     path: "/",
-    maxAge: MAX_AGE,
+    maxAge,
   });
+}
+
+export async function createSession(payload: SessionPayload): Promise<void> {
+  const abs = nowSec() + ABSOLUTE_SECONDS;
+  await writeCookie({ ...payload, abs }, Math.min(IDLE_SECONDS, ABSOLUTE_SECONDS));
+}
+
+/**
+ * ต่ออายุ session ของผู้ใช้ที่ยังใช้งานอยู่ — คืนจำนวนวินาทีที่เหลือก่อนหลุด
+ * คืน 0 เมื่อชนเพดานสัมบูรณ์แล้ว (ลบ cookie ทิ้งเลย ให้ไป login ใหม่)
+ */
+export async function touchSession(payload: SessionPayload): Promise<number> {
+  const now = nowSec();
+  // token เก่าที่ออกก่อนมีระบบนี้ ยังไม่มี abs — ให้เริ่มนับเพดานจากตอนนี้
+  const abs = payload.abs ?? now + ABSOLUTE_SECONDS;
+  const remaining = Math.min(IDLE_SECONDS, abs - now);
+  if (remaining <= 0) {
+    await destroySession();
+    return 0;
+  }
+  await writeCookie({ ...payload, abs }, remaining);
+  return remaining;
 }
 
 export async function destroySession(): Promise<void> {
@@ -54,6 +98,12 @@ export async function getSession(): Promise<SessionPayload | null> {
   } catch {
     return null;
   }
+}
+
+/** เหลืออีกกี่วินาที session จะหมดอายุ (นับจาก exp ของ token ปัจจุบัน) */
+export function sessionExpiresIn(payload: SessionPayload): number {
+  if (payload.exp == null) return IDLE_SECONDS; // token รุ่นเก่า — เดาเป็นเต็มช่วง idle
+  return Math.max(0, payload.exp - nowSec());
 }
 
 /** verify token จาก string (ใช้ใน middleware — edge runtime) */

@@ -46,10 +46,14 @@ export default async function TeacherHome() {
         </Link>
       </div>
 
-      <div className="row">
-        <Link href="/teacher/competitions" className="btn btn-primary">ดูรายการแข่งขัน</Link>
+      <div className="page-actions">
+        {/* งานหลักของครูประจำชั้น — ปุ่มแรกสุด กดถึงได้ทันทีตั้งแต่หน้าแรกบนมือถือ */}
+        <Link href="/teacher/class-registrations" className="btn btn-primary">
+          <Icon name="graduation" size={18} /> สมัครให้ห้องประจำชั้น
+        </Link>
+        <Link href="/teacher/competitions" className="btn btn-secondary">ดูรายการแข่งขัน</Link>
         {(session.role === "recorder" || session.role === "admin") && (
-          <Link href="/teacher/scoring" className="btn btn-secondary">บันทึกผลการแข่งขัน</Link>
+          <Link href="/teacher/scoring" className="btn btn-ghost">บันทึกผลการแข่งขัน</Link>
         )}
       </div>
     </div>

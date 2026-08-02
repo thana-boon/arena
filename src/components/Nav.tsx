@@ -5,7 +5,15 @@ import { useCallback, useEffect, useState } from "react";
 import { Icon, type IconName } from "@/components/Icon";
 import type { NavGroup } from "@/lib/nav";
 
-export type NavItem = { href: string; label: string; icon: IconName };
+export type NavItem = {
+  href: string;
+  label: string;
+  icon: IconName;
+  /** ชื่อย่อสำหรับแถบล่างบนมือถือ (ช่องแคบ — ชื่อเต็มบางอันยาวเกินไป) */
+  short?: string;
+  /** เมนูหลักที่ต้องกดถึงได้ในหนึ่งนิ้วบนมือถือ — ขึ้นแถบล่าง ไม่ต้องเปิดเมนู */
+  primary?: boolean;
+};
 
 /** จำสถานะพับของแต่ละหมวดไว้ข้ามหน้า/ข้ามการรีเฟรช (key = ชื่อ section) */
 const COLLAPSE_KEY = "arena.nav.collapsed";
@@ -103,21 +111,99 @@ export function Sidebar({ groups }: { groups: NavGroup[] }) {
   );
 }
 
-export function BottomNav({ items }: { items: NavItem[] }) {
+/**
+ * แถบเมนูล่างบนมือถือ — เมนูหลักไม่เกิน 4 อัน + ปุ่ม "เมนู" เปิดแผ่นรวมเมนูทั้งหมด
+ * (เดิมยัดทุกเมนูเรียงกันแล้วเลื่อนแนวนอน ซึ่งบนมือถือแทบไม่มีใครรู้ว่าเลื่อนได้)
+ */
+export function BottomNav({
+  items,
+  groups,
+  hasMore,
+  children,
+}: {
+  items: NavItem[];
+  groups: NavGroup[];
+  hasMore: boolean;
+  /** ส่วนท้ายแผ่นเมนู (ชื่อผู้ใช้ + ปุ่มออกจากระบบ) — ประกอบมาจาก AppShell ฝั่ง server */
+  children?: React.ReactNode;
+}) {
   const path = usePathname();
+  const [open, setOpen] = useState(false);
+
+  // เปลี่ยนหน้าแล้วปิดแผ่นเมนูเอง
+  useEffect(() => setOpen(false), [path]);
+
+  // เปิดแผ่นเมนูอยู่ = ล็อกไม่ให้หน้าด้านหลังเลื่อนตาม
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    // ขยายจอ/หมุนเครื่องจนกลับไปโหมด sidebar — ต้องปิดเอง ไม่งั้นหน้าค้างเลื่อนไม่ได้
+    const onResize = () => window.innerWidth > 768 && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onResize);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [open]);
+
+  // เมนูที่อยู่ในแผ่น (ไม่ได้อยู่บนแถบล่าง) ถ้าถูกเปิดอยู่ ให้ปุ่ม "เมนู" สว่างแทน
+  const shownHrefs = new Set(items.map((i) => i.href));
+  const moreActive = groups.some((g) => g.items.some((it) => !shownHrefs.has(it.href) && isActive(path, it.href)));
+
   return (
-    <nav className="bottom-nav">
-      {items.map((it) => {
-        const active = path === it.href || (it.href !== "/" && path.startsWith(it.href + "/"));
-        return (
-          <Link key={it.href} href={it.href} className={active ? "active" : ""}>
+    <>
+      <nav className="bottom-nav">
+        {items.map((it) => {
+          const active = isActive(path, it.href);
+          return (
+            <Link key={it.href} href={it.href} className={active ? "active" : ""}>
+              <span className="ico">
+                <Icon name={it.icon} size={22} />
+              </span>
+              <span>{it.short ?? it.label}</span>
+            </Link>
+          );
+        })}
+        {hasMore && (
+          <button type="button" className={`bn-more${moreActive || open ? " active" : ""}`} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
             <span className="ico">
-              <Icon name={it.icon} size={22} />
+              <Icon name={open ? "close" : "menu"} size={22} />
             </span>
-            <span>{it.label}</span>
-          </Link>
-        );
-      })}
-    </nav>
+            <span>เมนู</span>
+          </button>
+        )}
+      </nav>
+
+      {open && (
+        <div className="nav-sheet-overlay" onClick={() => setOpen(false)}>
+          <div className="nav-sheet" role="dialog" aria-modal="true" aria-label="เมนูทั้งหมด" onClick={(e) => e.stopPropagation()}>
+            <div className="nav-sheet-grip" aria-hidden="true" />
+            <div className="nav-sheet-body">
+              {groups.map((g, gi) => (
+                <div className="nav-sheet-group" key={g.section ?? `g${gi}`}>
+                  {g.section && <div className="nav-sheet-section">{g.section}</div>}
+                  {g.items.map((it) => {
+                    const active = isActive(path, it.href);
+                    return (
+                      <Link key={it.href} href={it.href} className={`nav-sheet-item${active ? " active" : ""}`} aria-current={active ? "page" : undefined}>
+                        <span className="ico">
+                          <Icon name={it.icon} size={20} />
+                        </span>
+                        <span>{it.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            {children && <div className="nav-sheet-foot">{children}</div>}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

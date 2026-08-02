@@ -39,7 +39,7 @@ export async function CompetitionDetailBody({
 
   return (
     <div className="stack">
-      <div className="row between">
+      <div className="page-bar">
         <div className="page-header" style={{ marginBottom: 0 }}>
           <h1>{comp.name}</h1>
           <div className="subtitle">
@@ -51,7 +51,7 @@ export async function CompetitionDetailBody({
             {eventDateTh && ` · ${eventDateTh}${comp.startTime ? ` ${comp.startTime.slice(0, 5)}–${comp.endTime?.slice(0, 5)} น.` : ""}`}
           </div>
         </div>
-        <div className="row">
+        <div className="page-actions">
           <Link href={`${basePath}/${id}/reports`} className="btn btn-ghost"><Icon name="printer" size={18} /> เอกสาร</Link>
           <Link href={`${basePath}/${id}/edit`} className="btn btn-secondary">แก้ไข</Link>
           {!comp.noContest && canScore(session, comp.createdBy, group?.catalogNo) && (

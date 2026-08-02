@@ -155,7 +155,7 @@ export function ClassRegistrations({
   return (
     <div className="stack">
       <div className="card">
-        <div className="row" style={{ alignItems: "flex-end", gap: 8 }}>
+        <div className="filter-bar">
           {isAdmin ? (
             <>
               <div className="form-group" style={{ marginBottom: 0, width: 140 }}>
@@ -209,14 +209,13 @@ export function ClassRegistrations({
           {isAdmin && (
             <button
               className="btn btn-ghost"
-              style={{ marginBottom: 1 }}
               disabled={ovBusy}
               onClick={() => (showOverview ? setShowOverview(false) : loadOverview())}
             >
               <Icon name="chart" size={14} /> {ovBusy ? "กำลังโหลด…" : showOverview ? "ซ่อนภาพรวม" : "ภาพรวมทุกห้อง"}
             </button>
           )}
-          {busy && <div className="muted text-sm" style={{ paddingBottom: 10 }}>กำลังโหลดรายชื่อ…</div>}
+          {busy && <div className="muted text-sm">กำลังโหลดรายชื่อ…</div>}
         </div>
         {err && <div className="form-error mt-2">{err}</div>}
       </div>
@@ -236,7 +235,7 @@ export function ClassRegistrations({
               <Bar pct={ovPct} label="สัดส่วนนักเรียนที่สมัครแล้วทั้งโรงเรียน" />
               <span className="text-sm" style={{ fontWeight: 600, minWidth: 42, textAlign: "right" }}>{ovPct}%</span>
             </div>
-            <div className="table-wrap">
+            <div className="table-wrap table-cards">
               <table className="table">
                 <thead>
                   <tr>
@@ -254,7 +253,7 @@ export function ClassRegistrations({
                     const done = r.total > 0 && r.registered >= r.total;
                     return (
                       <tr key={`${r.classLevel}/${r.classRoom}`}>
-                        <td>
+                        <td className="td-title">
                           <button
                             className="btn btn-ghost btn-sm"
                             style={{ padding: "0 6px" }}
@@ -264,15 +263,15 @@ export function ClassRegistrations({
                             {r.classLevel}/{r.classRoom}
                           </button>
                         </td>
-                        <td className="num">{r.total}</td>
-                        <td className="num">{r.registered}</td>
-                        <td>
+                        <td className="num" data-label="นักเรียน">{r.total}</td>
+                        <td className="num" data-label="สมัครแล้ว">{r.registered}</td>
+                        <td className="td-block" data-label="ความคืบหน้า">
                           <div className="row" style={{ gap: 10, alignItems: "center" }}>
                             <Bar pct={pct} label={`สัดส่วนที่สมัครแล้วของห้อง ${r.classLevel}/${r.classRoom}`} />
                           </div>
                         </td>
-                        <td className="num">{pct}%</td>
-                        <td>
+                        <td className="num" data-label="%">{pct}%</td>
+                        <td data-label="สถานะ">
                           {done ? (
                             <span className="badge badge-success">ครบ</span>
                           ) : (
@@ -312,7 +311,7 @@ export function ClassRegistrations({
               <span className="text-sm" style={{ fontWeight: 600, minWidth: 42, textAlign: "right" }}>{registeredPct}%</span>
             </div>
           )}
-          <div className="table-wrap">
+          <div className="table-wrap table-cards">
             <table className="table">
               <thead>
                 <tr>
@@ -327,11 +326,17 @@ export function ClassRegistrations({
               <tbody>
                 {students.map((s, i) => (
                   <tr key={s.studentCode}>
-                    <td>{i + 1}</td>
-                    <td>{s.studentCode}</td>
-                    <td>{s.name}</td>
-                    <td className="num">{s.registrations.length || ""}</td>
-                    <td>
+                    <td className="hide-sm">{i + 1}</td>
+                    <td className="hide-sm">{s.studentCode}</td>
+                    {/* บนมือถือรวมเป็นหัวการ์ด: ลำดับ + ชื่อ + รหัส (คอลัมน์ซ้ายถูกซ่อน) */}
+                    <td className="td-title">
+                      <span className="only-sm muted">{i + 1}. </span>
+                      {s.name}
+                      <div className="only-sm text-xs muted">รหัส {s.studentCode}</div>
+                    </td>
+                    {/* บนมือถือไม่ต้องมี — ช่อง "รายการที่สมัคร" ด้านล่างบอกอยู่แล้วว่ามีกี่รายการ/ยังไม่สมัคร */}
+                    <td className="num hide-sm">{s.registrations.length || ""}</td>
+                    <td className="td-block" data-label="รายการที่สมัคร">
                       {!s.registrations.length ? (
                         <span className="muted text-sm">ยังไม่ได้สมัคร</span>
                       ) : (
@@ -365,10 +370,12 @@ export function ClassRegistrations({
                         </div>
                       )}
                     </td>
-                    <td style={{ textAlign: "right" }}>
-                      <button className="btn btn-ghost btn-sm" onClick={() => setRegFor(s)}>
-                        <Icon name="plus" size={13} /> สมัครให้
-                      </button>
+                    <td className="td-actions" style={{ textAlign: "right" }}>
+                      <div className="row" style={{ justifyContent: "flex-end" }}>
+                        <button className="btn btn-secondary btn-sm" onClick={() => setRegFor(s)}>
+                          <Icon name="plus" size={13} /> สมัครให้
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

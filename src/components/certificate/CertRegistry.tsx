@@ -112,7 +112,7 @@ export function CertRegistry() {
   return (
     <div className="stack">
       <div className="card">
-        <form onSubmit={search} className="row" style={{ alignItems: "flex-end", gap: 8 }}>
+        <form onSubmit={search} className="filter-bar">
           <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: 200 }}>
             <label className="form-label">รหัสนักเรียน หรือ ชื่อ-สกุล</label>
             <input
@@ -144,7 +144,7 @@ export function CertRegistry() {
 
       {groups.map((g) => (
         <div key={g.studentCode} className="card stack">
-          <div className="row between" style={{ alignItems: "center" }}>
+          <div className="page-bar">
             <div>
               <h3 style={{ margin: 0 }}>{g.name}</h3>
               <div className="subtitle">
@@ -159,7 +159,7 @@ export function CertRegistry() {
             )}
           </div>
 
-          <div className="table-wrap">
+          <div className="table-wrap table-cards">
             <table className="table">
               <thead>
                 <tr>
@@ -174,29 +174,31 @@ export function CertRegistry() {
               <tbody>
                 {g.rows.map((r) => (
                   <tr key={r.key}>
-                    <td style={{ whiteSpace: "nowrap" }}>{r.yearBe}</td>
-                    <td>
+                    <td className="hide-sm" style={{ whiteSpace: "nowrap" }}>{r.yearBe}</td>
+                    <td className="td-title">
                       <div>{r.competitionName}</div>
                       <div className="subtitle">
+                        <span className="only-sm">ปี {r.yearBe} · </span>
                         {r.eventName || "—"}
                         {r.teamName && ` · ทีม ${r.teamName}`}
                       </div>
                     </td>
-                    <td style={{ whiteSpace: "nowrap" }}>{r.classText || "—"}</td>
-                    <td style={{ whiteSpace: "nowrap" }}>
+                    <td style={{ whiteSpace: "nowrap" }} data-label="ชั้น">{r.classText || "—"}</td>
+                    <td style={{ whiteSpace: "nowrap" }} data-label="รางวัล">
                       {r.issueId == null ? (
                         <span className="subtitle">—</span>
                       ) : (
-                        <>
+                        <span>
                           {r.award ? AWARD_LABEL[r.award] : "—"}
                           {r.rank > 0 && <div className="subtitle">{rankAwardLabel(r.rank)}</div>}
-                        </>
+                        </span>
                       )}
                     </td>
-                    <td style={{ whiteSpace: "nowrap" }}>
+                    <td style={{ whiteSpace: "nowrap" }} data-label="เลขทะเบียน">
                       {r.serialNo ?? <span className="subtitle">ยังไม่ออกใบ</span>}
                     </td>
-                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    <td className="td-actions" style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                      <div className="row" style={{ justifyContent: "flex-end" }}>
                       {r.revoked ? (
                         <span className="badge badge-warning">ยกเลิกแล้ว</span>
                       ) : r.issueId != null ? (
@@ -217,6 +219,7 @@ export function CertRegistry() {
                       ) : (
                         <span className="badge">{r.blockReason}</span>
                       )}
+                      </div>
                     </td>
                   </tr>
                 ))}

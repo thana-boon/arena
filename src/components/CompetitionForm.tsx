@@ -514,12 +514,13 @@ export function CompetitionForm({
         </div>
         <div className="form-section-body">
           {f.criteria.map((c, i) => (
-            <div key={i} className="row" style={{ alignItems: "center" }}>
+            <div key={i} className="row" style={{ alignItems: "center", gap: 8 }}>
               <span className="crit-no">{i + 1}</span>
-              <div className="form-group" style={{ marginBottom: 0, flex: 1 }}>
+              {/* จอแคบ: ชื่อเกณฑ์กินเต็มบรรทัด แล้วช่องคะแนน+ปุ่มลบตกลงมาบรรทัดถัดไป */}
+              <div className="form-group" style={{ marginBottom: 0, flex: "1 1 200px", minWidth: 160 }}>
                 <input className="form-input" placeholder="ชื่อเกณฑ์ เช่น ความสวยงาม" value={c.name} disabled={locked} onChange={(e) => setCrit(i, "name", e.target.value)} />
               </div>
-              <div className="form-group" style={{ marginBottom: 0, width: 120 }}>
+              <div className="form-group" style={{ marginBottom: 0, width: 110 }}>
                 <input type="number" min={0} step="0.01" className="form-input" placeholder="คะแนนเต็ม" value={c.maxScore} disabled={locked} onChange={(e) => setCrit(i, "maxScore", e.target.value)} />
               </div>
               {!locked && f.criteria.length > 1 && (
@@ -536,7 +537,8 @@ export function CompetitionForm({
       </section>
       )}
 
-      <div className="row" style={{ alignItems: "center" }}>
+      {/* บนมือถือแถบนี้ลอยติดขอบล่าง — ฟอร์มยาวมาก ไม่ควรต้องเลื่อนจนสุดเพื่อกดบันทึก */}
+      <div className="form-actions">
         <button className="btn btn-primary" disabled={busy}>{busy ? "กำลังบันทึก…" : initial.id ? "บันทึกการแก้ไข" : "สร้างรายการ"}</button>
         <button type="button" className="btn btn-ghost" onClick={() => router.back()}>ยกเลิก</button>
         <span className="form-hint" style={{ marginLeft: "auto" }}>รายการที่สร้างจะยังไม่เผยแพร่ จนกว่าจะเปิดจากหน้ารายการ</span>

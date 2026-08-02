@@ -145,24 +145,25 @@ export function CompetitionsTable({
     <>
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
       {eventOptions.length > 1 && (
-        <div className="row" style={{ alignItems: "center", gap: 8 }}>
-          <label className="form-label" style={{ marginBottom: 0 }}>งาน</label>
-          <select
-            className="form-select"
-            style={{ width: "auto", maxWidth: "100%" }}
-            value={eventFilter}
-            onChange={(e) => {
-              setEventFilter(e.target.value === "all" ? "all" : Number(e.target.value));
-              setGroupFilter("all"); // งานเปลี่ยน หมวดเดิมอาจไม่มีในงานใหม่
-            }}
-          >
-            <option value="all">ทุกงาน ({comps.length})</option>
-            {eventOptions.map((ev) => (
-              <option key={ev.id} value={ev.id}>
-                {ev.name} ({comps.filter((c) => (c.eventId ?? -1) === ev.id).length})
-              </option>
-            ))}
-          </select>
+        <div className="filter-bar">
+          <label className="field" style={{ maxWidth: 360 }}>
+            <span>งาน</span>
+            <select
+              className="form-select"
+              value={eventFilter}
+              onChange={(e) => {
+                setEventFilter(e.target.value === "all" ? "all" : Number(e.target.value));
+                setGroupFilter("all"); // งานเปลี่ยน หมวดเดิมอาจไม่มีในงานใหม่
+              }}
+            >
+              <option value="all">ทุกงาน ({comps.length})</option>
+              {eventOptions.map((ev) => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.name} ({comps.filter((c) => (c.eventId ?? -1) === ev.id).length})
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
       {groups.length > 1 && (
@@ -187,7 +188,7 @@ export function CompetitionsTable({
           })}
         </div>
       )}
-      <div className="table-wrap">
+      <div className="table-wrap table-cards">
         <table className="table">
           <thead>
             <tr>
@@ -205,17 +206,19 @@ export function CompetitionsTable({
             )}
             {filtered.map((c) => (
               <tr key={c.id}>
-                <td>
+                <td className="td-title">
                   <Link href={`${basePath}/${c.id}`} style={{ fontWeight: 500 }}>{c.name}</Link>
                   <div className="text-xs muted">{c.levels.join(", ")}{c.eventDate ? ` · ${formatThaiDate(c.eventDate)}` : ""}</div>
                 </td>
-                <td className="text-sm">{c.groupName}</td>
-                <td>
-                  <span className="badge">{c.type === "team" ? "ทีม" : "เดี่ยว"}</span>
-                  {c.noContest && <span className="badge badge-purple" style={{ marginLeft: 4 }}>ไม่มีการแข่งขัน</span>}
+                <td className="text-sm" data-label="หมวด">{c.groupName}</td>
+                <td data-label="ประเภท">
+                  <span>
+                    <span className="badge">{c.type === "team" ? "ทีม" : "เดี่ยว"}</span>
+                    {c.noContest && <span className="badge badge-purple" style={{ marginLeft: 4 }}>ไม่มีการแข่งขัน</span>}
+                  </span>
                 </td>
-                <td className="num">{isUnlimited(c.capacity) ? "ไม่จำกัด" : c.capacity} / {c.registered}</td>
-                <td>
+                <td className="num" data-label="รับ/สมัคร">{isUnlimited(c.capacity) ? "ไม่จำกัด" : c.capacity} / {c.registered}</td>
+                <td data-label="สถานะ">
                   <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
                     {/* ไม่มีการแข่งขัน = ไม่มีสถานะประกาศผล (ออกเกียรติบัตรได้เลย) */}
                     {c.noContest
@@ -226,7 +229,7 @@ export function CompetitionsTable({
                     {!c.visibleToStudents && <span className="badge">ซ่อนจากนักเรียน</span>}
                   </div>
                 </td>
-                <td className="num">
+                <td className="num td-actions">
                   <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
                     <Link href={`${basePath}/${c.id}`} className="btn btn-ghost btn-sm">จัดการ</Link>
                     {canEdit(c) && <Link href={`${basePath}/${c.id}/edit`} className="btn btn-secondary btn-sm">แก้ไข</Link>}

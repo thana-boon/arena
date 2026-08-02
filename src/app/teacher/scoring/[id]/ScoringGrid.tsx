@@ -101,7 +101,7 @@ export function ScoringGrid({
     <div className="stack">
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
 
-      <div className="table-wrap">
+      <div className="table-wrap table-cards score-cards">
         <table className="table">
           <thead>
             <tr>
@@ -120,24 +120,26 @@ export function ScoringGrid({
               const medal = decideMedal(pct, medalPct.gold, medalPct.silver, medalPct.bronze);
               return (
                 <tr key={e.entryId}>
-                  <td style={{ fontWeight: 700 }}>{ranked[e.entryId]}</td>
-                  <td>
+                  <td className="hide-sm" style={{ fontWeight: 700 }}>{ranked[e.entryId]}</td>
+                  <td className="td-title">
+                    <span className="only-sm badge badge-purple" style={{ marginRight: 6 }}>อันดับ {ranked[e.entryId]}</span>
                     {type === "team" && e.teamName && <div style={{ fontWeight: 600 }}>{e.teamName}</div>}
                     <div className="text-sm">{e.members.map((m) => `${m.name} (${m.classLevel}/${m.classRoom})`).join(", ")}</div>
                   </td>
                   {criteria.map((c) => (
-                    <td key={c.id} className="num">
+                    <td key={c.id} className="num" data-label={`${c.name} (เต็ม ${c.max})`}>
                       <input
-                        type="number" min={0} max={c.max} step="0.01"
-                        className="form-input" style={{ width: 90, textAlign: "right", padding: "4px 8px", height: 34 }}
+                        type="number" min={0} max={c.max} step="0.01" inputMode="decimal"
+                        className="form-input score-input" style={{ textAlign: "right" }}
+                        aria-label={`คะแนน ${c.name}`}
                         value={vals[key(e.entryId, c.id)] ?? ""}
                         onChange={(ev) => setVal(e.entryId, c.id, ev.target.value)}
                       />
                     </td>
                   ))}
-                  <td className="num" style={{ fontWeight: 600 }}>{total.toFixed(2)}</td>
-                  <td className="num">{pct.toFixed(1)}%</td>
-                  <td><span className={`badge ${MEDAL_BADGE_CLASS[medal]}`}>{MEDAL_LABEL[medal]}</span></td>
+                  <td className="num" style={{ fontWeight: 600 }} data-label={`รวม (${fullScore})`}>{total.toFixed(2)}</td>
+                  <td className="num" data-label="%">{pct.toFixed(1)}%</td>
+                  <td data-label="เหรียญ"><span className={`badge ${MEDAL_BADGE_CLASS[medal]}`}>{MEDAL_LABEL[medal]}</span></td>
                 </tr>
               );
             })}
@@ -145,7 +147,7 @@ export function ScoringGrid({
         </table>
       </div>
 
-      <div className="row between">
+      <div className="form-actions between">
         <button className="btn btn-primary" onClick={save} disabled={busy}>{busy ? "กำลังบันทึก…" : "บันทึกคะแนน"}</button>
         <button className={`btn ${published ? "btn-ghost" : "btn-accent"}`} onClick={togglePublish} disabled={busy}>
           {published ? "ยกเลิกการประกาศผล" : "ประกาศผล"}

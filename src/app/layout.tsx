@@ -1,10 +1,21 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "Arena - SchoolOS | โรงเรียนสุคนธรวิทย์",
   description: "ระบบรับสมัครและบันทึกผลการแข่งขันทางวิชาการ โรงเรียนสุคนธีรวิทย์",
+};
+
+/**
+ * ผู้ใช้ส่วนใหญ่เข้าจากมือถือ
+ * - viewportFit: cover ให้ env(safe-area-inset-*) มีค่าจริง (แถบเมนูล่างจะได้ไม่โดนแถบ home ทับ)
+ * - ไม่ล็อก maximumScale ผู้ใช้ยังซูมอ่านเองได้
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

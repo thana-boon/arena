@@ -64,12 +64,14 @@ export function ReportsView({
       <div className="no-print">
         <Link href={backHref} className="btn btn-ghost btn-sm">← กลับไปหน้ารายการแข่งขัน</Link>
       </div>
-      <div className="no-print row between">
+      <div className="no-print page-bar">
         <div className="page-header" style={{ marginBottom: 0 }}>
           <h1>เอกสาร / รายงาน</h1>
           <div className="subtitle">{meta.competitionName}</div>
         </div>
-        <button className="btn btn-primary" onClick={() => window.print()}><Icon name="printer" size={18} /> พิมพ์ (Ctrl+P)</button>
+        <div className="page-actions">
+          <button className="btn btn-primary" onClick={() => window.print()}><Icon name="printer" size={18} /> พิมพ์ (Ctrl+P)</button>
+        </div>
       </div>
 
       <div className="no-print auth-tabs" style={{ maxWidth: 520 }}>

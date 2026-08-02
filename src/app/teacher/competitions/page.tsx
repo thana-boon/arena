@@ -15,12 +15,14 @@ export default async function TeacherCompetitions() {
 
   return (
     <div className="stack">
-      <div className="row between">
+      <div className="page-bar">
         <div className="page-header" style={{ marginBottom: 0 }}>
           <h1>รายการแข่งขัน</h1>
           <div className="subtitle">{year ? `ปีการศึกษา ${year.yearBe}` : "ยังไม่เปิดปีการศึกษา"}</div>
         </div>
-        <Link href="/teacher/competitions/new" className="btn btn-primary">+ สร้างรายการ</Link>
+        <div className="page-actions">
+          <Link href="/teacher/competitions/new" className="btn btn-primary">+ สร้างรายการ</Link>
+        </div>
       </div>
 
       {!year ? (

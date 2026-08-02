@@ -53,32 +53,34 @@ export function TeacherCertificates({ rows }: { rows: Row[] }) {
   return (
     <div className="stack">
       {msg && <div className={`alert alert-${msg.type === "error" ? "error" : "success"}`}>{msg.text}</div>}
-      <div className="card">
+      <div className="table-wrap table-cards">
         <table className="table">
           <thead>
             <tr>
               <th>รายการแข่งขัน</th>
               <th>หมวด</th>
               <th>งาน</th>
-              <th style={{ textAlign: "center" }}>ผู้เข้าแข่ง</th>
+              <th className="num">ผู้เข้าแข่ง</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
-                <td>{r.name}</td>
-                <td>{r.groupName}</td>
-                <td>{r.eventName ?? <span className="subtitle">—</span>}</td>
-                <td style={{ textAlign: "center" }}>{r.activeEntries}</td>
-                <td style={{ textAlign: "right" }}>
-                  {r.ready ? (
-                    <button className="btn btn-sm btn-primary" onClick={() => issue(r)} disabled={busyId === r.id}>
-                      <Icon name="printer" size={16} /> {busyId === r.id ? "กำลังออก…" : "ออกเกียรติบัตร"}
-                    </button>
-                  ) : (
-                    <span className="badge">{r.reason}</span>
-                  )}
+                <td className="td-title">{r.name}</td>
+                <td data-label="หมวด">{r.groupName}</td>
+                <td data-label="งาน">{r.eventName ?? <span className="muted">—</span>}</td>
+                <td className="num" data-label="ผู้เข้าแข่ง">{r.activeEntries}</td>
+                <td className="num td-actions">
+                  <div className="row" style={{ justifyContent: "flex-end" }}>
+                    {r.ready ? (
+                      <button className="btn btn-sm btn-primary" onClick={() => issue(r)} disabled={busyId === r.id}>
+                        <Icon name="printer" size={16} /> {busyId === r.id ? "กำลังออก…" : "ออกเกียรติบัตร"}
+                      </button>
+                    ) : (
+                      <span className="badge">{r.reason}</span>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

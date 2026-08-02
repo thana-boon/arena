@@ -5,7 +5,7 @@ import { RouteTransition } from "./RouteTransition";
 import { BrandLogo } from "./BrandLogo";
 import { Wordmark } from "./Wordmark";
 import { Avatar } from "./Avatar";
-import { flattenNav, type NavGroup } from "@/lib/nav";
+import { bottomNavItems, type NavGroup } from "@/lib/nav";
 import { nameInitial } from "@/lib/initials";
 import type { SessionPayload, Role } from "@/lib/auth/session";
 
@@ -27,7 +27,7 @@ export function AppShell({
 }) {
   const initial = nameInitial(session.name, session.firstName);
   const hasPhoto = Boolean(session.photo);
-  const bottomItems = flattenNav(groups);
+  const bottom = bottomNavItems(groups);
   return (
     <div className="app-shell-nav">
       <aside className="sidebar">
@@ -52,14 +52,24 @@ export function AppShell({
           <div className="tb-user">
             <span className="role-chip">{ROLE_LABEL[session.role]}</span>
             <Avatar initial={initial} hasPhoto={hasPhoto} className="avatar-sm" />
-            <span className="nowrap">{session.name}</span>
-            <LogoutButton />
+            {/* บนมือถือเหลือแค่รูปโปรไฟล์ — ชื่อ/บทบาท/ปุ่มออก ไปอยู่ในแผ่นเมนูล่างแทน */}
+            <span className="nowrap hide-sm">{session.name}</span>
+            <span className="hide-sm"><LogoutButton /></span>
           </div>
         </header>
         <main className="main-content"><RouteTransition>{children}</RouteTransition></main>
       </div>
 
-      <BottomNav items={bottomItems} />
+      <BottomNav items={bottom.items} groups={groups} hasMore={bottom.hasMore}>
+        <div className="nav-sheet-user">
+          <Avatar initial={initial} hasPhoto={hasPhoto} />
+          <span className="who">
+            <span className="nm">{session.name}</span>
+            <span className="rl">{ROLE_LABEL[session.role]}</span>
+          </span>
+          <LogoutButton />
+        </div>
+      </BottomNav>
     </div>
   );
 }

@@ -267,14 +267,14 @@ function RoomMode({
   return (
     <div className="stack" style={{ gap: 8 }}>
       <div className="row" style={{ gap: 8 }}>
-        <div className="form-group" style={{ marginBottom: 0, width: 100 }}>
+        <div className="form-group" style={{ marginBottom: 0, flex: "1 1 110px", minWidth: 0 }}>
           <label className="form-label">ระดับ</label>
           <select className="form-select" value={level} disabled={!!lock} onChange={(e) => setLevel(e.target.value)}>
             {levelOptions.length !== 1 && <option value="">เลือก</option>}
             {levelOptions.map((l) => <option key={l} value={l}>{l}</option>)}
           </select>
         </div>
-        <div className="form-group" style={{ marginBottom: 0, width: 120 }}>
+        <div className="form-group" style={{ marginBottom: 0, flex: "1 1 110px", minWidth: 0 }}>
           <label className="form-label">ห้อง</label>
           {lock ? (
             <select className="form-select" value={lock.classRoom} disabled>

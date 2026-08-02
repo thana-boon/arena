@@ -206,7 +206,7 @@ export function RosterManager({
       {!roster.length ? (
         <div className="empty-state"><Icon name="clipboard" size={44} className="empty-ico" /><p>ยังไม่มีผู้ลงทะเบียน</p></div>
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap table-cards">
           <table className="table">
             <thead>
               <tr><th style={{ width: 50 }}>#</th>{type === "team" && <th>ทีม</th>}<th>สมาชิก</th><th></th></tr>
@@ -214,10 +214,17 @@ export function RosterManager({
             <tbody>
               {roster.map((e, i) => (
                 <tr key={e.entryId}>
-                  <td>{i + 1}</td>
-                  {type === "team" && <td>{e.teamName || "-"}</td>}
-                  <td>{e.members.map((m) => `${m.name} (${m.classLevel}/${m.classRoom})`).join(", ")}</td>
-                  <td className="num"><button className="btn btn-danger btn-sm" disabled={busy} onClick={() => withdraw(e.entryId)}>ยกเลิก</button></td>
+                  <td className="hide-sm">{i + 1}</td>
+                  {type === "team" && <td className="td-title">{e.teamName || `ทีมที่ ${i + 1}`}</td>}
+                  <td className={type === "team" ? "td-block" : "td-title"} data-label={type === "team" ? "สมาชิก" : undefined}>
+                    <span className="only-sm muted">{type === "team" ? "" : `${i + 1}. `}</span>
+                    {e.members.map((m) => `${m.name} (${m.classLevel}/${m.classRoom})`).join(", ")}
+                  </td>
+                  <td className="num td-actions">
+                    <div className="row" style={{ justifyContent: "flex-end" }}>
+                      <button className="btn btn-danger btn-sm" disabled={busy} onClick={() => withdraw(e.entryId)}>ยกเลิก</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

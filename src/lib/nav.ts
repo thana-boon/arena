@@ -4,7 +4,7 @@ import type { NavItem } from "@/components/Nav";
 export type NavGroup = { section?: string; items: NavItem[] };
 
 export const ADMIN_NAV_GROUPS: NavGroup[] = [
-  { items: [{ href: "/admin", label: "แดชบอร์ด", icon: "dashboard" }] },
+  { items: [{ href: "/admin", label: "แดชบอร์ด", icon: "dashboard", primary: true }] },
   {
     section: "กำหนดข้อมูล",
     items: [
@@ -20,14 +20,14 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
   {
     section: "การแข่งขัน",
     items: [
-      { href: "/admin/competitions", label: "รายการแข่งขัน", icon: "trophy" },
-      { href: "/admin/class-registrations", label: "การสมัครรายห้อง", icon: "clipboard" },
+      { href: "/admin/competitions", label: "รายการแข่งขัน", icon: "trophy", short: "รายการ", primary: true },
+      { href: "/admin/class-registrations", label: "การสมัครรายห้อง", icon: "clipboard", short: "รายห้อง", primary: true },
     ],
   },
   {
     section: "รายงาน",
     items: [
-      { href: "/admin/reports", label: "ออกรายงาน", icon: "file" },
+      { href: "/admin/reports", label: "ออกรายงาน", icon: "file", short: "รายงาน", primary: true },
       { href: "/admin/certificates", label: "เกียรติบัตร", icon: "trophy" },
       // อยู่นอก /admin/certificates โดยตั้งใจ — Nav ไฮไลต์ด้วย startsWith(href + "/")
       // ถ้าเป็น path ลูก เมนู "เกียรติบัตร" จะสว่างพร้อมกันทั้งคู่
@@ -46,13 +46,15 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
 export const TEACHER_NAV_GROUPS: NavGroup[] = [
   {
     items: [
-      { href: "/teacher", label: "หน้าหลัก", icon: "home" },
-      { href: "/teacher/competitions", label: "รายการของฉัน", icon: "trophy" },
+      { href: "/teacher", label: "หน้าหลัก", icon: "home", primary: true },
+      { href: "/teacher/competitions", label: "รายการของฉัน", icon: "trophy", short: "รายการ", primary: true },
+      // ครูประจำชั้นใช้บ่อยที่สุด (ลงสมัครแทนนักเรียนในห้องตัวเอง) — ต้องอยู่ติดกับ "รายการ" บนแถบล่าง
+      // เรียงให้ตรงกับเมนูฝั่ง admin (รายการแข่งขัน → การสมัครรายห้อง) จะได้ไม่สลับที่กันคนละมุม
+      { href: "/teacher/class-registrations", label: "การสมัครรายห้อง", icon: "graduation", short: "ห้องของฉัน", primary: true },
       // ครูทุกคนบันทึกคะแนนรายการในหมวดตัวเองได้ (admin/recorder ได้ทุกรายการ)
-      { href: "/teacher/scoring", label: "บันทึกผล", icon: "pencil" },
-      { href: "/teacher/certificates", label: "ออกเกียรติบัตร", icon: "file" },
-      { href: "/teacher/cert-registry", label: "ทะเบียนเกียรติบัตร", icon: "search" },
-      { href: "/teacher/class-registrations", label: "การสมัครรายห้อง", icon: "graduation" },
+      { href: "/teacher/scoring", label: "บันทึกผล", icon: "pencil", primary: true },
+      { href: "/teacher/certificates", label: "เกียรติบัตร", icon: "file" },
+      { href: "/teacher/cert-registry", label: "ทะเบียนเกียรติบัตร", icon: "search", short: "ทะเบียน" },
     ],
   },
 ];
@@ -60,13 +62,28 @@ export const TEACHER_NAV_GROUPS: NavGroup[] = [
 export const STUDENT_NAV_GROUPS: NavGroup[] = [
   {
     items: [
-      { href: "/student", label: "แดชบอร์ด", icon: "home" },
-      { href: "/student/browse", label: "การสมัคร", icon: "clipboard" },
+      { href: "/student", label: "แดชบอร์ด", icon: "home", primary: true },
+      { href: "/student/browse", label: "การสมัคร", icon: "clipboard", primary: true },
     ],
   },
 ];
 
-/** รวมทุกกลุ่มเป็นรายการเดียว (ใช้กับ BottomNav มือถือที่โชว์แบบเรียบ) */
+/** รวมทุกกลุ่มเป็นรายการเดียว (ใช้กับแถบล่างมือถือที่โชว์แบบเรียบ) */
 export function flattenNav(groups: NavGroup[]): NavItem[] {
   return groups.flatMap((g) => g.items);
+}
+
+/** จำนวนเมนูสูงสุดที่แถบล่างวางเรียงได้โดยยังกดถูก (มากกว่านี้ต้องมีปุ่ม "เมนู") */
+export const BOTTOM_NAV_SLOTS = 5;
+
+/**
+ * เมนูที่จะขึ้นแถบล่างบนมือถือ
+ * - เมนูน้อย (≤ 5) → โชว์ทั้งหมด ไม่ต้องมีปุ่มเมนู
+ * - เมนูเยอะ → เอาเฉพาะที่ทำเครื่องหมาย primary ไว้ (ไม่เกิน 4) ที่เหลือไปอยู่ในแผ่นเมนู
+ */
+export function bottomNavItems(groups: NavGroup[]): { items: NavItem[]; hasMore: boolean } {
+  const all = flattenNav(groups);
+  if (all.length <= BOTTOM_NAV_SLOTS) return { items: all, hasMore: false };
+  const primary = all.filter((i) => i.primary);
+  return { items: (primary.length ? primary : all).slice(0, BOTTOM_NAV_SLOTS - 1), hasMore: true };
 }

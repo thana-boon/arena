@@ -49,17 +49,6 @@ async function findTeacherByCode(code: string): Promise<SosTeacher | null> {
   return data.find((t) => (t.teacherCode ?? "").toUpperCase() === norm) ?? null;
 }
 
-/**
- * profile ครูจากรหัส (ไม่ต้องใช้รหัสผ่าน) — ใช้หลังยืนยันตัวตนมาแล้วทางอื่น เช่น SSO handoff
- * คืน null เมื่อหาแถวครูไม่เจอ (key ไม่มี teachers:read / รหัสไม่มีในระบบ)
- */
-export async function fetchTeacher(teacherCode: string): Promise<TeacherProfile | null> {
-  const row = await findTeacherByCode(teacherCode).catch(() => null);
-  if (!row) return null;
-  const no = await getSubjectGroupNoByName(row.subjectGroup).catch(() => null);
-  return toProfile(row, no);
-}
-
 /** login ครู → คืน profile ถ้าสำเร็จ + ยังทำงานอยู่, null ถ้ารหัสผิด/ลาออก */
 export async function teacherLogin(
   teacherCode: string,
@@ -69,8 +58,11 @@ export async function teacherLogin(
   if (!user || !user.active) return null; // ลาออก/พักงาน = เข้าไม่ได้
 
   // ดึงหมวด + ชื่อจริงจากรายชื่อครู (ต้องมี scope teachers:read) — พลาดได้แบบ graceful
-  const profile = await fetchTeacher(user.code);
-  if (profile) return profile;
+  const row = await findTeacherByCode(user.code).catch(() => null);
+  if (row) {
+    const no = await getSubjectGroupNoByName(row.subjectGroup).catch(() => null);
+    return toProfile(row, no);
+  }
 
   // ไม่มีแถวครู (เช่น key ไม่มี teachers:read) — สร้าง profile ขั้นต่ำจากผล verify
   const [first, ...rest] = (user.name ?? "").split(" ");

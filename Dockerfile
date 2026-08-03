@@ -16,10 +16,6 @@ FROM base AS build
 # compose ส่ง BASE_PATH=/arena มาให้ตอน build บน prod (ดู docker-compose.yml)
 ARG BASE_PATH=
 ENV BASE_PATH=$BASE_PATH
-# NEXT_PUBLIC_* ถูกฝังลง bundle ตอน build เหมือนกัน (runtime env แก้ทีหลังไม่มีผล)
-# → base URL ของ SSO ที่เบราว์เซอร์ใช้ ต้องส่งเป็น build arg เท่านั้น
-ARG NEXT_PUBLIC_SSO_BASE_URL=
-ENV NEXT_PUBLIC_SSO_BASE_URL=$NEXT_PUBLIC_SSO_BASE_URL
 # ค่า placeholder เฉพาะตอน build — src/lib/env.ts ตรวจ env ตอน collect page data
 # (ค่าจริงถูกกำหนดตอน runtime ผ่าน docker compose / .env; stage นี้ไม่หลุดไปถึง image สุดท้าย)
 ENV DATABASE_URL=postgres://build:build@localhost:5432/build

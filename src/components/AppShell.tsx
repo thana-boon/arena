@@ -32,7 +32,7 @@ export function AppShell({
   return (
     <div className="app-shell-nav">
       {/* เตือน + พากลับหน้า login เมื่อไม่มีการใช้งานนานเกินกำหนด */}
-      <SessionTimeout idleSeconds={IDLE_SECONDS} sso={session.sso ?? false} />
+      <SessionTimeout idleSeconds={IDLE_SECONDS} />
       <aside className="sidebar">
         <Link href="/" className="side-brand">
           <BrandLogo />
@@ -57,7 +57,7 @@ export function AppShell({
             <Avatar initial={initial} hasPhoto={hasPhoto} className="avatar-sm" />
             {/* บนมือถือเหลือแค่รูปโปรไฟล์ — ชื่อ/บทบาท/ปุ่มออก ไปอยู่ในแผ่นเมนูล่างแทน */}
             <span className="nowrap hide-sm">{session.name}</span>
-            <span className="hide-sm"><LogoutButton sso={session.sso ?? false} /></span>
+            <span className="hide-sm"><LogoutButton /></span>
           </div>
         </header>
         <main className="main-content"><RouteTransition>{children}</RouteTransition></main>
@@ -70,7 +70,7 @@ export function AppShell({
             <span className="nm">{session.name}</span>
             <span className="rl">{ROLE_LABEL[session.role]}</span>
           </span>
-          <LogoutButton sso={session.sso ?? false} />
+          <LogoutButton />
         </div>
       </BottomNav>
     </div>

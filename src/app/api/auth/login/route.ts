@@ -1,15 +1,14 @@
 import { z } from "zod";
 import { db } from "@/db";
-import { adminsLocal } from "@/db/schema";
+import { adminsLocal, teacherRoles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { ok, fail, handle } from "@/lib/api";
-import { createSession } from "@/lib/auth/session";
-import { sessionForTeacher, sessionForStudent } from "@/lib/auth/mapUser";
-import { teacherLogin } from "@/lib/external/teacher-api";
-import { studentLogin, type StudentProfile } from "@/lib/external/student-api";
+import { createSession, type Role } from "@/lib/auth/session";
+import { teacherLogin, teacherFullName } from "@/lib/external/teacher-api";
+import { studentLogin, studentFullName, type StudentProfile } from "@/lib/external/student-api";
 import { SosRateLimitError, SosKeyError } from "@/lib/external/schoolos";
-import { ROLE_HOME } from "@/lib/domain";
+import { getTeacherRole } from "@/lib/queries";
 import { loginBlockedFor, loginFailed, loginSucceeded, clientIp } from "@/lib/rateLimit";
 
 // ฟอร์ม login เดียว: identifier (รหัสผู้ใช้/รหัสนักเรียน/รหัสครู) + secret (รหัสผ่าน)
@@ -49,7 +48,15 @@ export async function POST(req: Request) {
     const loginStudent = async (): Promise<boolean> => {
       const student: StudentProfile | null = await studentLogin(identifier, secret);
       if (!student) return false;
-      await createSession(sessionForStudent(student));
+      await createSession({
+        role: "student",
+        code: student.student_code,
+        name: studentFullName(student),
+        firstName: student.first_name,
+        photo: student.photo_url ?? undefined,
+        classLevel: student.class_level,
+        classRoom: student.class_room,
+      });
       return true;
     };
 
@@ -60,13 +67,34 @@ export async function POST(req: Request) {
       }
 
       // 3) ครู — ผ่าน SchoolOS
-      //    สิทธิ์ admin/recorder map ที่ lib/auth/mapUser.ts ที่เดียว (ใช้ร่วมกับทาง SSO handoff)
       const profile = await teacherLogin(identifier, secret);
       if (profile) {
-        const payload = await sessionForTeacher(profile);
-        loginSucceeded(rlKey);
-        await createSession(payload);
-        return ok({ role: payload.role, redirect: ROLE_HOME[payload.role] ?? "/teacher" });
+      // สิทธิ์ admin มาจาก role ของ SchoolOS โดยตรง: role === "teacher-admin" = admin ของระบบนี้
+      // teacher_roles ยังใช้เป็นตัวเสริม (มอบ admin/recorder แบบมือผ่านหน้า /admin/teachers)
+      const roleRow = await getTeacherRole(profile.teacher_code);
+      let role: Role = "teacher";
+      if (profile.role === "teacher-admin" || roleRow?.isAdmin) role = "admin";
+      else if (roleRow?.isRecorder) role = "recorder";
+
+      // อัปเดต snapshot ชื่อไว้ใน teacher_roles ถ้ามี row
+      if (roleRow) {
+        await db
+          .update(teacherRoles)
+          .set({ nameSnapshot: teacherFullName(profile) })
+          .where(eq(teacherRoles.teacherCode, profile.teacher_code));
+      }
+
+      const sg = Number(profile.subject_group);
+      loginSucceeded(rlKey);
+      await createSession({
+        role,
+        code: profile.teacher_code,
+        name: teacherFullName(profile),
+        firstName: profile.first_name,
+        photo: profile.photo_url ?? undefined,
+        subjectGroupId: Number.isFinite(sg) ? sg : undefined,
+      });
+      return ok({ role, redirect: role === "admin" ? "/admin" : "/teacher" });
       }
 
       // 4) fallback — ถ้ารหัสไม่ใช่ตัวเลข (เดาว่าครู) แต่ที่จริงเป็นนักเรียน

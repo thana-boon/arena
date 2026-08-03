@@ -11,15 +11,6 @@ services:
         # ใช้ ${VAR-default} ไม่ใช่ :- เพื่อให้ค่าว่างที่ตั้งใจตั้งมีผลจริง
         # (Dockerfile bake ค่านี้เป็น ENV ใน runner ด้วย เพื่อให้ build/runtime ตรงกัน)
         BASE_PATH: ${BASE_PATH-/arena}
-        # base URL ของ SchoolOS Users ที่ "เบราว์เซอร์ผู้ใช้" เรียกถึง — ต้องเป็น build arg
-        # เพราะ NEXT_PUBLIC_* ถูกฝังลง bundle ตอน build (ใส่ใน environment ด้านล่างไม่มีผล)
-        #
-        # ค่า default ชี้ Users บนโดเมนเดียวกับ arena (https://schoolos.sukhon.ac.th/arena)
-        # ซึ่งทำให้เป็น same-origin → คุกกี้ SSO ทำงานได้และไม่ต้องพึ่ง CORS
-        # ⚠ ห้ามเปลี่ยนเป็น http://192.168.200.56:3002 เด็ดขาด — คนละ origin กับที่เบราว์เซอร์เปิดอยู่
-        #   คุกกี้ SameSite=Lax จะไม่ถูกส่ง แล้ว SSO จะตายเงียบ ๆ โดยไม่มี error ให้เห็น
-        # เว้นว่าง = ปิด SSO (ระบบกลับไปล็อกอินด้วยรหัสผ่านตามเดิมครบทุกอย่าง)
-        NEXT_PUBLIC_SSO_BASE_URL: ${NEXT_PUBLIC_SSO_BASE_URL-https://schoolos.sukhon.ac.th/users}
     container_name: arena-app
     environment:
       NODE_ENV: production
@@ -35,15 +26,10 @@ services:
       # จึงต้องดึงผ่าน ${...} จาก stack env ตรง ๆ (ไม่งั้น entrypoint เช็ค SCHOOLOS_API_KEY ว่างแล้ว exit 1)
       SCHOOLOS_API_BASE: ${SCHOOLOS_API_BASE:-http://192.168.200.56:3002}
       SCHOOLOS_API_KEY: ${SCHOOLOS_API_KEY:?ต้องตั้ง SCHOOLOS_API_KEY ใน Portainer stack env}
-      # ปลายทางที่ server ใช้แลกโค้ด handoff — ต้องเป็น Users อินสแตนซ์เดียวกับ NEXT_PUBLIC_SSO_BASE_URL
-      # ไม่ตั้ง = ใช้ SCHOOLOS_API_BASE (ถูกต้องอยู่แล้วบน prod)
-      SSO_API_BASE: ${SSO_API_BASE-}
-      # prod เสิร์ฟผ่าน HTTPS (https://schoolos.sukhon.ac.th) → เปิด Secure ได้แล้ว
-      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       # อายุ session (นาที) — IDLE = ไม่ใช้งานนานเท่านี้แล้วหลุด, ABSOLUTE = เพดานนับจากตอน login
       SESSION_IDLE_MINUTES: ${SESSION_IDLE_MINUTES:-30}
-      # 480 = 8 ชม. ตรงกับเพดานสัมบูรณ์ของ SSO ฝั่ง SchoolOS (อย่าตั้งยาวกว่านั้น)
-      SESSION_ABSOLUTE_MINUTES: ${SESSION_ABSOLUTE_MINUTES:-480}
+      SESSION_ABSOLUTE_MINUTES: ${SESSION_ABSOLUTE_MINUTES:-720}
       # ไม่มี env admin แล้ว — สิทธิ์ admin มาจาก role "teacher-admin" ของ SchoolOS โดยตรง
       # (ครูที่ SchoolOS กำหนดเป็น teacher-admin ล็อกอินเข้าเป็น admin ของระบบเอง)
     ports:

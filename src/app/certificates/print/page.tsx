@@ -1,4 +1,6 @@
-import { requireStaff } from "@/lib/auth/guards";
+import { redirect } from "next/navigation";
+import { requireAuth } from "@/lib/auth/guards";
+import { isStaff } from "@/lib/auth/session";
 import { getIssuesByIds, loadTemplatesForPrint, type CertRenderData } from "@/lib/certificates";
 import { CertificateCanvas } from "@/components/certificate/CertificateCanvas";
 import { formatThaiDate } from "@/lib/domain";
@@ -23,11 +25,18 @@ export default async function CertificatePrintPage({
 }: {
   searchParams: Promise<{ ids?: string }>;
 }) {
-  await requireStaff();
+  const session = await requireAuth();
+  if (!isStaff(session.role) && session.role !== "student") redirect("/");
+
   const idsRaw = (await searchParams).ids ?? "";
   const ids = idsRaw.split(",").map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0);
 
-  const issues = await getIssuesByIds(ids);
+  const all = await getIssuesByIds(ids);
+  // นักเรียนพิมพ์ได้เฉพาะใบของตัวเองที่ยังไม่ถูกยกเลิก — id ในลิงก์เดาได้ จึงต้องกรองที่นี่ ไม่ใช่แค่ที่หน้ารายการ
+  const issues =
+    session.role === "student"
+      ? all.filter((i) => i.studentCode === session.code && i.revokedAt == null)
+      : all;
   const templates = await loadTemplatesForPrint(issues.map((i) => i.templateId));
   const verifyBase = await verifyBaseUrl();
 

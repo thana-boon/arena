@@ -28,9 +28,10 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
     section: "รายงาน",
     items: [
       { href: "/admin/reports", label: "ออกรายงาน", icon: "file", short: "รายงาน", primary: true },
-      { href: "/admin/certificates", label: "เกียรติบัตร", icon: "trophy" },
-      // อยู่นอก /admin/certificates โดยตั้งใจ — Nav ไฮไลต์ด้วย startsWith(href + "/")
-      // ถ้าเป็น path ลูก เมนู "เกียรติบัตร" จะสว่างพร้อมกันทั้งคู่
+      { href: "/admin/certificates", label: "ออกแบบเกียรติบัตร", icon: "trophy" },
+      // สองอันล่างอยู่นอก /admin/certificates โดยตั้งใจ — Nav ไฮไลต์ด้วย startsWith(href + "/")
+      // ถ้าเป็น path ลูก เมนู "ออกแบบเกียรติบัตร" จะสว่างพร้อมกันทั้งคู่
+      { href: "/admin/cert-issue", label: "ออกเกียรติบัตร", icon: "printer" },
       { href: "/admin/cert-registry", label: "ทะเบียนเกียรติบัตร", icon: "search" },
     ],
   },
@@ -64,6 +65,7 @@ export const STUDENT_NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/student", label: "แดชบอร์ด", icon: "home", primary: true },
       { href: "/student/browse", label: "การสมัคร", icon: "clipboard", primary: true },
+      { href: "/student/certificates", label: "เกียรติบัตรของฉัน", icon: "trophy", short: "เกียรติบัตร", primary: true },
     ],
   },
 ];

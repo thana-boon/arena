@@ -1,12 +1,8 @@
 import { requireStaff } from "@/lib/auth/guards";
 import { getActiveYear } from "@/lib/queries";
-import { listCompetitions } from "@/lib/listings";
-import { canViewCompetition } from "@/lib/permit";
-import { db } from "@/db";
-import { competitions, events } from "@/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { listCertIssueEvents } from "@/lib/certIssuing";
+import { CertEventGrid } from "@/components/certificate/CertEventGrid";
 import { Icon } from "@/components/Icon";
-import { TeacherCertificates } from "./TeacherCertificates";
 
 export const dynamic = "force-dynamic";
 
@@ -22,54 +18,17 @@ export default async function TeacherCertificatesPage() {
     );
   }
 
-  const all = await listCompetitions(year.id);
-  const viewable = all.filter((c) => canViewCompetition(session, c.createdBy, c.groupCatalogNo));
-
-  // จับคู่ว่ารายการไหนอยู่ในงานเกียรติบัตรที่เผยแพร่แล้ว (published/locked)
-  const links = viewable.length
-    ? await db
-        .select({
-          competitionId: competitions.id,
-          eventId: events.id,
-          eventName: events.name,
-          status: events.status,
-          kind: events.kind,
-        })
-        .from(competitions)
-        .innerJoin(events, eq(events.id, competitions.eventId))
-        .where(inArray(competitions.id, viewable.map((c) => c.id)))
-    : [];
-  const linkOf = new Map(links.map((l) => [l.competitionId, l]));
-
-  const rows = viewable.map((c) => {
-    const link = linkOf.get(c.id);
-    // ไม่มีคะแนน = งานอบรม หรือรายการที่ตั้งเป็น "ไม่มีการแข่งขัน" → ออกได้เลยไม่ต้องประกาศผล
-    const noScoring = link?.kind === "training" || c.noContest;
-    const ready = link != null && link.status !== "draft" && (noScoring || c.isPublished);
-    let reason = "";
-    if (!link) reason = "ยังไม่ถูกจัดเข้างาน";
-    else if (link.status === "draft") reason = "ผู้ดูแลยังตั้งค่าไม่เสร็จ";
-    else if (!noScoring && !c.isPublished) reason = "ยังไม่ประกาศผล";
-    return {
-      id: c.id,
-      name: c.name,
-      groupName: c.groupName,
-      eventName: link?.eventName ?? null,
-      activeEntries: c.activeEntries,
-      ready,
-      reason,
-    };
-  });
+  const { events, orphanCount } = await listCertIssueEvents(session, year.id);
 
   return (
     <div className="stack">
       <div className="page-header">
         <h1>ออกเกียรติบัตร</h1>
         <div className="subtitle">
-          เลือกรายการแข่งขันเพื่อออกเกียรติบัตรให้ผู้เข้าแข่งขันทุกคน · ระบบจะเปิดแท็บใหม่ให้บันทึกเป็น PDF (Ctrl/⌘+P)
+          เลือกงานก่อน แล้วค่อยเลือกรายการในงานนั้น · ปีการศึกษา {year.yearBe}
         </div>
       </div>
-      <TeacherCertificates rows={rows} />
+      <CertEventGrid events={events} basePath="/teacher/certificates" orphanCount={orphanCount} />
     </div>
   );
 }

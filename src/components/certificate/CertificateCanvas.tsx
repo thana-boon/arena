@@ -99,17 +99,17 @@ export function CertificateCanvas({
         if (b.kind === "qr") {
           const size = wpc(b.w);
           const left = b.align === "right" ? `calc(${wpc(b.x)} - ${size})` : b.align === "center" ? `calc(${wpc(b.x)} - ${size} / 2)` : wpc(b.x);
-          return (
-            <div
-              key={b.id}
-              style={{ position: "absolute", left, top: wpc(b.y), width: size, height: size }}
-              dangerouslySetInnerHTML={qrSvg ? { __html: qrSvg } : undefined}
-            >
-              {!qrSvg && (
-                <div style={{ width: "100%", height: "100%", border: "1px dashed #9ca3af", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#9ca3af" }}>
-                  QR
-                </div>
-              )}
+          const boxStyle: CSSProperties = { position: "absolute", left, top: wpc(b.y), width: size, height: size };
+          // ⚠ ห้ามใส่ children กับ dangerouslySetInnerHTML พร้อมกัน แม้ children จะเป็น false
+          //    (React โยน "Can only set one of children or props.dangerouslySetInnerHTML" → หน้าพิมพ์ 500 ทั้งใบ)
+          //    จึงต้องแยกเป็นสองสาขา ไม่ใช่เขียนรวมกันแล้วให้ค่าใดค่าหนึ่งเป็น undefined
+          return qrSvg ? (
+            <div key={b.id} style={boxStyle} dangerouslySetInnerHTML={{ __html: qrSvg }} />
+          ) : (
+            <div key={b.id} style={boxStyle}>
+              <div style={{ width: "100%", height: "100%", border: "1px dashed #9ca3af", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#9ca3af" }}>
+                QR
+              </div>
             </div>
           );
         }

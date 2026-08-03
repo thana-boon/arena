@@ -9,7 +9,7 @@ import {
   certificateTemplates,
   competitions,
 } from "@/db/schema";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import type { PoolClient } from "pg";
 import type { CertAward, Medal } from "@/lib/domain";
@@ -385,6 +385,54 @@ export async function getIssuesByIds(ids: number[]) {
     .where(inArray(certificateIssues.id, ids));
   const order = new Map(ids.map((id, i) => [id, i]));
   return rows.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+}
+
+// ===== เกียรติบัตรของนักเรียนเอง =====
+
+export type MyCertificate = {
+  id: number;
+  serialNo: string;
+  verifyToken: string;
+  yearBe: number;
+  eventName: string;
+  competitionName: string;
+  teamName: string | null;
+  className: string;
+  award: CertAward;
+  rank: number;
+  issuedAt: Date;
+  revoked: boolean;
+};
+
+/**
+ * ใบทั้งหมดของนักเรียนคนหนึ่ง ทุกปีการศึกษา — สำหรับหน้า "เกียรติบัตรของฉัน"
+ *
+ * อ่านจากทะเบียนของเราเองล้วน (snapshot ครบทุกอย่างที่พิมพ์ลงกระดาษ) จึงไม่ต้องแตะ SchoolOS
+ * ส่วน "นักเรียนที่จบ/ลาออกแล้วต้องดูของตัวเองไม่ได้" ถูกกั้นตั้งแต่ชั้นล็อกอิน:
+ * SchoolOS ไม่ยืนยันตัวตนให้คนที่ไม่ได้เรียนอยู่ (ดู studentLogin / fetchActiveStudent)
+ * ศิษย์เก่าที่มาขอใบย้อนหลังจึงต้องให้ครู export ให้จากหน้าทะเบียนเกียรติบัตรแทน
+ */
+export async function getMyCertificates(studentCode: string): Promise<MyCertificate[]> {
+  const rows = await db
+    .select()
+    .from(certificateIssues)
+    .where(eq(certificateIssues.studentCode, studentCode))
+    .orderBy(desc(certificateIssues.yearBeSnapshot), desc(certificateIssues.issuedAt));
+
+  return rows.map((r) => ({
+    id: r.id,
+    serialNo: r.serialNo,
+    verifyToken: r.verifyToken,
+    yearBe: r.yearBeSnapshot,
+    eventName: r.eventNameSnapshot,
+    competitionName: r.competitionNameSnapshot,
+    teamName: r.teamNameSnapshot,
+    className: r.classSnapshot,
+    award: r.medal as CertAward,
+    rank: r.rank,
+    issuedAt: r.issuedAt,
+    revoked: r.revokedAt != null,
+  }));
 }
 
 /** ตรวจสอบเกียรติบัตรจาก token (หน้า public /verify/[token]) */

@@ -105,6 +105,7 @@ SSO ขาดอะไรไปก็แค่ไม่ทำงาน ระบ
 | 6 | `used_code` = บั๊กฝั่งเรา ขึ้น log ระดับ error และ **ห้าม retry ด้วยโค้ดเดิม** | โค้ดใช้ได้ครั้งเดียว ต้องขอใหม่เสมอ |
 | 7 | ตรวจสิทธิ์เองอีกรอบหลัง redeem (`fetchActiveTeacher` / `fetchActiveStudent`) | payload จาก handoff ไม่มี `active`/`status` และ role มีแค่ `teacher\|student` → คนที่ลาออก/จบไปแล้วจะเข้าได้ถ้าไม่ตรวจ |
 | 8 | entrypoint **เตือน** ไม่ใช่ `exit 1` เมื่อ key/scope ไม่ครบ | เคยตั้งเป็นตายทันทีแล้ว SchoolOS ล่มชั่วคราว = arena restart วนไม่จบ |
+| 9 | `SSO_PORTAL_URL` ถูกทำเป็น **URL เต็ม** เสมอก่อนใช้ (`portalUrl()` ใน `lib/env.ts`) | Users resolve `next` ที่เป็น path ล้วนด้วย base ของตัวเอง ซึ่งตั้งไว้เป็น `https://0.0.0.0:3002` → กดออกจากระบบแล้วไปโผล่หน้า "can't reach this page" · วัดของจริง: `next=/` → `https://0.0.0.0:3002/`, `next=<URL เต็ม>` → ถูกต้อง, **ไม่ใส่ `next` เลย** → ถูกต้อง |
 
 ---
 

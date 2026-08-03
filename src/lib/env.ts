@@ -6,6 +6,27 @@ function req(name: string): string {
   return v;
 }
 
+const usersBase = (process.env.SSO_USERS_BASE ?? "").replace(/\/+$/, "");
+
+/**
+ * ทำที่อยู่ portal ให้เป็น URL เต็มเสมอ โดยเติม origin ของ Users ให้เมื่อได้มาเป็น path
+ *
+ * ⚠ ห้ามถอดออก: ค่านี้ถูกส่งต่อเป็น `next=` ให้ Users ตอน logout และ Users resolve path ล้วน
+ * ด้วย base ของ "ตัวมันเอง" ซึ่งบนเซิร์ฟเวอร์โรงเรียนตั้งไว้เป็น https://0.0.0.0:3002
+ * → ผู้ใช้กดออกจากระบบแล้วไปโผล่หน้า "can't reach this page" (เจอมาแล้วจริง)
+ *
+ * ยืนยันด้วยของจริง: `next=/` → `https://0.0.0.0:3002/` · `next=<URL เต็ม>` → ถูกต้อง
+ */
+function portalUrl(raw: string | undefined): string {
+  const v = (raw || "/").trim();
+  if (/^https?:\/\//i.test(v)) return v;
+  try {
+    return new URL(v, new URL(usersBase).origin).toString();
+  } catch {
+    return v; // ไม่ได้ตั้ง SSO_USERS_BASE = SSO ปิดอยู่ ค่านี้ไม่ถูกใช้งานอยู่แล้ว
+  }
+}
+
 export const env = {
   DATABASE_URL: req("DATABASE_URL"),
   JWT_SECRET: req("JWT_SECRET"),
@@ -23,20 +44,16 @@ export const env = {
    * ไม่ตั้ง (ค่าว่าง) = ปิด SSO ทั้งระบบ ล็อกอินด้วยรหัสผ่านยังทำงานครบเหมือนเดิม
    * ⚠ ห้ามใส่พอร์ตหลังบ้าน (:3002) — เครื่องผู้ใช้ส่วนใหญ่เข้าไม่ถึงพอร์ตภายใน
    */
-  SSO_USERS_BASE: (process.env.SSO_USERS_BASE ?? "").replace(/\/+$/, ""),
+  SSO_USERS_BASE: usersBase,
 
   /** ชื่อระบบปลายทางที่ผูกไว้กับ API key ฝั่ง Users — ต้องตรงกับ handoffAudience ของ key เป๊ะ */
   SSO_AUDIENCE: process.env.SSO_AUDIENCE || "arena",
 
   /**
    * หน้าแรกของ SchoolOS — ที่ที่ผู้ใช้ถูกส่งไปเมื่อ session จบ ทั้งกดออกเองและหมดเวลา
-   *
-   * ⚠ ควรใส่เป็น URL เต็ม (https://schoolos.sukhon.ac.th/) ไม่ใช่ `/` เฉย ๆ
-   * ค่านี้ถูกส่งต่อเป็น `next=` ให้ Users ตอน logout ด้วย — path ล้วนขึ้นกับว่า Users
-   * ตีความฐานเป็นโดเมนหรือ basePath ของตัวเอง (`/users`) ซึ่งเราควบคุมไม่ได้
-   * ส่วนตอน dev ที่รันคนละพอร์ต `/` จะกลายเป็นหน้าแรกของ arena เอง ไม่ใช่ SchoolOS
+   * ตั้งเป็น path ก็ได้ (`/`) — จะถูกเติม origin ของ Users ให้เป็น URL เต็มเสมอ ดู portalUrl()
    */
-  SSO_PORTAL_URL: process.env.SSO_PORTAL_URL || "/",
+  SSO_PORTAL_URL: portalUrl(process.env.SSO_PORTAL_URL),
 
   /**
    * ที่อยู่ Users "ในสายตา server ของเรา" — ใช้ตอนแลกโค้ด handoff ด้วย X-API-Key เท่านั้น

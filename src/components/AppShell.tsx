@@ -43,7 +43,7 @@ export function AppShell({
         </Link>
         <Sidebar groups={groups} />
         <div className="side-user">
-          <Avatar initial={initial} hasPhoto={hasPhoto} />
+          <Avatar initial={initial} hasPhoto={hasPhoto} owner={session.code} />
           <span className="who">
             <span className="nm">{session.name}</span>
             <span className="rl">{ROLE_LABEL[session.role]}</span>
@@ -57,7 +57,7 @@ export function AppShell({
           <div className="spacer" />
           <div className="tb-user">
             <span className="role-chip">{ROLE_LABEL[session.role]}</span>
-            <Avatar initial={initial} hasPhoto={hasPhoto} className="avatar-sm" />
+            <Avatar initial={initial} hasPhoto={hasPhoto} owner={session.code} className="avatar-sm" />
             {/* บนมือถือเหลือแค่รูปโปรไฟล์ — ชื่อ/บทบาท/ปุ่มออก ไปอยู่ในแผ่นเมนูล่างแทน */}
             <span className="nowrap hide-sm">{session.name}</span>
             <span className="hide-sm"><LogoutButton sso={session.sso ?? false} /></span>
@@ -68,7 +68,7 @@ export function AppShell({
 
       <BottomNav items={bottom.items} groups={groups} hasMore={bottom.hasMore}>
         <div className="nav-sheet-user">
-          <Avatar initial={initial} hasPhoto={hasPhoto} />
+          <Avatar initial={initial} hasPhoto={hasPhoto} owner={session.code} />
           <span className="who">
             <span className="nm">{session.name}</span>
             <span className="rl">{ROLE_LABEL[session.role]}</span>

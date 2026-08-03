@@ -42,11 +42,39 @@ function toProfile(t: SosTeacher, subjectGroupNo?: number | null): TeacherProfil
   };
 }
 
-/** หาแถวครูจากรหัส (q ค้นชื่อ/รหัส แล้วกรองรหัสตรงแบบ case-insensitive) */
-async function findTeacherByCode(code: string): Promise<SosTeacher | null> {
+/**
+ * หาแถวครูจากรหัส
+ * ⚠ q ค้น "ชื่อ" ได้ด้วย ไม่ใช่รหัสอย่างเดียว → ต้องกรองรหัสให้ตรงเป๊ะเองเสมอ
+ * ไม่งั้นครูชื่อคล้ายกันจะถูกหยิบมาผิดคน
+ */
+async function findTeacherByCode(code: string, status = "all"): Promise<SosTeacher | null> {
   const norm = normalizeTeacherCode(code);
-  const { data } = await sosListTeachers({ q: norm, status: "all", pageSize: 50 });
+  const { data } = await sosListTeachers({ q: norm, status, pageSize: 50 });
   return data.find((t) => (t.teacherCode ?? "").toUpperCase() === norm) ?? null;
+}
+
+/** ผลการตรวจสิทธิ์ครูจากรหัส — แยก "ลาออกแล้ว" ออกจาก "ไม่มีรหัสนี้" เพราะข้อความที่ผู้ใช้เห็นคนละเรื่องกัน */
+export type TeacherLookup =
+  | { status: "ok"; profile: TeacherProfile }
+  | { status: "inactive" } // มีรหัสนี้จริง แต่ลาออก/พักงานแล้ว
+  | { status: "not_found" }; // ไม่มีรหัสนี้ในระบบเลย
+
+/**
+ * ตรวจว่ารหัสครูนี้ "ยังทำงานอยู่" ไหม แล้วคืน profile — ใช้กับทางเข้าที่ยืนยันตัวตนมาแล้วทางอื่น (SSO)
+ *
+ * ⚠ จำเป็นเพราะตัวตนที่ได้จาก handoff เชื่อได้แค่ "คนนี้คือใคร" เท่านั้น payload ไม่มี active/status
+ * มาด้วย → ครูที่ลาออกไปแล้วแต่ session ฝั่งแพลตฟอร์มยังค้างอยู่จะเข้าระบบเราได้ถ้าไม่ตรวจซ้ำตรงนี้
+ * (ทางรหัสผ่านมี user.active จาก /auth/verify คุมให้อยู่แล้ว — สองทางต้องกันคนกลุ่มเดียวกัน)
+ */
+export async function fetchActiveTeacher(teacherCode: string): Promise<TeacherLookup> {
+  const row = await findTeacherByCode(teacherCode, "active");
+  if (!row) {
+    // ไม่เจอในรายชื่อที่ยังทำงานอยู่ — ถามซ้ำแบบไม่กรองสถานะเพื่อแยกสองกรณีนี้ออกจากกัน
+    const any = await findTeacherByCode(teacherCode, "all").catch(() => null);
+    return { status: any ? "inactive" : "not_found" };
+  }
+  const no = await getSubjectGroupNoByName(row.subjectGroup).catch(() => null);
+  return { status: "ok", profile: toProfile(row, no) };
 }
 
 /** login ครู → คืน profile ถ้าสำเร็จ + ยังทำงานอยู่, null ถ้ารหัสผิด/ลาออก */

@@ -14,6 +14,14 @@ export type SessionPayload = {
   classLevel?: string; // สำหรับนักเรียน
   classRoom?: string;
   subjectGroupId?: number; // หมวด (กลุ่มสาระ) ของครู — ใช้กรองรายการที่เห็น
+  /**
+   * session นี้ผูกกับ SSO ของแพลตฟอร์มอยู่ (มาจาก handoff)
+   *
+   * มีผลจริงสามอย่าง: หน้าเว็บจะต่ออายุ session ของ Users ให้ด้วย, จะเช็คทุกครั้งที่ผู้ใช้กลับมา
+   * ที่แท็บว่า SSO ยังอยู่ไหม (logout จากบริการอื่น = ของเราต้องดับตาม), และปุ่มออกจากระบบ
+   * จะออกจากแพลตฟอร์มด้วย · admin local ที่ไม่มีตัวตนบน SchoolOS จะไม่มีธงนี้ และไม่ถูก SSO แตะเลย
+   */
+  sso?: boolean;
   /** เพดานเวลาสัมบูรณ์ของ session นี้ (epoch วินาที) — ต่ออายุได้ไม่เกินเวลานี้ ต้อง login ใหม่ */
   abs?: number;
   /** exp ของ JWT (epoch วินาที) — jose ใส่มาให้ตอน verify ไม่ต้องเซ็ตเอง */
@@ -28,10 +36,15 @@ const secret = () => new TextEncoder().encode(env.JWT_SECRET);
  * - IDLE: ไม่มีการใช้งานเกินเท่านี้ → หลุดเอง (ค่า exp ของ JWT + maxAge ของ cookie)
  *   ทุกครั้งที่ยังใช้งานอยู่ ฝั่งหน้าเว็บจะ ping มาต่ออายุให้ (ดู SessionTimeout.tsx)
  * - ABSOLUTE: นับจากตอน login ครั้งแรก ต่ออายุได้ไม่เกินเท่านี้ ต้อง login ใหม่เสมอ
- * ปรับได้ผ่าน env — ค่าเริ่มต้น 30 นาที / 12 ชม.
+ * ปรับได้ผ่าน env — ค่าเริ่มต้น 15 นาที / 8 ชม.
+ *
+ * ⚠ ตัวเลขสองตัวนี้ผูกกับนโยบายของ SchoolOS โดยตรง ห้ามตั้งยาวกว่าฝั่งนั้น
+ * - IDLE ต้อง <= SESSION_IDLE_MINUTES ของ Users ไม่งั้นจะเกิดช่วงที่ "ยังอยู่ในระบบเรา
+ *   แต่ SchoolOS ตายไปแล้ว" = บริการอื่นเด้งให้ล็อกอินแต่ arena ไม่เด้ง อธิบายให้ครูเข้าใจยากมาก
+ * - ABSOLUTE ตั้งให้ตรงกับเพดานสัมบูรณ์ของ SSO ด้วยเหตุผลเดียวกัน
  */
-export const IDLE_SECONDS = minutesFromEnv("SESSION_IDLE_MINUTES", 30);
-export const ABSOLUTE_SECONDS = minutesFromEnv("SESSION_ABSOLUTE_MINUTES", 60 * 12);
+export const IDLE_SECONDS = minutesFromEnv("SESSION_IDLE_MINUTES", 15);
+export const ABSOLUTE_SECONDS = minutesFromEnv("SESSION_ABSOLUTE_MINUTES", 60 * 8);
 
 function minutesFromEnv(name: string, fallbackMinutes: number): number {
   const n = Number(process.env[name]);
@@ -61,9 +74,19 @@ async function writeCookie(payload: SessionPayload, maxAge: number): Promise<voi
   });
 }
 
-export async function createSession(payload: SessionPayload): Promise<void> {
-  const abs = nowSec() + ABSOLUTE_SECONDS;
-  await writeCookie({ ...payload, abs }, Math.min(IDLE_SECONDS, ABSOLUTE_SECONDS));
+/**
+ * @param absoluteEndsAt เพดานสัมบูรณ์จากภายนอก (epoch มิลลิวินาที) — ส่งค่าที่ SSO คืนมาตอน redeem
+ *   เพื่อไม่ให้ session ของเราอยู่ยาวกว่า session ของแพลตฟอร์ม (ยึดอันที่ถึงก่อน)
+ */
+export async function createSession(
+  payload: SessionPayload,
+  opts?: { absoluteEndsAt?: number }
+): Promise<void> {
+  const now = nowSec();
+  const ours = now + ABSOLUTE_SECONDS;
+  const theirs = opts?.absoluteEndsAt ? Math.floor(opts.absoluteEndsAt / 1000) : 0;
+  const abs = theirs > now ? Math.min(ours, theirs) : ours;
+  await writeCookie({ ...payload, abs }, Math.min(IDLE_SECONDS, abs - now));
 }
 
 /**

@@ -104,6 +104,87 @@ export class SosKeyError extends Error {
   }
 }
 
+/**
+ * โยนเมื่อแลกโค้ด handoff ไม่ผ่าน
+ *
+ * แยกสองกลุ่มให้ขาดจากกัน (ข้อกำหนดของ contract):
+ * - โค้ดของผู้ใช้ใช้ไม่ได้ (invalid/expired/used) = เรื่องปกติ ให้ถอยไปกรอกรหัสผ่านเงียบ ๆ
+ * - config ฝั่งเราผิด (key/scope/audience) = ผู้ใช้ทำอะไรไม่ได้ ต้องขึ้น log ให้ผู้ดูแลเห็นทันที
+ * กลืนรวมกันเมื่อไหร่จะไล่หาสาเหตุไม่เจอเลย
+ */
+export class SosHandoffError extends Error {
+  constructor(public code: string) {
+    super(`handoff_${code}`);
+    this.name = "SosHandoffError";
+  }
+  /** true = ผู้ใช้แก้เองได้ด้วยการล็อกอินใหม่ · false = ปัญหา config ต้องให้ผู้ดูแลแก้ */
+  get userFixable(): boolean {
+    return ["invalid_code", "expired_code", "used_code", "audience_mismatch", "session_ended"].includes(this.code);
+  }
+  /** true = ระบบเรายิงโค้ดเดิมซ้ำเอง (บั๊กฝั่งเรา) — ห้าม retry ด้วยโค้ดเดิม ต้องขอโค้ดใหม่เสมอ */
+  get isReplay(): boolean {
+    return this.code === "used_code";
+  }
+}
+
+export type SosHandoffUser = {
+  sub: string;
+  code: string;
+  name: string;
+  /**
+   * ⚠ role ใน session ของ Users มีแค่สองค่านี้ และไม่มี active/status มาด้วย
+   * "teacher-admin" เป็น role ในฐานข้อมูล ต้องไปอ่านจาก /teachers เอง
+   * (ดู lib/auth/mapUser.ts — สิทธิ์ทุกทางต้อง map ที่เดียวกัน)
+   */
+  role: "teacher" | "student";
+};
+
+/**
+ * แลก "โค้ดใช้ครั้งเดียว" ที่เบราว์เซอร์ขอมาจาก Users → ตัวตนที่ server เชื่อถือได้
+ *
+ * นี่คือขาที่ทำให้ SSO ปลอดภัย: โค้ดขอได้เฉพาะเบราว์เซอร์ที่ถือคุกกี้ของ Users จริง
+ * และแลกเป็นตัวตนได้เฉพาะผู้ถือ API key ของ arena → ปลอมด้วยการรู้แค่รหัสครูไม่ได้
+ *
+ * ยิงไปที่ SSO_API_BASE (ไม่ใช่ SCHOOLOS_API_BASE) เพราะต้องเป็น Users อินสแตนซ์เดียว
+ * กับที่เบราว์เซอร์ขอโค้ดมา — ตอน dev อาจเป็นคนละเครื่องกับที่เก็บข้อมูลครู/นักเรียน
+ */
+export async function sosRedeemHandoff(code: string): Promise<{
+  user: SosHandoffUser;
+  expiresAt: number;
+  absoluteEndsAt: number;
+}> {
+  let res: Response;
+  try {
+    res = await fetch(`${env.SSO_API_BASE}${V1}/auth/handoff/redeem`, {
+      method: "POST",
+      headers: { "X-API-Key": env.SCHOOLOS_API_KEY, "content-type": "application/json" },
+      body: JSON.stringify({ code }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(SOS_TIMEOUT_MS),
+    });
+  } catch {
+    throw new SosHandoffError("unreachable");
+  }
+
+  if (!res.ok) {
+    const errCode = await res
+      .json()
+      .then((d) => d?.error?.code as string | undefined)
+      .catch(() => undefined);
+    throw new SosHandoffError(errCode ?? `http_${res.status}`);
+  }
+
+  const data = await res.json().catch(() => null);
+  if (!data?.valid || !data.user) throw new SosHandoffError("invalid_code");
+
+  return {
+    // sub กับ code เป็นค่าเดียวกันตาม contract แต่รับทั้งคู่ไว้เผื่อฝั่ง Users ส่งมาไม่ครบ
+    user: { ...data.user, sub: data.user.sub ?? data.user.code } as SosHandoffUser,
+    expiresAt: Number(data.expiresAt) || 0,
+    absoluteEndsAt: Number(data.absoluteEndsAt) || 0,
+  };
+}
+
 // ===== students =====
 export async function sosListStudents(params: {
   q?: string;

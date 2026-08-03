@@ -28,8 +28,22 @@ services:
       SCHOOLOS_API_KEY: ${SCHOOLOS_API_KEY:?ต้องตั้ง SCHOOLOS_API_KEY ใน Portainer stack env}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       # อายุ session (นาที) — IDLE = ไม่ใช้งานนานเท่านี้แล้วหลุด, ABSOLUTE = เพดานนับจากตอน login
-      SESSION_IDLE_MINUTES: ${SESSION_IDLE_MINUTES:-30}
-      SESSION_ABSOLUTE_MINUTES: ${SESSION_ABSOLUTE_MINUTES:-720}
+      # ทั้งคู่ต้องไม่ยาวกว่าฝั่ง SchoolOS ไม่งั้นจะเกิดช่วงที่ยังอยู่ในระบบเราแต่ SchoolOS ตายไปแล้ว
+      SESSION_IDLE_MINUTES: ${SESSION_IDLE_MINUTES:-15}
+      SESSION_ABSOLUTE_MINUTES: ${SESSION_ABSOLUTE_MINUTES:-480}
+      # ----- SSO กับ SchoolOS Users -----
+      # ⚠ ทั้งกลุ่มนี้เป็น env ของ runtime ล้วน ๆ (ไม่ใช่ NEXT_PUBLIC_* ที่ถูก bake ตอน build)
+      #   แก้แล้ว redeploy stack ได้เลย ไม่ต้อง rebuild image — ต่างจาก BASE_PATH
+      # ไม่ตั้ง SSO_USERS_BASE (ค่าว่าง) = ปิด SSO ทั้งระบบ ล็อกอินด้วยรหัสผ่านยังครบเหมือนเดิม
+      # ค่าที่ถูกต้องบน prod: https://schoolos.sukhon.ac.th/users  (ที่อยู่ "ในสายตาเบราว์เซอร์"
+      # ห้ามใส่พอร์ตหลังบ้าน :3002 เครื่องผู้ใช้เข้าไม่ถึง)
+      SSO_USERS_BASE: ${SSO_USERS_BASE:-}
+      # ต้องตรงกับ handoffAudience ที่ผูกไว้กับ API key ฝั่ง SchoolOS เป๊ะ
+      SSO_AUDIENCE: ${SSO_AUDIENCE:-arena}
+      # หน้าแรกของ SchoolOS — ที่ที่ผู้ใช้ถูกส่งไปเมื่อ session จบ
+      SSO_PORTAL_URL: ${SSO_PORTAL_URL:-/}
+      # ที่อยู่ Users "ในสายตา server" (ใช้ตอนแลกโค้ดด้วย X-API-Key) — ปกติเท่ากับ SCHOOLOS_API_BASE
+      SSO_API_BASE: ${SSO_API_BASE:-}
       # ไม่มี env admin แล้ว — สิทธิ์ admin มาจาก role "teacher-admin" ของ SchoolOS โดยตรง
       # (ครูที่ SchoolOS กำหนดเป็น teacher-admin ล็อกอินเข้าเป็น admin ของระบบเอง)
     ports:

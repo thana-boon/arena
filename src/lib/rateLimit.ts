@@ -49,6 +49,32 @@ export function loginSucceeded(key: string): void {
   buckets.delete(key);
 }
 
+// ===== ถังของ SSO — ต้องแยกจาก login เด็ดขาด =====
+/**
+ * หน้า login ยิง /api/auth/sso เองอัตโนมัติทุกครั้งที่เปิดหน้า (silent SSO)
+ * ถ้าใช้ถังเดียวกับการกรอกรหัสผ่าน แค่ผู้ใช้รีเฟรชไม่กี่ครั้งตอน SchoolOS มีปัญหา
+ * เขาก็จะล็อกการล็อกอินด้วยรหัสผ่านของตัวเองไปด้วย ทั้งที่ยังไม่ได้พิมพ์อะไรเลยสักตัว
+ *
+ * เพดานสูงกว่าฝั่ง login เพราะความล้มเหลวส่วนใหญ่ที่นี่คือ "โค้ดหมดอายุ" ซึ่งไม่ใช่การเดารหัส
+ */
+const SSO_MAX_FAILS = 20;
+
+export function ssoBlockedFor(ip: string): number | null {
+  const now = Date.now();
+  const b = buckets.get(`sso|${ip}`);
+  if (!b || b.resetAt <= now) return null;
+  if (b.fails < SSO_MAX_FAILS) return null;
+  return Math.max(1, Math.ceil((b.resetAt - now) / 1000));
+}
+
+export function ssoFailed(ip: string): void {
+  loginFailed(`sso|${ip}`);
+}
+
+export function ssoSucceeded(ip: string): void {
+  loginSucceeded(`sso|${ip}`);
+}
+
 /** ดึง IP ผู้เรียกจาก header (อยู่หลัง reverse proxy → x-forwarded-for ตัวแรก) */
 export function clientIp(req: Request): string {
   const fwd = req.headers.get("x-forwarded-for");

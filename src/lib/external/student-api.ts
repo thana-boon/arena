@@ -56,6 +56,31 @@ export async function fetchStudent(studentCode: string): Promise<StudentProfile 
   return hit ? toProfile(hit) : null;
 }
 
+/**
+ * สถานะที่ถือว่า "ยังเรียนอยู่" — นอกจากนี้ (graduated / resigned / ...) เข้าระบบไม่ได้
+ * ไม่มีฟิลด์ status มาเลย = ถือว่าใช้ได้ (API รุ่นเก่า/ผลลัพธ์ที่ไม่ได้ส่งฟิลด์นี้มา)
+ */
+const ACTIVE_STUDENT_STATUS = new Set(["studying", "active"]);
+
+export type StudentLookup =
+  | { status: "ok"; profile: StudentProfile }
+  | { status: "inactive" } // มีรหัสนี้ แต่จบ/ออกไปแล้ว
+  | { status: "not_found" };
+
+/**
+ * ตรวจว่ารหัสนักเรียนนี้ "ยังเรียนอยู่" ไหม — คู่แฝดของ fetchActiveTeacher
+ * จำเป็นด้วยเหตุผลเดียวกัน: ตัวตนจาก handoff ไม่มี status มาด้วย ต้องตรวจเองทุกครั้ง
+ */
+export async function fetchActiveStudent(studentCode: string): Promise<StudentLookup> {
+  const code = studentCode.trim();
+  const { data } = await sosListStudents({ q: code, status: "all", pageSize: 50 });
+  const hit = data.find((s) => String(s.studentCode) === code);
+  if (!hit) return { status: "not_found" };
+  const st = (hit.status ?? "").trim().toLowerCase();
+  if (st && !ACTIVE_STUDENT_STATUS.has(st)) return { status: "inactive" };
+  return { status: "ok", profile: toProfile(hit) };
+}
+
 /** login นักเรียนผ่าน SchoolOS (/auth/verify) — คืน profile ถ้าสำเร็จ + ยังเรียนอยู่ */
 export async function studentLogin(
   username: string,

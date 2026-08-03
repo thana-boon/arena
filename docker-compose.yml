@@ -40,8 +40,10 @@ services:
       SSO_USERS_BASE: ${SSO_USERS_BASE:-}
       # ต้องตรงกับ handoffAudience ที่ผูกไว้กับ API key ฝั่ง SchoolOS เป๊ะ
       SSO_AUDIENCE: ${SSO_AUDIENCE:-arena}
-      # หน้าแรกของ SchoolOS — ที่ที่ผู้ใช้ถูกส่งไปเมื่อ session จบ
-      SSO_PORTAL_URL: ${SSO_PORTAL_URL:-/}
+      # หน้าแรกของ SchoolOS — ที่ที่ผู้ใช้ถูกส่งไปเมื่อ session จบ (กดออกเอง / หมดเวลา)
+      # ⚠ ต้องเป็น URL เต็ม ค่านี้ถูกส่งเป็น next= ให้ Users ตอน logout ด้วย — `/` เฉย ๆ
+      #   ขึ้นกับว่า Users ตีความฐานเป็นโดเมนหรือ basePath ของตัวเอง (/users) ซึ่งเราคุมไม่ได้
+      SSO_PORTAL_URL: ${SSO_PORTAL_URL:-https://schoolos.sukhon.ac.th/}
       # ที่อยู่ Users "ในสายตา server" (ใช้ตอนแลกโค้ดด้วย X-API-Key) — ปกติเท่ากับ SCHOOLOS_API_BASE
       SSO_API_BASE: ${SSO_API_BASE:-}
       # ไม่มี env admin แล้ว — สิทธิ์ admin มาจาก role "teacher-admin" ของ SchoolOS โดยตรง

@@ -201,8 +201,26 @@ export async function ssoLogoutUrl(next?: string): Promise<string | null> {
   return `${cfg.usersBase}/api/auth/logout?next=${encodeURIComponent(target)}`;
 }
 
-/** path ของหน้าแรก SchoolOS — ใช้ตอนที่ไม่ได้จะ logout แต่แค่ส่งผู้ใช้กลับไปที่ portal */
+/** ที่อยู่หน้าแรก SchoolOS — ใช้ตอนที่ไม่ได้จะ logout แต่แค่ส่งผู้ใช้กลับไปที่ portal */
 export async function ssoPortalUrl(): Promise<string | null> {
   const cfg = await ssoConfig();
   return cfg.enabled ? cfg.portalUrl || "/" : null;
+}
+
+/**
+ * ปลายทางเมื่อ session ของ arena จบ ไม่ว่าจะจบด้วยเหตุใด — ที่เดียวของนโยบาย
+ * "จบแล้วต้องไปโผล่หน้าแรกของ SchoolOS ไม่ใช่ค้างอยู่หน้า login ของเรา"
+ *
+ * ใช้ร่วมกันทั้งปุ่มออกจากระบบและตัวจับเวลาหมดอายุ — ถ้าแยกกันตัดสินใจเมื่อไหร่
+ * จะกลายเป็นออกเองไปที่หนึ่ง หมดเวลาไปอีกที่หนึ่ง ซึ่งผู้ใช้เจอแล้วงงว่าระบบรวน
+ *
+ * @param platform session นี้ผูกกับ SSO ไหม
+ *   true  = ต้อง "ออก" จากแพลตฟอร์มจริง ๆ ไม่ใช่แค่พากลับหน้าแรก ไม่งั้นคุกกี้ของ Users
+ *           ยังอยู่แล้ว silent SSO พากลับเข้ามาเอง
+ *   false = admin local / ล็อกอินด้วยรหัสผ่าน — พากลับหน้าแรกเฉย ๆ ห้ามไปเตะ SSO
+ *           ของคนอื่นที่อาจค้างอยู่บนเบราว์เซอร์เครื่องเดียวกัน
+ * @returns null เมื่อ SSO ปิดอยู่หรืออ่าน config ไม่ได้ → ผู้เรียกต้องตกกลับไปหน้า login ของเราเอง
+ */
+export async function ssoExitUrl(platform: boolean): Promise<string | null> {
+  return platform ? ssoLogoutUrl() : ssoPortalUrl();
 }

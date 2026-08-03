@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "@/lib/client";
-import { ssoProbe, ssoRefresh, ssoLogoutUrl, clearSsoCache, ssoConfig } from "@/lib/sso";
+import { ssoProbe, ssoRefresh, ssoExitUrl, clearSsoCache, ssoConfig } from "@/lib/sso";
 import { markKickedOut, isSigningOut } from "@/lib/auth/clientState";
 
 /** เตือนก่อนหมดเวลากี่วินาที */
@@ -56,9 +56,11 @@ export function SessionTimeout({ idleSeconds, sso = false }: { idleSeconds: numb
   /**
    * จบ session แล้วพาผู้ใช้ออกไป
    *
+   * ปลายทางคือหน้าแรกของ SchoolOS เสมอตามนโยบาย (ไม่ค้างอยู่หน้า login ของเรา) —
+   * ตกมาที่ `/login?reason=` เฉพาะตอน SSO ปิดอยู่หรืออ่าน config ไม่ได้เท่านั้น
+   *
    * ⚠ session ที่ผูก SSO ต้องออกจากแพลตฟอร์มด้วยเสมอ ไม่งั้นคุกกี้ของ Users ยังอยู่
    * แล้วหน้า login จะ SSO กลับเข้ามาเอง = timeout ไม่มีผลจริง
-   * แล้วไปจบที่หน้าแรกของ SchoolOS ตามนโยบาย (ไม่ค้างอยู่หน้า login ของเรา)
    */
   const endSession = useCallback(
     async (reason: EndReason, manual = false) => {
@@ -73,7 +75,7 @@ export function SessionTimeout({ idleSeconds, sso = false }: { idleSeconds: numb
       if (!manual && reason !== "sso") markKickedOut();
       await api.post("/api/auth/logout");
       clearSsoCache();
-      const away = sso ? await ssoLogoutUrl() : null;
+      const away = await ssoExitUrl(sso);
       // ใช้ location แทน router เพื่อล้าง state ของหน้าทิ้งทั้งหมด
       // window.location ไม่ได้ถูกเติม basePath ให้อัตโนมัติเหมือน <Link> — ต้องเติมเอง
       const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
@@ -129,7 +131,8 @@ export function SessionTimeout({ idleSeconds, sso = false }: { idleSeconds: numb
     // เปิดหน้ามาอาจเป็น session ที่ปล่อยค้างไว้ครึ่งทางแล้ว — ถามเวลาที่เหลือจริงจาก server ก่อน
     void sync();
     // อุ่นค่า config ไว้ล่วงหน้า เพื่อให้ตอนต้องเด้งออกจริงไม่ต้องรอ request นี้ก่อน
-    if (sso) void ssoConfig();
+    // (ทุก session ต้องใช้ ไม่ใช่เฉพาะที่ผูก SSO — ทางที่ไม่ผูกก็ต้องรู้ที่อยู่ portal)
+    void ssoConfig();
 
     const markActivity = () => {
       lastActivityRef.current = Date.now();

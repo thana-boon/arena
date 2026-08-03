@@ -52,7 +52,7 @@
 |---|---|---|
 | `SSO_USERS_BASE` | `https://schoolos.sukhon.ac.th/users` | ที่อยู่ Users **ในสายตาเบราว์เซอร์** · ว่าง = ปิด SSO |
 | `SSO_AUDIENCE` | `arena` | ต้องตรงกับ `handoffAudience` ของ API key เป๊ะ |
-| `SSO_PORTAL_URL` | `/` | หน้าแรก SchoolOS — ปลายทางเมื่อ session จบ |
+| `SSO_PORTAL_URL` | `https://schoolos.sukhon.ac.th/` | หน้าแรก SchoolOS — ปลายทางเมื่อ session จบ · **ใส่ URL เต็ม** ไม่ใช่ `/` (ค่านี้ถูกส่งเป็น `next=` ให้ Users ตอน logout ด้วย) |
 | `SSO_API_BASE` | (ว่าง) | ที่อยู่ Users **ในสายตา server** · ว่าง = ใช้ `SCHOOLOS_API_BASE` |
 | `SESSION_IDLE_MINUTES` | 15 | ต้อง **≤** `SESSION_IDLE_MINUTES` ของ Users เสมอ |
 | `SESSION_ABSOLUTE_MINUTES` | 480 | เพดานสัมบูรณ์ ให้ตรงกับฝั่ง SchoolOS |
@@ -84,8 +84,12 @@ SSO ขาดอะไรไปก็แค่ไม่ทำงาน ระบ
   — ห้ามนับ `mousemove` เพราะเมาส์สะเทือนบนโต๊ะก็ต่ออายุได้ = เท่ากับไม่มี timeout
 - ต่ออายุ session ของ **Users** ทุก 10 นาทีด้วย เพราะ Users ไม่นับการใช้งานในระบบเราเป็น activity (จงใจ)
   ไม่ต่อให้ = ครูที่ทำงานอยู่แท้ ๆ หลุดจาก SchoolOS เงียบ ๆ
-- session จบ → ส่งผู้ใช้ไป **หน้าแรกของ SchoolOS** (ผู้ใช้ได้รับคำเตือนล่วงหน้า 2 นาทีในกล่องข้อความอยู่แล้ว)
+- session จบ → ส่งผู้ใช้ไป **หน้าแรกของ SchoolOS เสมอ** ทั้งกดออกเองและหมดเวลา
+  (ผู้ใช้ได้รับคำเตือนล่วงหน้า 2 นาทีในกล่องข้อความอยู่แล้ว) · ตัดสินใจที่เดียวคือ `ssoExitUrl()`
+  ใน `lib/sso.ts` — ตกกลับมาที่ `/login` ของเราเฉพาะตอน **SSO ปิดอยู่หรืออ่าน config ไม่ได้**
 - ปุ่มออกจากระบบ → ออกจาก SchoolOS ด้วย ไม่งั้น SSO พากลับเข้ามาเอง = ล็อกเอาต์ไม่ได้จริงบนเครื่องส่วนกลาง
+  · session ที่ **ไม่ได้** ผูก SSO (admin local / ล็อกอินด้วยรหัสผ่าน) ไปหน้าแรก SchoolOS เหมือนกัน
+  แต่ **ไม่** ยิง logout ของ Users เพราะจะไปเตะ session ของคนอื่นที่ค้างอยู่บนเบราว์เซอร์เครื่องเดียวกัน
 
 ---
 

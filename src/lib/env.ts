@@ -28,7 +28,14 @@ export const env = {
   /** ชื่อระบบปลายทางที่ผูกไว้กับ API key ฝั่ง Users — ต้องตรงกับ handoffAudience ของ key เป๊ะ */
   SSO_AUDIENCE: process.env.SSO_AUDIENCE || "arena",
 
-  /** หน้าแรกของ SchoolOS — ที่ที่ผู้ใช้ถูกส่งไปเมื่อ session จบ (path ล้วนได้ เพราะ same-origin) */
+  /**
+   * หน้าแรกของ SchoolOS — ที่ที่ผู้ใช้ถูกส่งไปเมื่อ session จบ ทั้งกดออกเองและหมดเวลา
+   *
+   * ⚠ ควรใส่เป็น URL เต็ม (https://schoolos.sukhon.ac.th/) ไม่ใช่ `/` เฉย ๆ
+   * ค่านี้ถูกส่งต่อเป็น `next=` ให้ Users ตอน logout ด้วย — path ล้วนขึ้นกับว่า Users
+   * ตีความฐานเป็นโดเมนหรือ basePath ของตัวเอง (`/users`) ซึ่งเราควบคุมไม่ได้
+   * ส่วนตอน dev ที่รันคนละพอร์ต `/` จะกลายเป็นหน้าแรกของ arena เอง ไม่ใช่ SchoolOS
+   */
   SSO_PORTAL_URL: process.env.SSO_PORTAL_URL || "/",
 
   /**

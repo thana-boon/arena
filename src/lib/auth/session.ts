@@ -1,32 +1,11 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { SignJWT, jwtVerify } from "jose";
 import { env } from "@/lib/env";
+import { signIdentity, verifyIdentity, type Role, type SessionPayload } from "./identity";
 
-export type Role = "student" | "teacher" | "recorder" | "admin";
-
-export type SessionPayload = {
-  role: Role;
-  code: string; // student_code / teacher_code / admin username
-  name: string;
-  firstName?: string; // ชื่อจริงล้วน (ไม่มีคำนำหน้า) — ใช้ทำตัวอักษรย่อบน avatar
-  photo?: string; // path รูปบน SchoolOS — ไม่มีรูป = undefined (ดู /api/me/photo)
-  classLevel?: string; // สำหรับนักเรียน
-  classRoom?: string;
-  subjectGroupId?: number; // หมวด (กลุ่มสาระ) ของครู — ใช้กรองรายการที่เห็น
-  /**
-   * session นี้ผูกกับ SSO ของแพลตฟอร์มอยู่ (มาจาก handoff)
-   *
-   * มีผลจริงสามอย่าง: หน้าเว็บจะต่ออายุ session ของ Users ให้ด้วย, จะเช็คทุกครั้งที่ผู้ใช้กลับมา
-   * ที่แท็บว่า SSO ยังอยู่ไหม (logout จากบริการอื่น = ของเราต้องดับตาม), และปุ่มออกจากระบบ
-   * จะออกจากแพลตฟอร์มด้วย · admin local ที่ไม่มีตัวตนบน SchoolOS จะไม่มีธงนี้ และไม่ถูก SSO แตะเลย
-   */
-  sso?: boolean;
-  /** เพดานเวลาสัมบูรณ์ของ session นี้ (epoch วินาที) — ต่ออายุได้ไม่เกินเวลานี้ ต้อง login ใหม่ */
-  abs?: number;
-  /** exp ของ JWT (epoch วินาที) — jose ใส่มาให้ตอน verify ไม่ต้องเซ็ตเอง */
-  exp?: number;
-};
+// นิยามตัวตน + การเซ็น/ตรวจ token อยู่ที่ identity.ts (ไฟล์บริสุทธิ์ที่เทสได้) — ไฟล์นี้ดูแลคุกกี้กับอายุ
+export type { Role, SessionPayload };
+export { identityOf } from "./identity";
 
 const COOKIE = "arena_session";
 const secret = () => new TextEncoder().encode(env.JWT_SECRET);
@@ -54,13 +33,9 @@ function minutesFromEnv(name: string, fallbackMinutes: number): number {
 const nowSec = () => Math.floor(Date.now() / 1000);
 
 async function writeCookie(payload: SessionPayload, maxAge: number): Promise<void> {
-  // exp/iat มาจาก token ใบเก่า — ต้องไม่ติดไปกับใบใหม่ (jose จะเซ็ตให้เองด้านล่าง)
-  const { exp: _exp, ...rest } = payload;
-  const token = await new SignJWT({ ...rest })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime(`${maxAge}s`)
-    .sign(secret());
+  // ⚠ ทุก token ของระบบออกจากบรรทัดนี้บรรทัดเดียว — identityOf() ข้างใน signIdentity คือตัวรับประกัน
+  // ว่า claim ทุกตัว (โดยเฉพาะ ssoSub) รอดข้ามการต่ออายุ ห้ามเซ็น token เองที่อื่น
+  const token = await signIdentity(payload, secret(), maxAge);
 
   const jar = await cookies();
   jar.set(COOKIE, token, {
@@ -115,12 +90,7 @@ export async function getSession(): Promise<SessionPayload | null> {
   const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
   if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, secret());
-    return payload as unknown as SessionPayload;
-  } catch {
-    return null;
-  }
+  return verifyIdentity(token, secret());
 }
 
 /** เหลืออีกกี่วินาที session จะหมดอายุ (นับจาก exp ของ token ปัจจุบัน) */
@@ -131,12 +101,7 @@ export function sessionExpiresIn(payload: SessionPayload): number {
 
 /** verify token จาก string (ใช้ใน middleware — edge runtime) */
 export async function verifyToken(token: string): Promise<SessionPayload | null> {
-  try {
-    const { payload } = await jwtVerify(token, secret());
-    return payload as unknown as SessionPayload;
-  } catch {
-    return null;
-  }
+  return verifyIdentity(token, secret());
 }
 
 export const SESSION_COOKIE = COOKIE;

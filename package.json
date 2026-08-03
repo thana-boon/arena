@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start -p 3017",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/lib/auth/identity.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:push": "drizzle-kit push --force",

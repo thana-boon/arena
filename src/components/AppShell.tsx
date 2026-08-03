@@ -6,6 +6,7 @@ import { BrandLogo } from "./BrandLogo";
 import { Wordmark } from "./Wordmark";
 import { Avatar } from "./Avatar";
 import { SessionTimeout } from "./SessionTimeout";
+import { SessionGuard } from "./SessionGuard";
 import { bottomNavItems, type NavGroup } from "@/lib/nav";
 import { nameInitial } from "@/lib/initials";
 import { IDLE_SECONDS, type SessionPayload, type Role } from "@/lib/auth/session";
@@ -33,6 +34,8 @@ export function AppShell({
     <div className="app-shell-nav">
       {/* เตือน + พากลับหน้า login เมื่อไม่มีการใช้งานนานเกินกำหนด */}
       <SessionTimeout idleSeconds={IDLE_SECONDS} sso={session.sso ?? false} />
+      {/* สลับผู้ใช้ให้ตรงกับคนที่ล็อกอิน SchoolOS อยู่จริง ณ วินาทีนี้ (เครื่องส่วนกลางใช้ต่อกันหลายคน) */}
+      <SessionGuard sso={session.sso ?? false} ssoSub={session.ssoSub} />
       <aside className="sidebar">
         <Link href="/" className="side-brand">
           <BrandLogo />

@@ -64,6 +64,15 @@ export async function POST(req: Request) {
     const { user, absoluteEndsAt } = redeemed;
 
     /**
+     * ⚠ ประทับไว้ว่า session ใบนี้ "คัดลอกตัวตนมาจาก session ไหนของ SchoolOS" — ค่าดิบ ห้ามแปลง
+     *
+     * ถ้าไม่มีค่านี้ ระบบจะไม่มีทางรู้เลยว่าคนที่ล็อกอินอยู่ที่ portal ตอนนี้เปลี่ยนคนไปแล้ว
+     * (sub/code ของเราเองเป็นคนละ namespace เอาไปเทียบไม่ได้) → ผลคือคนใหม่เห็นข้อมูลของคนเก่า
+     * ซึ่งบนเครื่องส่วนกลางคือการรั่วของข้อมูลจริง · ตัวที่เอาไปเทียบคือ SessionGuard.tsx
+     */
+    const ssoSub = (user.sub || user.code || "").trim();
+
+    /**
      * ⚠ ตัวตนที่ได้จาก handoff เชื่อได้แค่ "คนนี้คือใคร" เท่านั้น
      * payload ไม่มี active/status และ role มีแค่ teacher|student (ไม่มี teacher-admin)
      * → ต้องตรวจสิทธิ์เองอีกรอบด้วย API key ของเรา ด้วยเกณฑ์เดียวกับตอนล็อกอินด้วยรหัสผ่าน
@@ -77,7 +86,7 @@ export async function POST(req: Request) {
         return fail("ไม่พบข้อมูลนักเรียนในระบบ กรุณาติดต่อผู้ดูแลระบบ", 403);
       }
       const payload = sessionForStudent(found.profile);
-      await createSession({ ...payload, sso: true }, { absoluteEndsAt });
+      await createSession({ ...payload, sso: true, ssoSub }, { absoluteEndsAt });
       ssoSucceeded(ip);
       return ok({ role: payload.role, redirect: ROLE_HOME[payload.role] ?? "/" });
     }
@@ -90,7 +99,7 @@ export async function POST(req: Request) {
       return fail("ไม่พบข้อมูลบุคลากรในระบบ กรุณาติดต่อผู้ดูแลระบบ", 403);
     }
     const payload = await sessionForTeacher(found.profile);
-    await createSession({ ...payload, sso: true }, { absoluteEndsAt });
+    await createSession({ ...payload, sso: true, ssoSub }, { absoluteEndsAt });
     ssoSucceeded(ip);
     console.info(
       `[sso] เข้าสู่ระบบด้วย SSO: ${teacherFullName(found.profile)} (${found.profile.teacher_code}) → ${payload.role}`

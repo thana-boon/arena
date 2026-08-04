@@ -70,6 +70,7 @@ export async function CompetitionEditBody({
         venues={venues.map((v) => ({ id: v.id, name: v.name, building: v.building }))}
         returnTo={returnTo}
         lockSubjectGroup={!isAdmin}
+        canEditLocked={isAdmin}
         initial={{
           id: comp.id,
           name: comp.name,

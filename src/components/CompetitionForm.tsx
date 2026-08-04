@@ -50,6 +50,7 @@ export function CompetitionForm({
   initial,
   returnTo = "/teacher/competitions",
   lockSubjectGroup = false,
+  canEditLocked = false,
 }: {
   events: { id: number; name: string; kind: string; eventDate: string | null }[];
   groups: { id: number; name: string }[];
@@ -60,13 +61,17 @@ export function CompetitionForm({
   returnTo?: string;
   /** ครูทั่วไปเลือกได้เฉพาะหมวดตัวเอง → ล็อกช่องหมวดไว้ (admin ปลดล็อกเลือกได้ทุกหมวด) */
   lockSubjectGroup?: boolean;
+  /** admin แก้ได้ทุกช่องแม้มีผู้ลงทะเบียนแล้ว (ครูทั่วไปยังถูกล็อกเหมือนเดิม) */
+  canEditLocked?: boolean;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
   const [f, setF] = useState<CompFormInitial>(initial);
   const [msg, setMsg] = useState<{ type: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const locked = !!initial.locked;
+  const hasEntries = !!initial.locked;
+  // ล็อกช่องโครงสร้าง (ประเภท/ระดับชั้น/เกณฑ์) เมื่อมีคนลงแล้ว — ยกเว้น admin ที่ปลดล็อกได้ทุกช่อง
+  const locked = hasEntries && !canEditLocked;
   // error ต้องมองเห็นเสมอ: เลื่อนจอขึ้นไปหากล่องข้อความ + เล่นอนิเมชันสั่นซ้ำทุกครั้งที่กดบันทึก
   const alertRef = useRef<HTMLDivElement | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
@@ -223,7 +228,19 @@ export function CompetitionForm({
           {msg.text}
         </div>
       )}
-      {locked && <div className="alert alert-warning">รายการนี้มีผู้ลงทะเบียนแล้ว แก้ไขได้เฉพาะชื่อ/วันเวลา/จำนวนรับ (ไม่สามารถเปลี่ยนประเภท ระดับชั้น หรือเกณฑ์)</div>}
+      {locked && (
+        <div className="alert alert-warning">
+          รายการนี้มีผู้ลงทะเบียนแล้ว แก้ไขได้เฉพาะชื่อ/วันเวลา/จำนวนรับ (ไม่สามารถเปลี่ยนประเภท ระดับชั้น หรือเกณฑ์) —
+          ถ้าต้องการแก้ไขโปรดติดต่อผู้ดูแลระบบ (admin)
+        </div>
+      )}
+      {hasEntries && canEditLocked && (
+        <div className="alert alert-info">
+          รายการนี้มีผู้ลงทะเบียนแล้ว — ท่านเป็นผู้ดูแลระบบจึงแก้ไขได้ทุกช่อง โปรดตรวจสอบให้ดีก่อนบันทึก
+          การเปลี่ยนประเภท ระดับชั้น หรือเกณฑ์ อาจกระทบผู้ที่ลงทะเบียนและคะแนนที่บันทึกไว้แล้ว
+          (เกณฑ์ที่ถูกลบจะลบคะแนนของเกณฑ์นั้นไปด้วย)
+        </div>
+      )}
 
       {/* ── ส่วนที่ 1: ข้อมูลรายการ ── */}
       <section className="card form-section">

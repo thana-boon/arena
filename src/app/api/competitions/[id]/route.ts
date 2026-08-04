@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { competitions, competitionCapacity, competitionVenues, criteria, entries, scores, timeSlots, events } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { competitions, competitionCapacity, competitionVenues, criteria, entries, entryMembers, scores, timeSlots, events } from "@/db/schema";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
 import { competitionInput } from "@/lib/validation";
@@ -13,6 +13,72 @@ import { findVenueConflicts } from "@/lib/venues";
 async function hasEntries(compId: number): Promise<boolean> {
   const rows = await db.select({ id: entries.id }).from(entries).where(eq(entries.competitionId, compId)).limit(1);
   return rows.length > 0;
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * นับผู้ลงทะเบียนที่ยัง active จริงจากตาราง entries
+ * ใช้ตอน admin แก้โครงสร้างรายการทั้งที่มีคนลงแล้ว — สร้างแถวโควตาใหม่ต้องคงยอดที่ลงไว้ ไม่ใช่รีเซ็ตเป็น 0
+ * (ระดับชั้นของ entry ยึดสมาชิกคนแรก เหมือนตอนลงทะเบียน)
+ */
+async function countActiveEntries(tx: Tx, compId: number) {
+  const ents = await tx
+    .select({ id: entries.id })
+    .from(entries)
+    .where(and(eq(entries.competitionId, compId), eq(entries.status, "active")));
+  const byLevel: Record<string, number> = {};
+  if (!ents.length) return { total: 0, byLevel };
+
+  const mem = await tx
+    .select({ id: entryMembers.id, entryId: entryMembers.entryId, level: entryMembers.classLevelSnapshot })
+    .from(entryMembers)
+    .where(inArray(entryMembers.entryId, ents.map((e) => e.id)));
+  mem.sort((a, b) => a.id - b.id);
+  const firstLevel = new Map<number, string | null>();
+  for (const m of mem) if (!firstLevel.has(m.entryId)) firstLevel.set(m.entryId, m.level);
+
+  for (const e of ents) {
+    const lv = firstLevel.get(e.id);
+    if (lv) byLevel[lv] = (byLevel[lv] ?? 0) + 1;
+  }
+  return { total: ents.length, byLevel };
+}
+
+/**
+ * เขียนเกณฑ์ใหม่แบบจับคู่ตามลำดับ (แก้ของเดิมทับ) แทนการลบทิ้งแล้วสร้างใหม่
+ * เพื่อให้ criterion id เดิมอยู่ครบ → คะแนนที่บันทึกไว้แล้วไม่กลายเป็นข้อมูลกำพร้า
+ * - เกณฑ์ที่ถูกตัดออก: ลบคะแนนของเกณฑ์นั้นไปด้วย
+ * - คะแนนเต็มที่ลดลง: ตัดคะแนนที่เกินลงมาให้เท่าคะแนนเต็มใหม่
+ */
+async function writeCriteria(tx: Tx, compId: number, next: { name: string; maxScore: number }[]) {
+  const old = await tx.select().from(criteria).where(eq(criteria.competitionId, compId));
+  old.sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+
+  const keep = Math.min(old.length, next.length);
+  for (let i = 0; i < keep; i++) {
+    const max = next[i].maxScore;
+    await tx
+      .update(criteria)
+      .set({ name: next[i].name.trim(), maxScore: max.toFixed(2), sortOrder: i })
+      .where(eq(criteria.id, old[i].id));
+    await tx
+      .update(scores)
+      .set({ score: max.toFixed(2) })
+      .where(and(eq(scores.criterionId, old[i].id), sql`${scores.score} > ${max.toFixed(2)}::numeric`));
+  }
+  if (next.length > keep) {
+    await tx.insert(criteria).values(
+      next.slice(keep).map((c, i) => ({
+        competitionId: compId, name: c.name.trim(), maxScore: c.maxScore.toFixed(2), sortOrder: keep + i,
+      }))
+    );
+  }
+  if (old.length > keep) {
+    const dropIds = old.slice(keep).map((c) => c.id);
+    await tx.delete(scores).where(inArray(scores.criterionId, dropIds));
+    await tx.delete(criteria).where(inArray(criteria.id, dropIds));
+  }
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -61,7 +127,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       if (conflicts.length) return ok({ venueConflict: true, conflicts });
     }
 
-    const locked = await hasEntries(id);
+    // มีคนลงแล้ว = ล็อกโครงสร้าง (ประเภท/ระดับชั้น/เกณฑ์) — ยกเว้น admin ที่แก้ได้ทุกช่อง
+    const registered = await hasEntries(id);
+    const locked = registered && s.role !== "admin";
 
     const capRows = await db.select().from(competitionCapacity).where(eq(competitionCapacity.competitionId, id));
 
@@ -106,25 +174,30 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
       if (!locked) {
         // rebuild capacity + criteria
+        // admin แก้รายการที่มีคนลงแล้วได้ → ยอดที่ลงไว้ต้องยกมาใส่แถวใหม่ ไม่งั้นที่นั่งจะว่างผิด
+        const counts = registered ? await countActiveEntries(tx, id) : { total: 0, byLevel: {} as Record<string, number> };
         await tx.delete(competitionCapacity).where(eq(competitionCapacity.competitionId, id));
         if (body.type === "individual" && body.capacityMode !== "combined") {
-          for (const lv of body.allowedClassLevels) {
+          // ชั้นที่ถูกเอาออกแต่ยังมีคนลงค้างอยู่ ต้องคงแถวไว้ (ไม่งั้นยกเลิกการลงทะเบียนแล้วยอดไม่ลด)
+          const open = new Set<string>(body.allowedClassLevels);
+          const levels = [...new Set<string>([...open, ...Object.keys(counts.byLevel)])];
+          for (const lv of levels) {
+            const taken = counts.byLevel[lv] ?? 0;
+            const cap = open.has(lv)
+              ? body.capacityPerLevel?.[lv] ?? UNLIMITED_CAPACITY
+              : taken; // ชั้นที่ปิดรับแล้ว → เต็มพอดี ลงเพิ่มไม่ได้
             await tx.insert(competitionCapacity).values({
-              competitionId: id, classLevel: lv, capacity: body.capacityPerLevel?.[lv] ?? UNLIMITED_CAPACITY, registeredCount: 0,
+              competitionId: id, classLevel: lv, capacity: cap, registeredCount: taken,
             });
           }
         } else {
           await tx.insert(competitionCapacity).values({
             competitionId: id, classLevel: null,
-            capacity: (body.type === "team" ? body.teamCapacity : body.combinedCapacity) ?? UNLIMITED_CAPACITY, registeredCount: 0,
+            capacity: (body.type === "team" ? body.teamCapacity : body.combinedCapacity) ?? UNLIMITED_CAPACITY,
+            registeredCount: counts.total,
           });
         }
-        await tx.delete(criteria).where(eq(criteria.competitionId, id));
-        if (body.criteria.length) {
-          await tx.insert(criteria).values(
-            body.criteria.map((c, i) => ({ competitionId: id, name: c.name.trim(), maxScore: c.maxScore.toFixed(2), sortOrder: i }))
-          );
-        }
+        await writeCriteria(tx, id, body.criteria);
       } else {
         // มีคนลงแล้ว → อัปเดตได้เฉพาะจำนวนรับ (ห้ามต่ำกว่าที่ลงไปแล้ว)
         for (const row of capRows) {
@@ -144,7 +217,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       }
     });
 
-    await logAudit(s.code, "update_competition", { competitionId: id, locked });
+    await logAudit(s.code, "update_competition", { competitionId: id, locked, adminOverride: registered && !locked });
     return ok({ locked });
   });
 }

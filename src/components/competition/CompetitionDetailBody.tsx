@@ -39,6 +39,9 @@ export async function CompetitionDetailBody({
 
   return (
     <div className="stack">
+      <div className="no-print">
+        <Link href={basePath} className="btn btn-ghost btn-sm">← กลับไปรายการแข่งขันทั้งหมด</Link>
+      </div>
       <div className="page-bar">
         <div className="page-header" style={{ marginBottom: 0 }}>
           <h1>{comp.name}</h1>

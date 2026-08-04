@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { events } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { CatalogSheet, DOC_LABEL, SUMMARY_DOCS, type DocType, SummarySheet, VenueUsageSheet, ReportSheet } from "@/app/admin/reports/ReportSheets";
-import { PrintControls } from "./PrintControls";
+import { PrintControls } from "@/components/PrintControls";
 
 export const dynamic = "force-dynamic";
 

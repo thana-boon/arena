@@ -29,8 +29,16 @@ function readCollapsed(): CollapseMap {
   }
 }
 
+/**
+ * เมนูไหนคือหน้าที่เปิดอยู่ — ปกติเทียบแบบขึ้นต้น (path ลูกทำให้เมนูแม่สว่าง เช่น
+ * /admin/competitions/5/edit → "รายการแข่งขัน") ยกเว้นหน้าแรกของแต่ละบทบาท
+ * (/admin, /teacher, /student) ที่เป็นต้นทางของทุก path ในบทบาทนั้น — ถ้าเทียบแบบขึ้นต้น
+ * "แดชบอร์ด" จะสว่างค้างอยู่ทุกหน้า จึงต้องตรงเป๊ะเท่านั้น
+ */
 function isActive(path: string, href: string) {
-  return path === href || (href !== "/" && path.startsWith(href + "/"));
+  const isRoleHome = href.split("/").filter(Boolean).length <= 1;
+  if (isRoleHome) return path === href;
+  return path === href || path.startsWith(href + "/");
 }
 
 export function Sidebar({ groups }: { groups: NavGroup[] }) {

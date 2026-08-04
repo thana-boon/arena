@@ -54,6 +54,8 @@ export function ClassRegistrations({
   const [overview, setOverview] = useState<Overview | null>(null);
   const [ovBusy, setOvBusy] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
+  // มุมมองภาพรวม: grid = ตารางไขว้ชั้น×ห้อง เห็นทั้งโรงเรียนในจอเดียว, list = ตารางรายห้องแบบเดิม
+  const [ovView, setOvView] = useState<"grid" | "list">("grid");
   // กรองตามงาน — ค่าเริ่มต้นตามที่ admin ตั้งไว้ (ถ้ามี) ไม่งั้นแสดงทุกงาน
   const [eventFilter, setEventFilter] = useState<number | "all">(() =>
     defaultEventId != null && events.some((e) => e.id === defaultEventId) ? defaultEventId : "all"
@@ -240,8 +242,16 @@ export function ClassRegistrations({
               style={{ maxWidth: 900, maxHeight: "85vh", display: "flex", flexDirection: "column" }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="modal-title">ภาพรวมทุกห้อง</h3>
-              <div className="muted text-sm">
+              <div className="row between" style={{ gap: 8, alignItems: "center" }}>
+                <h3 className="modal-title" style={{ margin: 0 }}>ภาพรวมทุกห้อง</h3>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setOvView(ovView === "grid" ? "list" : "grid")}
+                >
+                  {ovView === "grid" ? "แบบรายการ" : "แบบตาราง"}
+                </button>
+              </div>
+              <div className="muted text-sm mt-2">
                 {overview.rooms.length} ห้อง · นักเรียน {overview.total} คน · สมัครแล้ว {overview.registered} คน ({ovPct}%)
                 {eventFilter !== "all" && " · เฉพาะงานที่เลือก"} · สมัครอย่างน้อย 1 รายการ = นับว่าสมัครแล้ว
               </div>
@@ -249,6 +259,15 @@ export function ClassRegistrations({
                 <Bar pct={ovPct} label="สัดส่วนนักเรียนที่สมัครแล้วทั้งโรงเรียน" />
                 <span className="text-sm" style={{ fontWeight: 600, minWidth: 42, textAlign: "right" }}>{ovPct}%</span>
               </div>
+              {ovView === "grid" ? (
+                <OverviewGrid
+                  rooms={overview.rooms}
+                  onPick={(lv, rm) => {
+                    load(lv, rm);
+                    setShowOverview(false);
+                  }}
+                />
+              ) : (
               <div className="table-wrap table-cards" style={{ overflow: "auto", flex: 1 }}>
                 <table className="table">
                   <thead>
@@ -303,6 +322,7 @@ export function ClassRegistrations({
                   </tbody>
                 </table>
               </div>
+              )}
               <div className="modal-actions">
                 <button className="btn btn-primary" onClick={() => setShowOverview(false)}>ปิด</button>
               </div>
@@ -427,6 +447,104 @@ export function ClassRegistrations({
           onDone={afterMutation}
         />
       )}
+    </div>
+  );
+}
+
+/* ---------- ภาพรวมแบบตารางไขว้ ชั้น × ห้อง ----------
+   16 ระดับชั้น × ห้องไม่กี่ห้อง = กริดเล็ก ๆ ที่เห็นทั้งโรงเรียนได้ในจอเดียวโดยไม่ต้องเลื่อน
+   (ตารางรายห้องแบบเดิมยาว 30-50 แถว ต้องไล่เลื่อนหา) — สีบอกสถานะ ตัวเลขบอกรายละเอียด */
+
+const OV_TIERS = [
+  { min: 100, cls: "ov-full", label: "ครบ" },
+  { min: 75, cls: "ov-high", label: "75-99%" },
+  { min: 40, cls: "ov-mid", label: "40-74%" },
+  { min: 0, cls: "ov-low", label: "ต่ำกว่า 40%" },
+] as const;
+
+function tierOf(pct: number) {
+  return OV_TIERS.find((t) => pct >= t.min) ?? OV_TIERS[OV_TIERS.length - 1];
+}
+
+function OverviewGrid({
+  rooms,
+  onPick,
+}: {
+  rooms: RoomOverviewRow[];
+  onPick: (classLevel: string, classRoom: string) => void;
+}) {
+  // คอลัมน์ = ชื่อห้องทุกแบบที่พบจริง (ปกติ 1..3) เรียงเลขก่อน แล้วค่อยเรียงตัวอักษร
+  const roomCols = [...new Set(rooms.map((r) => r.classRoom))].sort((a, b) => {
+    const na = Number(a), nb = Number(b);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return a.localeCompare(b, "th");
+  });
+
+  // แถว = ระดับชั้นตามลำดับ CLASS_LEVELS (ชั้นแปลก ๆ ที่ไม่อยู่ในลิสต์ต่อท้าย)
+  const levelOrder = (l: string) => {
+    const i = (CLASS_LEVELS as readonly string[]).indexOf(l);
+    return i === -1 ? 999 : i;
+  };
+  const levels = [...new Set(rooms.map((r) => r.classLevel))].sort(
+    (a, b) => levelOrder(a) - levelOrder(b) || a.localeCompare(b, "th")
+  );
+  const byKey = new Map(rooms.map((r) => [`${r.classLevel}|${r.classRoom}`, r]));
+
+  if (!rooms.length) return <div className="text-center muted mt-4">ไม่พบข้อมูลนักเรียน</div>;
+
+  return (
+    <div className="stack" style={{ gap: 8, flex: 1, minHeight: 0 }}>
+      <div className="ov-grid-wrap" style={{ overflow: "auto", flex: 1 }}>
+        <table className="ov-grid">
+          <thead>
+            <tr>
+              <th className="ov-corner">ชั้น</th>
+              {roomCols.map((rm) => <th key={rm}>ห้อง {rm}</th>)}
+              <th className="ov-sum-col">รวมทั้งชั้น</th>
+            </tr>
+          </thead>
+          <tbody>
+            {levels.map((lv) => {
+              const cells = roomCols.map((rm) => byKey.get(`${lv}|${rm}`) ?? null);
+              const total = cells.reduce((s, c) => s + (c?.total ?? 0), 0);
+              const registered = cells.reduce((s, c) => s + (c?.registered ?? 0), 0);
+              const lvPct = total ? Math.round((registered / total) * 100) : 0;
+              return (
+                <tr key={lv}>
+                  <th className="ov-lv">{lv}</th>
+                  {cells.map((c, i) => {
+                    if (!c) return <td key={roomCols[i]} className="ov-cell ov-none">·</td>;
+                    const pct = c.total ? Math.round((c.registered / c.total) * 100) : 0;
+                    return (
+                      <td key={roomCols[i]} className={`ov-cell ${tierOf(pct).cls}`}>
+                        <button
+                          type="button"
+                          onClick={() => onPick(c.classLevel, c.classRoom)}
+                          title={`เปิดดูรายชื่อ ${c.classLevel}/${c.classRoom}`}
+                          aria-label={`${c.classLevel}/${c.classRoom} สมัครแล้ว ${c.registered} จาก ${c.total} คน ${pct}%`}
+                        >
+                          <span className="ov-pct">{pct}%</span>
+                          <span className="ov-cnt">{c.registered}/{c.total}</span>
+                        </button>
+                      </td>
+                    );
+                  })}
+                  <td className={`ov-cell ov-sum ${tierOf(lvPct).cls}`}>
+                    <span className="ov-pct">{lvPct}%</span>
+                    <span className="ov-cnt">{registered}/{total}</span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="ov-legend muted text-sm">
+        {OV_TIERS.map((t) => (
+          <span key={t.cls}><i className={`ov-swatch ${t.cls}`} />{t.label}</span>
+        ))}
+        <span>· แตะช่องเพื่อเปิดรายชื่อห้องนั้น</span>
+      </div>
     </div>
   );
 }

@@ -2846,3 +2846,115 @@ p {
     page-break-after: auto;
   }
 }
+
+/* ============================================================
+   ภาพรวมการสมัคร — ตารางไขว้ ชั้น × ห้อง
+   16 ชั้น × ห้องไม่กี่ห้อง ต้องเห็นครบในจอเดียว (รวมมือถือ) จึงบีบทุกอย่างให้เล็กที่สุด
+   ที่ยังอ่านออก แล้วใช้สีพื้นเป็นตัวกวาดสายตาแทนการอ่านตัวเลขทีละช่อง
+   ============================================================ */
+.ov-grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 3px;
+  table-layout: fixed;
+}
+.ov-grid thead th {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--skdw-muted);
+  text-align: center;
+  padding: 2px;
+  white-space: nowrap;
+}
+/* หัวแถว (ชื่อชั้น) ค้างไว้ตอนเลื่อนแนวนอน — โรงเรียนที่มีหลายห้องจะได้ไม่หลงแถว */
+.ov-grid .ov-corner,
+.ov-grid .ov-lv {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--skdw-white);
+  width: 62px;
+}
+.ov-grid .ov-lv {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: left;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+.ov-cell {
+  padding: 0;
+  border-radius: var(--radius-sm);
+  text-align: center;
+  line-height: 1.15;
+}
+.ov-cell > button,
+.ov-cell.ov-sum {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 100%;
+  padding: 5px 2px;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.ov-cell.ov-sum {
+  cursor: default;
+}
+.ov-cell > button:hover {
+  outline: 2px solid var(--skdw-purple);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+.ov-cell > button:focus-visible {
+  outline: 2px solid var(--skdw-purple);
+  outline-offset: -2px;
+}
+.ov-pct {
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.ov-cnt {
+  font-size: 10px;
+  opacity: 0.72;
+}
+/* ระดับความคืบหน้า — พื้นอ่อน ตัวอักษรเข้ม (คอนทราสต์ผ่านทุกช่อง ไม่พึ่งสีอย่างเดียว) */
+.ov-full { background: #d6f0e0; color: #14532d; }
+.ov-high { background: #eaf7ef; color: #166534; }
+.ov-mid  { background: var(--color-warning-bg); color: var(--color-warning); }
+.ov-low  { background: var(--color-error-bg); color: var(--color-error); }
+.ov-none { color: var(--skdw-border); font-size: var(--text-sm); }
+.ov-cell.ov-sum { border: 1px dashed rgba(0, 0, 0, 0.12); }
+.ov-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
+}
+.ov-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ov-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+/* มือถือ: บีบให้ 16 แถวยังจบในความสูง modal เดียว */
+@media screen and (max-width: 768px) {
+  .ov-grid { border-spacing: 2px; }
+  .ov-grid .ov-corner,
+  .ov-grid .ov-lv { width: 46px; font-size: var(--text-xs); padding: 0 2px; }
+  .ov-cell > button,
+  .ov-cell.ov-sum { padding: 2px 1px; gap: 0; }
+  .ov-pct { font-size: var(--text-xs); }
+  .ov-cnt { font-size: 9px; }
+  .ov-grid thead th { font-size: 10px; }
+}

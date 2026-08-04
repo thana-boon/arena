@@ -89,6 +89,16 @@ export function ClassRegistrations({
     setShowOverview(true);
   }
 
+  // Esc = ปิดภาพรวม
+  useEffect(() => {
+    if (!showOverview) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setShowOverview(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showOverview]);
+
   // เปลี่ยนตัวกรอง "งาน" ตอนภาพรวมเปิดอยู่ → โหลดใหม่ให้ตัวเลขตรงกับตัวกรอง
   useEffect(() => {
     if (isAdmin && showOverview) loadOverview();
@@ -208,12 +218,8 @@ export function ClassRegistrations({
             </div>
           )}
           {isAdmin && (
-            <button
-              className="btn btn-ghost"
-              disabled={ovBusy}
-              onClick={() => (showOverview ? setShowOverview(false) : loadOverview())}
-            >
-              <Icon name="chart" size={14} /> {ovBusy ? "กำลังโหลด…" : showOverview ? "ซ่อนภาพรวม" : "ภาพรวมทุกห้อง"}
+            <button className="btn btn-ghost" disabled={ovBusy} onClick={loadOverview}>
+              <Icon name="chart" size={14} /> {ovBusy ? "กำลังโหลด…" : "ภาพรวมทุกห้อง"}
             </button>
           )}
           {busy && <div className="muted text-sm">กำลังโหลดรายชื่อ…</div>}
@@ -221,72 +227,88 @@ export function ClassRegistrations({
         {err && <div className="form-error mt-2">{err}</div>}
       </div>
 
+      {/* ภาพรวมทุกห้อง — modal (portal ไป body ด้วยเหตุผลเดียวกับ RegisterModal ด้านล่าง) */}
       {isAdmin && showOverview && overview && (() => {
         const ovPct = overview.total ? Math.round((overview.registered / overview.total) * 100) : 0;
-        return (
-          <div className="card">
-            <div className="row between mb-2">
+        return createPortal(
+          <div className="modal-overlay" onClick={() => setShowOverview(false)}>
+            <div
+              className="modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="ภาพรวมการสมัครทุกห้อง"
+              style={{ maxWidth: 900, maxHeight: "85vh", display: "flex", flexDirection: "column" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="modal-title">ภาพรวมทุกห้อง</h3>
               <div className="muted text-sm">
-                ภาพรวมทุกห้อง · {overview.rooms.length} ห้อง · นักเรียน {overview.total} คน · สมัครแล้ว {overview.registered} คน ({ovPct}%)
-                {eventFilter !== "all" && " · เฉพาะงานที่เลือก"}
+                {overview.rooms.length} ห้อง · นักเรียน {overview.total} คน · สมัครแล้ว {overview.registered} คน ({ovPct}%)
+                {eventFilter !== "all" && " · เฉพาะงานที่เลือก"} · สมัครอย่างน้อย 1 รายการ = นับว่าสมัครแล้ว
               </div>
-              <span className="muted text-sm">สมัครอย่างน้อย 1 รายการ = นับว่าสมัครแล้ว</span>
+              <div className="row mt-2 mb-4" style={{ gap: 10, alignItems: "center" }}>
+                <Bar pct={ovPct} label="สัดส่วนนักเรียนที่สมัครแล้วทั้งโรงเรียน" />
+                <span className="text-sm" style={{ fontWeight: 600, minWidth: 42, textAlign: "right" }}>{ovPct}%</span>
+              </div>
+              <div className="table-wrap table-cards" style={{ overflow: "auto", flex: 1 }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 90 }}>ห้อง</th>
+                      <th className="num" style={{ width: 80 }}>นักเรียน</th>
+                      <th className="num" style={{ width: 90 }}>สมัครแล้ว</th>
+                      <th>ความคืบหน้า</th>
+                      <th className="num" style={{ width: 60 }}>%</th>
+                      <th style={{ width: 80 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overview.rooms.map((r) => {
+                      const pct = r.total ? Math.round((r.registered / r.total) * 100) : 0;
+                      const done = r.total > 0 && r.registered >= r.total;
+                      return (
+                        <tr key={`${r.classLevel}/${r.classRoom}`}>
+                          <td className="td-title">
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              style={{ padding: "0 6px" }}
+                              title="เปิดดูรายชื่อห้องนี้"
+                              // เลือกห้องแล้วปิดภาพรวม — รายชื่อห้องนั้นอยู่ข้างหลัง modal
+                              onClick={() => {
+                                load(r.classLevel, r.classRoom);
+                                setShowOverview(false);
+                              }}
+                            >
+                              {r.classLevel}/{r.classRoom}
+                            </button>
+                          </td>
+                          <td className="num" data-label="นักเรียน">{r.total}</td>
+                          <td className="num" data-label="สมัครแล้ว">{r.registered}</td>
+                          <td className="td-block" data-label="ความคืบหน้า">
+                            <div className="row" style={{ gap: 10, alignItems: "center" }}>
+                              <Bar pct={pct} label={`สัดส่วนที่สมัครแล้วของห้อง ${r.classLevel}/${r.classRoom}`} />
+                            </div>
+                          </td>
+                          <td className="num" data-label="%">{pct}%</td>
+                          <td data-label="สถานะ">
+                            {done ? (
+                              <span className="badge badge-success">ครบ</span>
+                            ) : (
+                              <span className="muted text-sm">ขาด {r.total - r.registered}</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {!overview.rooms.length && <tr><td colSpan={6} className="text-center muted">ไม่พบข้อมูลนักเรียน</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+              <div className="modal-actions">
+                <button className="btn btn-primary" onClick={() => setShowOverview(false)}>ปิด</button>
+              </div>
             </div>
-            <div className="row mb-4" style={{ gap: 10, alignItems: "center" }}>
-              <Bar pct={ovPct} label="สัดส่วนนักเรียนที่สมัครแล้วทั้งโรงเรียน" />
-              <span className="text-sm" style={{ fontWeight: 600, minWidth: 42, textAlign: "right" }}>{ovPct}%</span>
-            </div>
-            <div className="table-wrap table-cards">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 90 }}>ห้อง</th>
-                    <th className="num" style={{ width: 80 }}>นักเรียน</th>
-                    <th className="num" style={{ width: 90 }}>สมัครแล้ว</th>
-                    <th>ความคืบหน้า</th>
-                    <th className="num" style={{ width: 60 }}>%</th>
-                    <th style={{ width: 80 }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.rooms.map((r) => {
-                    const pct = r.total ? Math.round((r.registered / r.total) * 100) : 0;
-                    const done = r.total > 0 && r.registered >= r.total;
-                    return (
-                      <tr key={`${r.classLevel}/${r.classRoom}`}>
-                        <td className="td-title">
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            style={{ padding: "0 6px" }}
-                            title="เปิดดูรายชื่อห้องนี้"
-                            onClick={() => load(r.classLevel, r.classRoom)}
-                          >
-                            {r.classLevel}/{r.classRoom}
-                          </button>
-                        </td>
-                        <td className="num" data-label="นักเรียน">{r.total}</td>
-                        <td className="num" data-label="สมัครแล้ว">{r.registered}</td>
-                        <td className="td-block" data-label="ความคืบหน้า">
-                          <div className="row" style={{ gap: 10, alignItems: "center" }}>
-                            <Bar pct={pct} label={`สัดส่วนที่สมัครแล้วของห้อง ${r.classLevel}/${r.classRoom}`} />
-                          </div>
-                        </td>
-                        <td className="num" data-label="%">{pct}%</td>
-                        <td data-label="สถานะ">
-                          {done ? (
-                            <span className="badge badge-success">ครบ</span>
-                          ) : (
-                            <span className="muted text-sm">ขาด {r.total - r.registered}</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {!overview.rooms.length && <tr><td colSpan={6} className="text-center muted">ไม่พบข้อมูลนักเรียน</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          </div>,
+          document.body
         );
       })()}
 

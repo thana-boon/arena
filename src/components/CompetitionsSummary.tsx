@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "@/components/Icon";
 import type { CompetitionsSummary as Summary } from "@/lib/listings";
 
@@ -59,7 +60,9 @@ export function CompetitionsSummary({ summary }: { summary: Summary }) {
         </div>
       )}
 
-      {open && (
+      {/* portal ไป body — ถ้า render ในหน้า ancestor ที่มี transform (route/stagger animation) จะทำให้
+          position:fixed ยึดกับหน้าแทน viewport → หน้าจอมืดแต่กล่องไปโผล่กลางความสูงของหน้า ต้องเลื่อนหา */}
+      {open && createPortal(
         <div className="modal-overlay" onClick={() => setOpen(false)}>
           <div
             className="modal"
@@ -128,7 +131,8 @@ export function CompetitionsSummary({ summary }: { summary: Summary }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

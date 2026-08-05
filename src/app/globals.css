@@ -131,6 +131,33 @@ body {
   margin: 0;
   padding: 0;
 }
+/* พื้นหลัง canvas ต้องอยู่ที่ <html> ด้วย — ไม่งั้นเวลาเลื่อนเลยขอบ (overscroll/แถบเลื่อนแนวนอน
+   บนจอแคบ) จะโผล่พื้นขาวของเบราว์เซอร์ออกมาแทนที่จะเป็นสีพื้นของเรา */
+html {
+  background: var(--skdw-bg);
+  /* Firefox: แถบเลื่อนสีเดียวกับธีม ไม่ใช่แถบขาวพาดข้างจอ */
+  scrollbar-color: #cfc4e2 var(--skdw-bg);
+}
+/* Chrome/Edge/Safari: แถบเลื่อนกลืนกับพื้นหลัง (ค่าเริ่มต้นเป็นรางขาว เห็นชัดมากบนพื้นอมม่วง) */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: var(--skdw-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: #cfc4e2;
+  border-radius: var(--radius-full);
+  /* ขอบสีพื้น = ทำให้หัวเลื่อนดูผอมลอยอยู่กลางราง */
+  border: 3px solid var(--skdw-bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--skdw-purple-light);
+}
+::-webkit-scrollbar-corner {
+  background: var(--skdw-bg);
+}
 body {
   font-family: var(--font-th-modern), var(--font-en-sans), sans-serif;
   font-size: var(--text-md);
@@ -141,8 +168,9 @@ body {
 }
 
 /* ---------- Background decoration (ลายเป้าธนู + แสงมุมจอ) ----------
-   เลเยอร์ตกแต่งจาง ๆ อยู่หลังการ์ด: เป้าธนูสีม่วง/ทอง (SVG inline) +
-   แสงไล่สีมุมบน-ขวา/ล่าง-ซ้าย ให้บรรยากาศ "สนามแข่ง" โดยไม่รบกวนการอ่าน */
+   เลเยอร์ตกแต่งจาง ๆ อยู่หลังการ์ด: เป้าธนูสีม่วง/ทอง (SVG inline) + แสงไล่สีมุมจอ
+   โทนคุมด้วยม่วงเป็นหลัก (ทองเป็นแค่จุดเน้น) — หน้าที่มีเนื้อหาน้อยอย่างหน้าแรกจะได้ไม่
+   กลายเป็นพื้นเหลืองทั้งจอ และอ่านเป็นโทนเดียวกับหน้าประกาศผลที่การ์ดขาวเต็มจอ */
 body::before {
   content: "";
   position: fixed;
@@ -150,17 +178,19 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background-image:
-    radial-gradient(circle at 88% 12%, rgba(245, 197, 24, 0.12), transparent 42%),
-    radial-gradient(circle at 8% 92%, rgba(91, 45, 142, 0.10), transparent 45%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='440' height='440' viewBox='0 0 440 440'%3E%3Cg fill='none' stroke-width='16'%3E%3Ccircle cx='220' cy='220' r='200' stroke='%235b2d8e' stroke-opacity='0.05'/%3E%3Ccircle cx='220' cy='220' r='155' stroke='%23f5c518' stroke-opacity='0.10'/%3E%3Ccircle cx='220' cy='220' r='110' stroke='%235b2d8e' stroke-opacity='0.05'/%3E%3Ccircle cx='220' cy='220' r='65' stroke='%23f5c518' stroke-opacity='0.10'/%3E%3C/g%3E%3Ccircle cx='220' cy='220' r='24' fill='%235b2d8e' fill-opacity='0.06'/%3E%3C/svg%3E");
-  background-repeat: no-repeat, no-repeat, no-repeat;
-  background-position: top right, bottom left, right -120px bottom -120px;
-  background-size: auto, auto, 440px 440px;
+    /* ม่วงจางไล่ลงมาจากใต้แถบบน — ทำให้พื้นหน้าต่อเนื่องกับ navbar สีม่วง */
+    linear-gradient(to bottom, rgba(91, 45, 142, 0.07), rgba(91, 45, 142, 0) 420px),
+    radial-gradient(circle at 92% 8%, rgba(245, 197, 24, 0.07), transparent 30%),
+    radial-gradient(circle at 6% 94%, rgba(91, 45, 142, 0.09), transparent 42%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='440' height='440' viewBox='0 0 440 440'%3E%3Cg fill='none' stroke-width='16'%3E%3Ccircle cx='220' cy='220' r='200' stroke='%235b2d8e' stroke-opacity='0.055'/%3E%3Ccircle cx='220' cy='220' r='155' stroke='%23f5c518' stroke-opacity='0.05'/%3E%3Ccircle cx='220' cy='220' r='110' stroke='%235b2d8e' stroke-opacity='0.055'/%3E%3Ccircle cx='220' cy='220' r='65' stroke='%23f5c518' stroke-opacity='0.05'/%3E%3C/g%3E%3Ccircle cx='220' cy='220' r='24' fill='%235b2d8e' fill-opacity='0.06'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: top center, top right, bottom left, right -120px bottom -120px;
+  background-size: 100% 420px, auto, auto, 440px 440px;
 }
 @media (max-width: 768px) {
   body::before {
-    background-size: auto, auto, 300px 300px;
-    background-position: top right, bottom left, right -90px bottom -90px;
+    background-size: 100% 260px, auto, auto, 300px 300px;
+    background-position: top center, top right, bottom left, right -90px bottom -90px;
   }
 }
 @media print {
@@ -1334,17 +1364,23 @@ p {
   /* กันหน้าเลื่อนซ้าย-ขวาได้เมื่อมีอะไรกว้างเกินจอ — ใช้ clip ไม่ใช่ hidden เพื่อไม่ให้ position:sticky ของแถบบนพัง */
   overflow-x: clip;
 }
+/* แถบบนกินเต็มความกว้างจอ (แถบสีม่วงไม่ขาดตอน) แต่ "ของข้างใน" อยู่ในกรอบเดียวกับ
+   .main-content — โลโก้จึงตรงแนวกับหัวเรื่องของหน้า ไม่ลอยไปติดขอบจอบนจอกว้าง */
 .navbar {
-  height: 64px;
   background: var(--skdw-purple);
   color: #fff;
-  display: flex;
-  align-items: center;
-  padding: 0 var(--space-8);
   box-shadow: var(--shadow-md);
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
+}
+.navbar-inner {
+  height: 64px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--space-8);
+  display: flex;
+  align-items: center;
   gap: var(--space-4);
 }
 .navbar .brand {
@@ -1725,6 +1761,41 @@ p {
   font-size: var(--text-sm);
   margin-top: -8px;
 }
+/* หัวข้อคั่นกลุ่มเนื้อหาในหน้าเดียวกัน (เล็กกว่าหัวเรื่องหน้า แต่ยังเป็นลำดับ h2) */
+.section-title {
+  font-size: var(--text-lg);
+  margin: var(--space-2) 0 0;
+}
+
+/* การ์ดนำของหน้าแรก — บอกว่าหน้านี้คืออะไร + ปุ่มหลักปุ่มเดียวไปหน้าผลการแข่งขัน */
+.home-lead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  background: linear-gradient(135deg, var(--skdw-purple-pale), #fff 62%);
+}
+.home-lead h2 {
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-1);
+}
+.home-lead p {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.home-lead .btn {
+  flex-shrink: 0;
+}
+@media (max-width: 768px) {
+  .home-lead {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-4);
+  }
+  .home-lead .btn {
+    width: 100%;
+  }
+}
 
 /* Bottom nav (mobile) */
 .bottom-nav {
@@ -1777,10 +1848,10 @@ p {
 }
 
 @media (max-width: 768px) {
-  .navbar {
+  .navbar-inner {
     height: 56px;
     /* max() = อย่างน้อยเท่าระยะปกติ แต่ถ้าเครื่องมีรอยบาก (แนวนอน) ให้หลบให้พอดี */
-    padding: 0 max(var(--space-3), env(safe-area-inset-right)) 0 max(var(--space-3), env(safe-area-inset-left));
+    padding: 0 max(var(--space-4), env(safe-area-inset-right)) 0 max(var(--space-4), env(safe-area-inset-left));
     gap: var(--space-2);
   }
   /* โลโก้ยอมย่อ/ตัดคำได้ ไม่งั้นมันดันปุ่มขวาจนแถบกว้างเกินจอ (เจอบน iPhone 16 Pro) */

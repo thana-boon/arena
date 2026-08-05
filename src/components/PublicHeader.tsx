@@ -12,24 +12,27 @@ export async function PublicHeader() {
   const title = event?.name ?? "งานแข่งขันทางวิชาการ โรงเรียนสุคนธีรวิทย์";
   return (
     <header className="navbar">
-      <Link href="/" className="brand">
-        <BrandLogo />
-        <Wordmark />
-      </Link>
-      <span className="brand-sub">
-        {title}
-        {year ? ` · ปีการศึกษา ${year.yearBe}` : ""}
-      </span>
-      <div className="spacer" />
-      <div className="nav-actions">
-        {/* จอแคบมาก (iPhone) เหลือแค่ไอคอน — ถ้าปล่อยข้อความไว้ทั้งคู่ แถบบนจะกว้างเกินจอแล้วเลื่อนซ้าย-ขวาได้ */}
-        <Link href="/results" className="btn btn-sm btn-nav-ghost" title="ผลการแข่งขัน">
-          <Icon name="trophy" size={15} />
-          <span className="nav-label">ผลการแข่งขัน</span>
+      {/* กรอบในกว้างเท่า .main-content — โลโก้จะตรงแนวกับหัวเรื่องของหน้า */}
+      <div className="navbar-inner">
+        <Link href="/" className="brand">
+          <BrandLogo />
+          <Wordmark />
         </Link>
-        <Link href={session ? ROLE_HOME[session.role] ?? "/" : "/login"} className="btn btn-accent btn-sm">
-          {session ? "เข้าใช้งาน" : "เข้าสู่ระบบ"}
-        </Link>
+        <span className="brand-sub">
+          {title}
+          {year ? ` · ปีการศึกษา ${year.yearBe}` : ""}
+        </span>
+        <div className="spacer" />
+        <div className="nav-actions">
+          {/* จอแคบมาก (iPhone) เหลือแค่ไอคอน — ถ้าปล่อยข้อความไว้ทั้งคู่ แถบบนจะกว้างเกินจอแล้วเลื่อนซ้าย-ขวาได้ */}
+          <Link href="/results" className="btn btn-sm btn-nav-ghost" title="ผลการแข่งขัน">
+            <Icon name="trophy" size={15} />
+            <span className="nav-label">ผลการแข่งขัน</span>
+          </Link>
+          <Link href={session ? ROLE_HOME[session.role] ?? "/" : "/login"} className="btn btn-accent btn-sm">
+            {session ? "เข้าใช้งาน" : "เข้าสู่ระบบ"}
+          </Link>
+        </div>
       </div>
     </header>
   );

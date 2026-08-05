@@ -30,44 +30,69 @@ export default async function HomePage() {
   return (
     <div className="stack">
       <div className="page-header">
-        <h2>รายการแข่งขันที่เปิดประกาศ</h2>
-        {event && <div className="subtitle">{event.name}</div>}
+        <h1>ประกาศผลการแข่งขัน</h1>
+        <div className="subtitle">
+          {event ? `${event.name} · ` : ""}
+          {year ? `ปีการศึกษา ${year.yearBe}` : ""}
+        </div>
       </div>
 
       {!comps.length ? (
         <div className="empty-state card">
           <Icon name="trophy" size={44} className="empty-ico" />
-          <p>ยังไม่มีรายการแข่งขันที่ประกาศ</p>
-          <p className="text-sm">โปรดกลับมาตรวจสอบอีกครั้งในภายหลัง</p>
+          <p>ยังไม่มีการประกาศผลการแข่งขัน</p>
+          <p className="text-sm">เมื่อกรรมการบันทึกคะแนนเรียบร้อยแล้ว ผลจะขึ้นที่หน้านี้</p>
         </div>
       ) : (
-        <div className="grid-3 stagger">
-          {comps.map((c) => (
-            <div key={c.id} className="card">
-              <div className="row between mb-2">
-                <span className="badge badge-purple">{groupName(c.subjectGroupId)}</span>
-                <CompTypeBadge
-                  type={c.type === "team" ? "team" : "individual"}
-                  teamSizeMin={c.teamSizeMin}
-                  teamSizeMax={c.teamSizeMax}
-                  size="sm"
-                />
-              </div>
-              <h3 style={{ fontSize: "var(--text-lg)" }}>{c.name}</h3>
-              <div className="text-sm muted">
-                ระดับชั้น: {competitionAllowedLevels(c).join(", ") || "-"}
-              </div>
-              {c.eventDate && (
-                <div className="text-sm muted">
-                  วันแข่ง: {formatThaiDate(c.eventDate)} {c.startTime?.slice(0, 5)}–{c.endTime?.slice(0, 5)}
-                </div>
-              )}
-              <Link href={`/results#comp-${c.id}`} className="btn btn-ghost btn-sm mt-4">
-                ดูรายละเอียด
-              </Link>
+        <>
+          {/* ทางเข้าหลักของหน้านี้ — คนทั่วไปเข้ามาเพื่อ "ดูผล" ไม่ใช่มาอ่านรายชื่อรายการ */}
+          <div className="card home-lead">
+            <div>
+              <h2>ดูคะแนนและรางวัลของทุกรายการ</h2>
+              <p className="muted">
+                ค้นหาชื่อนักเรียนหรือชื่อรายการ เพื่อดูคะแนน อันดับ และเหรียญรางวัลที่ได้รับ
+              </p>
             </div>
-          ))}
-        </div>
+            <Link href="/results" className="btn btn-primary">
+              <Icon name="trophy" size={16} />
+              ดูผลการแข่งขัน
+            </Link>
+          </div>
+
+          <h2 className="section-title">รายการแข่งขันในงานนี้ ({comps.length} รายการ)</h2>
+          <div className="grid-3 stagger">
+            {comps.map((c) => (
+              <div key={c.id} className="card">
+                <div className="row between mb-2">
+                  <span className="badge badge-purple">{groupName(c.subjectGroupId)}</span>
+                  <CompTypeBadge
+                    type={c.type === "team" ? "team" : "individual"}
+                    teamSizeMin={c.teamSizeMin}
+                    teamSizeMax={c.teamSizeMax}
+                    size="sm"
+                  />
+                </div>
+                <h3 style={{ fontSize: "var(--text-lg)" }}>{c.name}</h3>
+                <div className="text-sm muted">
+                  ระดับชั้น: {competitionAllowedLevels(c).join(", ") || "-"}
+                </div>
+                {c.eventDate && (
+                  <div className="text-sm muted">
+                    วันแข่ง: {formatThaiDate(c.eventDate)} {c.startTime?.slice(0, 5)}–{c.endTime?.slice(0, 5)}
+                  </div>
+                )}
+                {/* รายการที่ "ไม่มีการแข่งขัน" ไม่มีผลให้ดู — หน้า /results ก็ตัดออกอยู่แล้ว */}
+                {c.noContest ? (
+                  <div className="text-sm muted mt-4">กิจกรรมนี้ไม่มีการแข่งขัน จึงไม่มีผลประกาศ</div>
+                ) : (
+                  <Link href={`/results#comp-${c.id}`} className="btn btn-ghost btn-sm mt-4">
+                    ดูผลรายการนี้
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

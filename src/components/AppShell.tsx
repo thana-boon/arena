@@ -7,8 +7,11 @@ import { Wordmark } from "./Wordmark";
 import { Avatar } from "./Avatar";
 import { SessionTimeout } from "./SessionTimeout";
 import { SessionGuard } from "./SessionGuard";
+import { AnnouncementBanner } from "./AnnouncementBanner";
 import { bottomNavItems, type NavGroup } from "@/lib/nav";
 import { nameInitial } from "@/lib/initials";
+import { getAnnouncementsFor } from "@/lib/announcements";
+import type { AnnouncementView } from "@/lib/announcementTypes";
 import { IDLE_SECONDS, type SessionPayload, type Role } from "@/lib/auth/session";
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -18,7 +21,7 @@ const ROLE_LABEL: Record<Role, string> = {
   admin: "ผู้ดูแลระบบ",
 };
 
-export function AppShell({
+export async function AppShell({
   session,
   groups,
   children,
@@ -30,6 +33,13 @@ export function AppShell({
   const initial = nameInitial(session.name, session.firstName);
   const hasPhoto = Boolean(session.photo);
   const bottom = bottomNavItems(groups);
+  // ประกาศจาก admin — DB ล่ม/ตารางยังไม่มี ต้องไม่ทำให้ทั้งเว็บพัง (แถบประกาศไม่ใช่ของจำเป็นต่อการทำงาน)
+  let announcements: AnnouncementView[] = [];
+  try {
+    announcements = await getAnnouncementsFor(session.role);
+  } catch (e) {
+    console.error("โหลดประกาศไม่สำเร็จ", e);
+  }
   return (
     <div className="app-shell-nav">
       {/* เตือน + พากลับหน้า login เมื่อไม่มีการใช้งานนานเกินกำหนด */}
@@ -63,7 +73,11 @@ export function AppShell({
             <span className="hide-sm"><LogoutButton sso={session.sso ?? false} /></span>
           </div>
         </header>
-        <main className="main-content"><RouteTransition>{children}</RouteTransition></main>
+        <main className="main-content">
+          {/* ประกาศอยู่นอก RouteTransition — ค้างอยู่กับที่ตอนสลับหน้า ไม่กะพริบตามเนื้อหา */}
+          <AnnouncementBanner items={announcements} />
+          <RouteTransition>{children}</RouteTransition>
+        </main>
       </div>
 
       <BottomNav items={bottom.items} groups={groups} hasMore={bottom.hasMore}>

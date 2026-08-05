@@ -1,9 +1,10 @@
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { db } from "@/db";
-import { events, competitions } from "@/db/schema";
-import { asc, eq, sql } from "drizzle-orm";
+import { events, competitions, announcements } from "@/db/schema";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { SettingsForm } from "./SettingsForm";
 import { EventsManager, type EventItem } from "./EventsManager";
+import { AnnouncementsManager, type AnnouncementItem } from "./AnnouncementsManager";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +15,46 @@ function toLocalInput(d: Date | null): string {
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 }
 
+const fmtDateTime = (d: Date) =>
+  new Date(d).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
+
 export default async function SettingsPage() {
   const { year, setting } = await getActiveYearWithSettings();
+
+  // ประกาศไม่ผูกปีการศึกษา — โหลดก่อน guard เพื่อให้ยังจัดการได้แม้ยังไม่ได้เปิดปี
+  const annRows = await db.select().from(announcements).orderBy(desc(announcements.updatedAt));
+  const annItems: AnnouncementItem[] = annRows.map((a) => ({
+    id: a.id,
+    title: a.title,
+    body: a.body,
+    level: a.level,
+    audience: a.audience,
+    isActive: a.isActive,
+    dismissible: a.dismissible,
+    createdBy: a.createdBy,
+    updatedAt: fmtDateTime(a.updatedAt),
+  }));
+
+  const announcementSection = (
+    <div>
+      <h2 style={{ marginBottom: 8 }}>ประกาศ</h2>
+      <div className="subtitle" style={{ marginBottom: 12 }}>
+        ข้อความที่เปิดไว้จะขึ้นเป็นแถบบนสุดของทุกหน้า หลังนักเรียน/ครูเข้าสู่ระบบ · ปิดสวิตช์เมื่อไม่ต้องการแสดง
+      </div>
+      <AnnouncementsManager items={annItems} />
+    </div>
+  );
+
   if (!year || !setting) {
-    return <div className="alert alert-warning">ยังไม่มีปีการศึกษาที่เปิดใช้งาน โปรดเปิดปีการศึกษาก่อน</div>;
+    return (
+      <div className="stack">
+        <div className="page-header">
+          <h1>ตั้งค่า</h1>
+        </div>
+        <div className="alert alert-warning">ยังไม่มีปีการศึกษาที่เปิดใช้งาน โปรดเปิดปีการศึกษาก่อน</div>
+        {announcementSection}
+      </div>
+    );
   }
 
   const eventRows = await db.select().from(events).where(eq(events.yearId, year.id)).orderBy(asc(events.name));
@@ -47,6 +84,8 @@ export default async function SettingsPage() {
         <h1>ตั้งค่า</h1>
         <div className="subtitle">ปีการศึกษา {year.yearBe}</div>
       </div>
+
+      {announcementSection}
 
       <div>
         <h2 style={{ marginBottom: 8 }}>งาน (กิจกรรม/การแข่งขัน)</h2>

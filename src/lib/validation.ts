@@ -113,6 +113,18 @@ export const certEventInput = z.object({
 });
 export type CertEventInput = z.infer<typeof certEventInput>;
 
+// ===== ประกาศ (announcement) =====
+// body บังคับ (แถบว่าง ๆ ไม่มีประโยชน์) ; title ไม่บังคับ — ข้อความสั้น ๆ บรรทัดเดียวก็พอ
+export const announcementInput = z.object({
+  title: z.string().max(191, "หัวข้อยาวเกินไป (ไม่เกิน 191 ตัวอักษร)").optional().default(""),
+  body: z.string().min(1, "กรุณากรอกข้อความประกาศ").max(2000, "ข้อความยาวเกินไป (ไม่เกิน 2000 ตัวอักษร)"),
+  level: z.enum(["info", "warning", "success"]).optional().default("info"),
+  audience: z.enum(["all", "student", "teacher"]).optional().default("all"),
+  isActive: z.boolean().optional(),
+  dismissible: z.boolean().optional(),
+});
+export type AnnouncementInput = z.infer<typeof announcementInput>;
+
 const certBlock = z.object({
   id: z.string(),
   kind: z.enum([

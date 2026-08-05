@@ -708,6 +708,84 @@ p {
   animation: alert-shake 0.5s ease-in-out;
 }
 
+/* ---------- ประกาศ (announcement) — แถบบนสุดของทุกหน้าหลังล็อกอิน ----------
+   ต่างจาก .alert ตรงที่ไม่ใช่ผลลัพธ์ของสิ่งที่ผู้ใช้เพิ่งกด แต่เป็นข้อความที่ admin กระจายมา
+   จึงมีแถบสีด้านซ้าย + ไอคอน + ปุ่มปิด และอยู่เหนือเนื้อหาหน้าเสมอ */
+.ann-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+.ann {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  border-left-width: 4px;
+  font-size: var(--text-md);
+  line-height: 1.55;
+}
+.ann-icon {
+  display: flex;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.ann-text {
+  min-width: 0;
+  flex: 1;
+}
+.ann-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+/* ข้อความยาว ๆ ที่ admin เคาะขึ้นบรรทัดใหม่ ต้องขึ้นบรรทัดตามที่พิมพ์ */
+.ann-body {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.ann-close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: inherit;
+  opacity: 0.65;
+  cursor: pointer;
+}
+.ann-close:hover {
+  opacity: 1;
+  background: rgb(0 0 0 / 0.06);
+}
+.ann-info {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+  border-left-color: var(--color-info);
+}
+.ann-warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  border-left-color: var(--color-warning);
+}
+.ann-success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  border-left-color: var(--color-success);
+}
+/* ตัวอย่างข้อความในหน้าตั้งค่า — ยาวแค่ไหนก็ไม่ดันการ์ดจนล้น */
+.ann-preview-body {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  color: var(--skdw-dark);
+}
+
 /* ---------- Thai date picker (ปฏิทิน พ.ศ.) ---------- */
 .tdp {
   position: relative;

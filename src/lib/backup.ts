@@ -28,6 +28,7 @@ const TABLES = [
   "entry_members",
   "scores",
   "audit_log",
+  "announcements",
   "teacher_cache",
   "certificate_assets",
   "certificate_templates",

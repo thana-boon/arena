@@ -258,6 +258,32 @@ export const auditLog = pgTable("audit_log", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// ===== ประกาศ (announcement) — แถบข้อความที่ admin กระจายไปทุกหน้าหลังล็อกอิน =====
+// ไม่ผูกปีการศึกษา: ประกาศเป็นเรื่อง "ตอนนี้" ไม่ใช่ข้อมูลของปี (ปิดเองเมื่อหมดเรื่อง)
+// audience: 'all' = ทุกคน | 'student' = เฉพาะนักเรียน | 'teacher' = เฉพาะครู/ผู้บันทึกผล/แอดมิน
+// level: 'info' | 'warning' | 'success' — คุมสีแถบเท่านั้น ไม่มีผลต่อ logic
+// isActive: หัวใจของฟีเจอร์ — ปิดแล้วข้อความยังอยู่ในระบบ เปิดใหม่ได้ทันทีโดยไม่ต้องพิมพ์ซ้ำ
+export const announcements = pgTable(
+  "announcements",
+  {
+    id: serial("id").primaryKey(),
+    title: varchar("title", { length: 191 }).notNull().default(""),
+    body: text("body").notNull(),
+    level: varchar("level", { length: 16 }).notNull().default("info"),
+    audience: varchar("audience", { length: 16 }).notNull().default("all"),
+    isActive: boolean("is_active").notNull().default(false),
+    // ให้ผู้อ่านกดปิดแถบเองได้ (จำไว้ที่เบราว์เซอร์) — ประกาศสำคัญตั้ง false เพื่อให้ค้างอยู่ทุกหน้า
+    dismissible: boolean("dismissible").notNull().default(true),
+    createdBy: varchar("created_by", { length: 64 }).notNull().default(""),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("ann_active_idx").on(t.isActive)]
+);
+
 // ===== cache ข้อมูลจาก Student/Teacher API (snapshot) =====
 export const teacherCache = pgTable("teacher_cache", {
   teacherCode: varchar("teacher_code", { length: 64 }).primaryKey(),
@@ -423,3 +449,4 @@ export type CertificateTemplate = typeof certificateTemplates.$inferSelect;
 export type CertificateSignature = typeof certificateSignatures.$inferSelect;
 export type CertificateIssue = typeof certificateIssues.$inferSelect;
 export type EventRow = typeof events.$inferSelect;
+export type Announcement = typeof announcements.$inferSelect;

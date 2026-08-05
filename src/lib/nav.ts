@@ -22,6 +22,7 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/competitions", label: "รายการแข่งขัน", icon: "trophy", short: "รายการ", primary: true },
       { href: "/admin/class-registrations", label: "การสมัครรายห้อง", icon: "clipboard", short: "รายห้อง", primary: true },
+      { href: "/admin/results", label: "ประกาศผล", icon: "chart" },
     ],
   },
   {
@@ -54,6 +55,8 @@ export const TEACHER_NAV_GROUPS: NavGroup[] = [
       { href: "/teacher/class-registrations", label: "การสมัครรายห้อง", icon: "graduation", short: "ห้องของฉัน", primary: true },
       // ครูทุกคนบันทึกคะแนนรายการในหมวดตัวเองได้ (admin/recorder ได้ทุกรายการ)
       { href: "/teacher/scoring", label: "บันทึกผล", icon: "pencil", primary: true },
+      // ภาพรวม "ประกาศแล้ว/ยังไม่ประกาศ" ของทั้งหมวด — งานหลังบันทึกคะแนนเสร็จ จึงอยู่ถัดจาก "บันทึกผล"
+      { href: "/teacher/results", label: "ประกาศผล", icon: "chart" },
       { href: "/teacher/certificates", label: "เกียรติบัตร", icon: "file" },
       { href: "/teacher/cert-registry", label: "ทะเบียนเกียรติบัตร", icon: "search", short: "ทะเบียน" },
     ],

@@ -1964,6 +1964,29 @@ p {
   color: var(--skdw-purple);
 }
 
+/* แถบความคืบหน้า (หน้าประกาศผล) */
+.progress {
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--skdw-purple-pale);
+  overflow: hidden;
+}
+.progress > span {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--skdw-purple);
+  transition: width 0.3s ease;
+}
+.publish-percent {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  font-family: var(--font-en-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--skdw-purple);
+  line-height: 1;
+}
+
 .empty-state {
   text-align: center;
   padding: var(--space-12) var(--space-4);

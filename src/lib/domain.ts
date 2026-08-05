@@ -90,6 +90,15 @@ export function scorePercent(total: number, fullScore: number): number {
   return (total / fullScore) * 100;
 }
 
+/**
+ * % ความคืบหน้าแบบไม่หลอกตา — ปัดลงเสมอ จึงขึ้น 100% ต่อเมื่อทำครบจริง
+ * (99.6% ปัดขึ้นเป็น 100% จะทำให้คนเข้าใจว่าประกาศครบแล้วทั้งที่ยังเหลือรายการค้าง)
+ */
+export function progressPercent(done: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.floor((Math.min(done, total) / total) * 100);
+}
+
 /** ตัดสินเหรียญจาก % ตามเกณฑ์ */
 export function decideMedal(
   pct: number,

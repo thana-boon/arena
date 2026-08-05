@@ -60,7 +60,7 @@ export async function POST(req: Request) {
 
     try {
       const members = await resolveMembers(memberCodes, selfSnapshot);
-      const entryId = await registerEntry({
+      const { entryId, competitionName } = await registerEntry({
         competitionId: body.competitionId,
         members,
         teamName: body.teamName ?? null,
@@ -68,7 +68,20 @@ export async function POST(req: Request) {
         byCode: session.code,
         override,
       });
-      if (override) await logAudit(session.code, "override_register", { competitionId: body.competitionId, entryId, memberCodes });
+
+      // บันทึกการลงทะเบียน "ทุกครั้ง" ไม่ใช่เฉพาะ override
+      // (ของเดิมบันทึกแค่ override ทำให้ log ไม่มีร่องรอยเลยว่านักเรียนคนไหนลงรายการอะไร
+      //  ทั้งที่ยกเลิก (withdraw_entry) ถูกบันทึกไว้ — เห็นแต่ตอนถอน ไม่เห็นตอนลง)
+      // แยก action ตามคนกด เพื่อกรองได้ว่า "นักเรียนลงเอง" กับ "ครูลงให้" ต่างกัน
+      const action = override ? "override_register" : isStaff ? "register_by_staff" : "register";
+      await logAudit(session.code, action, {
+        competitionId: body.competitionId,
+        competition: competitionName,
+        entryId,
+        // เก็บชื่อคู่รหัส — ค้นใน log ด้วยชื่อนักเรียนหรือรหัสก็เจอเหมือนกัน
+        members: members.map((m) => `${m.name} (${m.studentCode})`),
+        ...(body.teamName?.trim() ? { teamName: body.teamName.trim() } : {}),
+      });
       return ok({ entryId });
     } catch (e) {
       if (e instanceof RegistrationError) return fail(e.message, e.status);

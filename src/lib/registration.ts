@@ -33,11 +33,17 @@ function timeOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string)
   return aStart < bEnd && bStart < aEnd;
 }
 
+export type RegisterResult = {
+  entryId: number;
+  /** ชื่อรายการ — ผู้เรียกใช้เขียนลง audit log ได้โดยไม่ต้อง query ซ้ำ */
+  competitionName: string;
+};
+
 /**
  * ลงทะเบียน 1 entry แบบ atomic + validate กติกา 1–7
  * ทุกอย่างอยู่ใน transaction เดียว, counter อัปเดตแบบ conditional กัน race
  */
-export async function registerEntry(args: RegisterArgs): Promise<number> {
+export async function registerEntry(args: RegisterArgs): Promise<RegisterResult> {
   const override = args.override === true && args.byRole === "admin";
   const { year, setting } = await getActiveYearWithSettings();
   if (!year || !setting) throw new RegistrationError("ยังไม่มีปีการศึกษาที่เปิดใช้งาน");
@@ -204,7 +210,7 @@ export async function registerEntry(args: RegisterArgs): Promise<number> {
     return newEntryId;
   });
 
-  return entryId;
+  return { entryId, competitionName: comp.name };
 }
 
 /** ยกเลิกการลงทะเบียน (คืน counter ใน transaction เดียว) */

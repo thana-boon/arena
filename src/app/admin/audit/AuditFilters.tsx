@@ -69,6 +69,11 @@ export function AuditFilters({
   const known = new Set(AUDIT_GROUPS.flatMap((g) => g.actions));
   const others = actions.filter((a) => !known.has(a));
 
+  // ตั้งแต่บันทึกการลงทะเบียนของนักเรียนด้วย รายชื่อ "ผู้ทำ" ยาวขึ้นเป็นหลักร้อย
+  // แยกครู (มีชื่อจากสิทธิ์ที่ให้ไว้) ออกมาไว้บนสุด ที่เหลือคือรหัสนักเรียนกองไว้ด้านล่าง
+  const staff = people.filter((p) => p.name);
+  const students = people.filter((p) => !p.name);
+
   return (
     <div className="card stack">
       <form
@@ -126,11 +131,24 @@ export function AuditFilters({
           <label className="form-label">ผู้ทำ</label>
           <select className="form-select" value={v.who} onChange={(e) => apply({ who: e.target.value })}>
             <option value="">ทุกคน</option>
-            {people.map((p) => (
-              <option key={p.code} value={p.code}>
-                {p.name ? `${p.name} (${p.code})` : p.code}
-              </option>
-            ))}
+            {staff.length > 0 && (
+              <optgroup label="ครู / เจ้าหน้าที่">
+                {staff.map((p) => (
+                  <option key={p.code} value={p.code}>
+                    {p.name} ({p.code})
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {students.length > 0 && (
+              <optgroup label="นักเรียน (รหัส)">
+                {students.map((p) => (
+                  <option key={p.code} value={p.code}>
+                    {p.code}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
         </div>
 

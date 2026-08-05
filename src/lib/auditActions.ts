@@ -22,7 +22,7 @@ export const AUDIT_GROUPS: { key: AuditGroupKey; label: string; actions: string[
   {
     key: "registration",
     label: "การลงทะเบียน",
-    actions: ["override_register", "withdraw_entry"],
+    actions: ["register", "register_by_staff", "override_register", "withdraw_entry"],
   },
   {
     key: "certificate",
@@ -90,6 +90,8 @@ export const ACTION_LABEL: Record<string, string> = {
   publish: "ประกาศผล",
   unpublish: "ยกเลิกประกาศผล",
 
+  register: "ลงทะเบียน (นักเรียนลงเอง)",
+  register_by_staff: "ลงทะเบียนให้นักเรียน",
   override_register: "ลงทะเบียนแบบ override",
   withdraw_entry: "ยกเลิกการลงทะเบียน",
 
@@ -165,6 +167,9 @@ export function actionsMatching(q: string): string[] {
 
 const DETAIL_LABEL: Record<string, string> = {
   competitionId: "รายการที่",
+  competition: "รายการ",
+  members: "ผู้เข้าแข่งขัน",
+  teamName: "ชื่อทีม",
   entryId: "การลงทะเบียนที่",
   eventId: "งานที่",
   yearId: "ปีที่",

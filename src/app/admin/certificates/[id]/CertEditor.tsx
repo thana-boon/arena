@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
 import { useAlert, useConfirm } from "@/components/ConfirmDialog";
@@ -901,8 +902,11 @@ export function CertEditor(props: {
         </div>
       </div>
 
-      {/* ===== โหมดเต็มจอ ===== */}
-      {full && (
+      {/* ===== โหมดเต็มจอ =====
+          portal ไป body — ถ้า render ในหน้า ancestor ที่มี transform animation (.route-fade) จะทำให้
+          position:fixed ยึดกับกล่องเนื้อหาแทน viewport → กระดาษไปลอยกลางความสูงของหน้า ต้องเลื่อนหา
+          และพอคลิกชิ้นงาน เบราว์เซอร์จะเลื่อนหน้าไปหาเองจนจอเด้ง */}
+      {full && createPortal(
         <div className="cert-fs">
           <div className="cert-fs-bar">
             <strong style={{ marginInlineEnd: "auto" }}>{props.event.name}</strong>
@@ -1042,7 +1046,8 @@ export function CertEditor(props: {
           <div className="cert-fs-foot">
             ลากตรงกลางเพื่อย้าย · ลากจุดซ้าย/ขวาเพื่อปรับความกว้าง · ลากจุดมุมขวาล่างเพื่อขยายตัวอักษร · ปุ่มลูกศรขยับทีละน้อย (กด Shift = ทีละมาก) · Delete = ลบ
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

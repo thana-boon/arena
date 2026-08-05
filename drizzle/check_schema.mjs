@@ -27,6 +27,7 @@ const CHECKS = [
   { id: "0005", what: "ทีมข้ามห้อง", how: () => column("competitions", "allow_cross_class"), fix: "node drizzle/apply_0005.mjs" },
   { id: "0006", what: "รายการไม่มีการแข่งขัน", how: () => column("competitions", "no_contest"), fix: "node drizzle/apply_0006.mjs" },
   { id: "0007", what: "ประกาศ (announcement)", how: () => table("announcements"), fix: "node drizzle/apply_0007.mjs" },
+  { id: "0008", what: "IP ใน audit log", how: () => column("audit_log", "ip"), fix: "node drizzle/apply_0008.mjs" },
 ];
 
 try {

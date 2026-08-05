@@ -78,7 +78,8 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
     // คำค้นเป็นภาษาไทยได้ — เทียบกับป้ายชื่อไทยของ action และชื่อครู แล้วแปลงกลับเป็นรหัสก่อนค้น
     const byAction = actionsMatching(q);
     const byName = roles.filter((r) => r.name.toLowerCase().includes(q.toLowerCase())).map((r) => r.code);
-    const parts: SQL[] = [ilike(auditLog.detail, like), ilike(auditLog.who, like)];
+    // ค้น IP ได้ตรง ๆ ด้วย (พิมพ์ "192.168.1." เพื่อไล่ดูว่าเครื่องวงนี้ทำอะไรไปบ้าง)
+    const parts: SQL[] = [ilike(auditLog.detail, like), ilike(auditLog.who, like), ilike(auditLog.ip, like)];
     if (byAction.length) parts.push(inArray(auditLog.action, byAction));
     if (byName.length) parts.push(inArray(auditLog.who, byName));
     const combined = or(...parts);
@@ -164,6 +165,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                 <tr>
                   <th>เวลา</th>
                   <th>ผู้ทำ</th>
+                  <th>IP</th>
                   <th>การกระทำ</th>
                   <th>รายละเอียด</th>
                 </tr>
@@ -179,10 +181,13 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                         {new Date(l.createdAt).toLocaleString("th-TH")}
                       </td>
                       <td className="text-sm hide-sm">{name ?? l.who}</td>
+                      {/* บันทึกเก่าก่อนมีคอลัมน์นี้ (และกรณี proxy ไม่ส่ง header) จะว่าง → ขีดแทน */}
+                      <td className="text-sm nowrap hide-sm">{l.ip || "—"}</td>
                       <td className="td-title">
                         <span className={actionBadgeClass(l.action)}>{actionLabel(l.action)}</span>
                         <div className="only-sm text-xs muted" style={{ fontWeight: 400, marginTop: 4 }}>
                           {new Date(l.createdAt).toLocaleString("th-TH")} · {name ?? l.who}
+                          {l.ip && ` · ${l.ip}`}
                         </div>
                       </td>
                       <td className="text-xs muted td-block" data-label="รายละเอียด">

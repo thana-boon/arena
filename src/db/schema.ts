@@ -255,6 +255,9 @@ export const auditLog = pgTable("audit_log", {
   who: varchar("who", { length: 128 }).notNull(),
   action: varchar("action", { length: 64 }).notNull(),
   detail: text("detail"), // json
+  // IP ของเครื่องที่สั่งงาน — ว่าง = อ่านไม่ได้ (ไม่มี header จาก proxy) หรือเป็นบันทึกเก่าก่อนมีคอลัมน์นี้
+  // ยาว 64 เผื่อ IPv6 เต็มรูป (45) + เผื่อรูปแบบแปลก ๆ จาก proxy
+  ip: varchar("ip", { length: 64 }).notNull().default(""),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

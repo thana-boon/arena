@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { computeCompetitionResults } from "@/lib/results";
 import { getRoster } from "@/lib/roster";
+import { resolveClassNumbers, withClassNumbers } from "@/lib/classNumbers";
 import { canViewCompetition } from "@/lib/permit";
 import { MEDAL_LABEL } from "@/lib/domain";
 import type { SessionPayload } from "@/lib/auth/session";
@@ -37,6 +38,12 @@ export async function loadCompetitionSheet(
   const roster = await getRoster(id);
   const computed = await computeCompetitionResults(id, medalPct);
 
+  // ใช้เลขที่ที่ freeze ไว้ตอนสมัคร — คนที่สมัครก่อนระบบเก็บเลขที่ค่อยถาม SchoolOS ให้
+  const classNumbers = await resolveClassNumbers([
+    ...roster.flatMap((e) => e.members),
+    ...(computed?.results ?? []).flatMap((r) => r.members),
+  ]);
+
   return {
     ok: true,
     data: {
@@ -52,11 +59,11 @@ export async function loadCompetitionSheet(
       },
       criteria: (computed?.criteria ?? []).map((c) => ({ id: c.id, name: c.name, max: Number(c.maxScore) })),
       fullScore: computed?.fullScore ?? 0,
-      roster,
+      roster: roster.map((e) => ({ ...e, members: withClassNumbers(e.members, classNumbers) })),
       results: (computed?.results ?? []).map((r) => ({
         entryId: r.entryId,
         teamName: r.teamName,
-        members: r.members,
+        members: withClassNumbers(r.members, classNumbers),
         scoresByCriterion: r.scoresByCriterion,
         total: r.total,
         percent: r.percent,

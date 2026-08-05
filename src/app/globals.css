@@ -2199,6 +2199,92 @@ p {
   .report-catalog .table tr {
     break-inside: avoid;
   }
+
+  /* ===== เอกสารกระดาษ: หัวเรื่อง + หัวตาราง ===== */
+  /* ประเภทเอกสารต้องใหญ่กว่าบรรทัดอื่น — กฎ 13px ด้านบนคลุม .print-title * ทั้งก้อน ต้องแย่งคืนตรงนี้ */
+  .print-title .sheet-head-doc {
+    font-size: 15px !important;
+    font-weight: 700;
+  }
+  .sheet-head-compact .sheet-head-doc {
+    font-size: 13px !important;
+  }
+  /* หัวตารางจัดกลาง — ต้องชนะ .report-web .table th ที่ชิดซ้าย จึงต้องระบุทั้งสองชั้น */
+  .sheet-table th,
+  .sheet-table th.num,
+  .report-web .table.sheet-table th,
+  .report-web .table.sheet-table th.num {
+    text-align: center !important;
+  }
+  .sheet-table .col-seq,
+  .sheet-table .col-class,
+  .sheet-table .col-team,
+  .sheet-table .col-medal {
+    text-align: center;
+    white-space: nowrap;
+    width: 1px !important;
+  }
+  .sheet-table .col-name {
+    width: 100% !important;
+  }
+  /* แถวของคนคนหนึ่งอย่าถูกตัดคาหน้ากระดาษ (ทีมที่ merge ช่องไว้จะเบี้ยวทันทีถ้าโดนตัด) */
+  .sheet-table tr {
+    break-inside: avoid;
+  }
+}
+
+/* ---------- เอกสารกระดาษ (หัวกระดาษ + ตาราง) ---------- */
+/* ใช้ร่วมกันทุกใบ ทั้งพรีวิวในหน้าเอกสาร/รายงาน และหน้าพิมพ์ — ดู components/report/sheetLayout.tsx */
+.sheet-head {
+  margin-bottom: 16px;
+  text-align: center;
+}
+/* บรรทัดแรก = ประเภทเอกสาร (ใบกรอกคะแนน/ใบประกาศผล/...) เด่นสุดบนกระดาษ */
+.sheet-head-doc {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+}
+/* บรรทัดที่สอง = ชื่องาน + ชื่อโรงเรียน */
+.sheet-head-event {
+  font-weight: 600;
+}
+/* แบบกระชับ (ใบรายการให้นักเรียน): ทุกบรรทัดขนาดเท่ากัน ไม่เสียที่กระดาษให้หัวเรื่อง */
+.sheet-head-compact {
+  margin-bottom: 8px;
+}
+.sheet-head-compact .sheet-head-doc {
+  font-size: inherit;
+}
+
+/* หัวตารางจัดกลางทุกช่อง — รวมช่องคะแนนที่เนื้อในชิดขวา */
+.sheet-table th,
+.sheet-table th.num {
+  text-align: center;
+}
+/* ช่องสั้น ๆ (ลำดับ/เลขที่/ชั้น/ชื่อทีม/เหรียญ) บีบพอดีเนื้อหาและจัดกลางให้อ่านเป็นคอลัมน์ */
+.sheet-table .col-seq,
+.sheet-table .col-class,
+.sheet-table .col-team,
+.sheet-table .col-medal {
+  text-align: center;
+  white-space: nowrap;
+  width: 1px;
+}
+/* ชื่อ-สกุลกินที่ที่เหลือทั้งหมด — ไม่งั้นชื่อไทยยาว ๆ ถูกบีบตัดขึ้นสามบรรทัด
+   ทั้งที่ช่องคะแนนข้าง ๆ ว่างอยู่ (width:100% คู่กับ width:1px ของช่องอื่นคือวิธีมาตรฐาน) */
+.sheet-table .col-name {
+  width: 100%;
+  min-width: 12ch;
+}
+/* ช่องที่ merge ข้ามหลายแถว (ลำดับ/ชื่อทีม/คะแนนของทีม) อยู่กลางแนวตั้งด้วย ไม่ลอยติดขอบบน */
+.sheet-table td[rowspan] {
+  vertical-align: middle;
+}
+.sheet-signature {
+  margin-top: 48px;
+  text-align: right;
+  padding-right: 24px;
 }
 
 /* ---------- Combined report (ออกเอกสารหลายรายการรวมกัน) ---------- */
@@ -3129,4 +3215,250 @@ p {
   .ov-pct { font-size: var(--text-xs); }
   .ov-cnt { font-size: 9px; }
   .ov-grid thead th { font-size: 10px; }
+}
+
+/* ============================================================
+   เกียรติบัตร — หน้าออกแบบ (แผงตั้งค่า + กระดาษที่ลากได้)
+   หน่วยพิกัดทุกอย่างเป็น % ของ "ความกว้าง" กระดาษ ตัวกรอบจึงคำนวณเป็น px
+   มาจาก React ไม่ใช่จาก CSS — ที่นี่ดูแลแค่หน้าตา
+   ============================================================ */
+.cert-editor-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 380px) 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+@media (max-width: 1024px) {
+  .cert-editor-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.cert-preview-col {
+  position: sticky;
+  top: var(--space-3);
+  align-self: flex-start;
+}
+.cert-sig-active {
+  outline: 2px solid var(--skdw-purple);
+}
+
+/* ภาพย่อ: กดที่ไหนก็ได้เพื่อเข้าโหมดเต็มจอ (หน้านี้ลากบนภาพย่อไม่ได้ ตั้งใจให้ไปลากตอนเต็มจอ) */
+.cert-preview-click {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--skdw-border);
+  border-radius: var(--radius-md);
+  background: none;
+  overflow: hidden;
+  cursor: zoom-in;
+  text-align: start;
+}
+.cert-preview-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(26, 26, 46, 0.42);
+  color: #fff;
+  font-size: var(--text-md);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.cert-preview-click:hover .cert-preview-hint,
+.cert-preview-click:focus-visible .cert-preview-hint {
+  opacity: 1;
+}
+
+.cert-stage {
+  position: relative;
+  flex: 0 0 auto;
+  background: #fff;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.22);
+  touch-action: none;
+  /* ลากบนกระดาษต้องเป็นการย้ายชิ้นงานเท่านั้น ห้ามกลายเป็นลากคลุมข้อความ/ลากรูป
+     (พอซูมจนจอเลื่อนได้ การลากคลุมจะสั่งให้จอไหลตามเมาส์จนคุมไม่ได้) */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cert-stage img {
+  -webkit-user-drag: none;
+}
+
+/* กรอบของแต่ละชิ้นบนกระดาษ — เห็นจาง ๆ ตลอด เลือกแล้วค่อยเข้ม จะได้รู้ว่ามีอะไรวางอยู่ตรงไหนบ้าง */
+.cert-box {
+  position: absolute;
+  outline: 1px dashed rgba(37, 99, 235, 0.45);
+  cursor: move;
+  touch-action: none;
+}
+.cert-box.sig {
+  outline-color: rgba(124, 58, 237, 0.5);
+}
+.cert-box:hover {
+  outline-color: rgba(37, 99, 235, 0.9);
+  background: rgba(37, 99, 235, 0.06);
+}
+.cert-box.sel {
+  outline: 2px solid #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+}
+.cert-box.sig.sel {
+  outline-color: #7c3aed;
+  background: rgba(124, 58, 237, 0.08);
+}
+.cert-box-tag {
+  position: absolute;
+  bottom: 100%;
+  inset-inline-start: 0;
+  margin-bottom: 2px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: #2563eb;
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.cert-box.sig .cert-box-tag {
+  background: #7c3aed;
+}
+.cert-h {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #2563eb;
+  border-radius: 2px;
+  background: #fff;
+  touch-action: none;
+}
+.cert-box.sig .cert-h {
+  border-color: #7c3aed;
+}
+.cert-h.l {
+  inset-inline-start: -6px;
+  top: 50%;
+  margin-top: -6px;
+  cursor: ew-resize;
+}
+.cert-h.r {
+  inset-inline-end: -6px;
+  top: 50%;
+  margin-top: -6px;
+  cursor: ew-resize;
+}
+.cert-h.br {
+  inset-inline-end: -6px;
+  bottom: -6px;
+  border-radius: 50%;
+  cursor: nwse-resize;
+}
+/* เส้นไกด์กึ่งกลางหน้า — โผล่เฉพาะตอนลากเข้าใกล้แล้วโดนดูด */
+.cert-guide {
+  position: absolute;
+  background: #ec4899;
+  pointer-events: none;
+  z-index: 6;
+}
+
+/* ---------- โหมดเต็มจอ ---------- */
+/* ต่ำกว่า --z-modal เพื่อให้กล่องยืนยัน/แจ้งผลลอยทับได้ตามปกติ */
+.cert-fs {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  background: #4a4a63;
+}
+.cert-fs-bar,
+.cert-fs-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--skdw-white);
+  border-bottom: 1px solid var(--skdw-border);
+}
+.cert-fs-tools {
+  gap: 4px;
+  min-height: 44px;
+  background: var(--skdw-bg);
+}
+.cert-fs-tools .btn-sm {
+  min-width: 34px;
+  justify-content: center;
+}
+.cert-fs-tools select,
+.cert-fs-tools input {
+  height: 32px;
+  padding: 0 6px;
+  font-size: var(--text-sm);
+}
+.cert-tool-name {
+  color: var(--skdw-purple);
+  margin-inline-end: var(--space-2);
+}
+.cert-tool-label {
+  font-size: var(--text-xs);
+  color: var(--skdw-muted);
+}
+.cert-tool-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px var(--space-2);
+  background: var(--skdw-border);
+}
+.cert-tool-num {
+  width: 68px;
+}
+.cert-tool-text {
+  width: 170px;
+}
+.cert-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.cert-zoom-val {
+  min-width: 46px;
+  text-align: center;
+  font-size: var(--text-sm);
+}
+/* margin:auto แทน align-items:center — พอซูมจนใหญ่กว่าจอ จะได้เลื่อนเห็นครบทุกด้าน ไม่โดนตัดหัว */
+.cert-fs-body {
+  flex: 1;
+  display: flex;
+  overflow: auto;
+  padding: 12px;
+  /* ปิด scroll anchoring: ระหว่างลาก ชิ้นงานบนกระดาษขยับทุกเฟรม
+     เบราว์เซอร์จะพยายามเลื่อนจอตามให้ กลายเป็นจอเด้งสู้กับมือเรา */
+  overflow-anchor: none;
+  overscroll-behavior: contain;
+}
+.cert-fs-body > .cert-stage {
+  margin: auto;
+}
+.cert-fs-foot {
+  padding: var(--space-2) var(--space-3);
+  background: var(--skdw-white);
+  border-top: 1px solid var(--skdw-border);
+  color: var(--skdw-muted);
+  font-size: var(--text-xs);
+}
+@media (max-width: 768px) {
+  .cert-fs-foot {
+    display: none;
+  }
+}
+
+/* QR ต้องมีพื้นขาวรอบตัวเสมอ ไม่งั้นบนเกียรติบัตรพื้นเข้มจะจมจนสแกนไม่ติด
+   (กล่อง/ระยะขอบมาจาก CertificateCanvas ที่นี่แค่บังคับให้ svg เต็มกล่อง) */
+.cert-qr-box > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }

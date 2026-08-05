@@ -1,11 +1,22 @@
 import "server-only";
 import { db } from "@/db";
-import { competitions, subjectGroups, competitionCapacity, competitionVenues, venues, type Competition } from "@/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import {
+  competitions,
+  subjectGroups,
+  competitionCapacity,
+  competitionVenues,
+  venues,
+  entries,
+  entryMembers,
+  type Competition,
+} from "@/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { computeCompetitionResults } from "@/lib/results";
-import { getRoster, type RosterEntry } from "@/lib/roster";
+import { getRoster } from "@/lib/roster";
+import { resolveClassNumbers, withClassNumbers, type ClassNumberMap } from "@/lib/classNumbers";
 import { MEDAL_LABEL, parseJsonArray, isUnlimited, UNLIMITED_CAPACITY } from "@/lib/domain";
+import type { SheetEntry } from "@/components/report/sheetLayout";
 
 export type MedalPct = { gold: number; silver: number; bronze: number };
 
@@ -18,10 +29,18 @@ export async function buildBundle(
   groupName: string,
   yearBe: number,
   medalPct: MedalPct,
-  extras: BundleExtras = { venueName: "", venueList: [], capacity: 0 }
+  extras: BundleExtras = { venueName: "", venueList: [], capacity: 0 },
+  /** เลขที่ที่ดึงมาไว้แล้วสำหรับทั้งงาน — ไม่ส่งมา = ยิง SchoolOS ให้เฉพาะรายการนี้ */
+  classNumbers?: ClassNumberMap
 ): Promise<ReportBundle> {
   const roster = await getRoster(comp.id);
   const computed = await computeCompetitionResults(comp.id, medalPct);
+  const classNo =
+    classNumbers ??
+    (await resolveClassNumbers([
+      ...roster.flatMap((e) => e.members),
+      ...(computed?.results ?? []).flatMap((r) => r.members),
+    ]));
   return {
     id: comp.id,
     eventId: comp.eventId,
@@ -46,11 +65,11 @@ export async function buildBundle(
     },
     criteria: (computed?.criteria ?? []).map((c) => ({ id: c.id, name: c.name, max: Number(c.maxScore) })),
     fullScore: computed?.fullScore ?? 0,
-    roster,
+    roster: roster.map((e) => ({ ...e, members: withClassNumbers(e.members, classNo) })),
     results: (computed?.results ?? []).map((r) => ({
       entryId: r.entryId,
       teamName: r.teamName,
-      members: r.members,
+      members: withClassNumbers(r.members, classNo),
       scoresByCriterion: r.scoresByCriterion,
       total: r.total,
       percent: r.percent,
@@ -65,7 +84,7 @@ export async function buildBundle(
 export type ReportResultRow = {
   entryId: number;
   teamName: string | null;
-  members: { studentCode: string; name: string; classLevel: string; classRoom: string }[];
+  members: { studentCode: string; name: string; classLevel: string; classRoom: string; classNumber: string }[];
   scoresByCriterion: Record<number, number>;
   total: number;
   percent: number;
@@ -97,7 +116,7 @@ export type ReportBundle = {
   };
   criteria: { id: number; name: string; max: number }[];
   fullScore: number;
-  roster: RosterEntry[];
+  roster: SheetEntry[];
   results: ReportResultRow[];
   rosterCount: number; // จำนวน entry (เดี่ยว = คน, ทีม = ทีม)
   studentCount: number; // จำนวนนักเรียนรวมทุก entry
@@ -131,6 +150,22 @@ export async function getReportBundles(): Promise<{ yearBe: number; bundles: Rep
     ? await db.select().from(competitionVenues).where(inArray(competitionVenues.competitionId, compIds))
     : [];
 
+  // เลขที่ของทุกคนในงาน — รวบเป็นชุดเดียวแล้วส่งต่อให้ทุก bundle ใช้
+  // (ถ้าปล่อยให้ buildBundle หาเอง คนที่ยังไม่มี snapshot จะทำให้ยิง SchoolOS ซ้ำทุกรายการแข่งขัน)
+  const allMembers = compIds.length
+    ? await db
+        .select({
+          studentCode: entryMembers.studentCode,
+          classLevel: entryMembers.classLevelSnapshot,
+          classRoom: entryMembers.classRoomSnapshot,
+          classNumber: entryMembers.classNumberSnapshot,
+        })
+        .from(entryMembers)
+        .innerJoin(entries, eq(entryMembers.entryId, entries.id))
+        .where(and(inArray(entries.competitionId, compIds), eq(entries.status, "active")))
+    : [];
+  const classNumbers = await resolveClassNumbers(allMembers);
+
   const bundles: ReportBundle[] = [];
   for (const comp of comps) {
     const g = groupOf(comp.subjectGroupId);
@@ -147,7 +182,9 @@ export async function getReportBundles(): Promise<{ yearBe: number; bundles: Rep
       .filter((v): v is (typeof venueRows)[number] => !!v)
       .map((v) => (v.building ? `${v.building} · ${v.name}` : v.name));
     const venueName = venueList.join(", ");
-    bundles.push(await buildBundle(comp, g?.name ?? "-", year.yearBe, medalPct, { venueName, venueList, capacity }));
+    bundles.push(
+      await buildBundle(comp, g?.name ?? "-", year.yearBe, medalPct, { venueName, venueList, capacity }, classNumbers)
+    );
   }
 
   // เรียงตามหมวด แล้วตามชื่อรายการ ให้เอกสารออกมาเป็นระเบียบ

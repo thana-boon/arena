@@ -15,6 +15,7 @@ export type StudentProfile = {
   last_name: string;
   class_level: string; // เช่น "ม.1"
   class_room: string;
+  class_number: string; // เลขที่ในห้อง — "" ถ้า SchoolOS ไม่ได้ส่งมา
   photo_url?: string | null; // path รูปบน SchoolOS (ต้อง proxy ผ่านฝั่งเรา)
   [k: string]: unknown;
 };
@@ -26,6 +27,7 @@ function toProfile(s: SosStudent): StudentProfile {
     last_name: s.lastName,
     class_level: s.gradeLevel ?? "",
     class_room: s.classroom != null ? String(s.classroom) : "",
+    class_number: s.classNumber != null ? String(s.classNumber) : "",
     photo_url: s.photoUrl ?? null,
   };
 }
@@ -100,6 +102,7 @@ export async function studentLogin(
     last_name: rest.join(" "),
     class_level: "",
     class_room: "",
+    class_number: "",
   };
 }
 
@@ -130,11 +133,18 @@ export async function listStudents(params: {
   class_room?: string;
   page?: number;
   limit?: number;
+  /**
+   * "all" = รวมคนที่จบ/ลาออกไปแล้วด้วย (SchoolOS default คือ "studying" เท่านั้น)
+   * ใช้ตอนทำเอกสารย้อนหลัง — คนที่จบไปแล้วก็ยังเคยลงแข่งและต้องมีชื่อบนกระดาษ
+   * ⚠ อย่าใช้กับหน้าสมัคร: ที่นั่นต้องเห็นเฉพาะคนที่ยังเรียนอยู่
+   */
+  status?: "studying" | "all";
 }): Promise<StudentListResult> {
   const r = await sosListStudents({
     q: params.q,
     grade: params.class_level,
     classroom: params.class_room,
+    status: params.status,
     page: params.page ?? 1,
     pageSize: params.limit ?? 50,
   });
@@ -167,10 +177,11 @@ export async function listClassRooms(classLevel: string): Promise<string[]> {
   });
 }
 
-/** นักเรียนทั้งห้อง (ทุกหน้า) — ใช้หน้า "การสมัครรายห้อง" */
+/** นักเรียนทั้งห้อง (ทุกหน้า) — ใช้หน้า "การสมัครรายห้อง" และตอนหาเลขที่ลงเอกสาร */
 export async function listStudentsInRoom(
   classLevel: string,
-  classRoom: string
+  classRoom: string,
+  status?: "studying" | "all"
 ): Promise<StudentProfile[]> {
   const out: StudentProfile[] = [];
   const limit = 200;
@@ -181,6 +192,7 @@ export async function listStudentsInRoom(
     const { data, meta } = await listStudents({
       class_level: classLevel,
       class_room: classRoom,
+      status,
       page,
       limit,
     });
@@ -191,8 +203,8 @@ export async function listStudentsInRoom(
   return out;
 }
 
-/** นักเรียนทุกคนทุกห้อง (ทุกหน้า) — ใช้ทำภาพรวมการสมัครรายห้องของ admin */
-export async function listAllStudents(): Promise<StudentProfile[]> {
+/** นักเรียนทุกคนทุกห้อง (ทุกหน้า) — ใช้ทำภาพรวมการสมัครรายห้องของ admin และหาเลขที่ลงเอกสาร */
+export async function listAllStudents(status?: "studying" | "all"): Promise<StudentProfile[]> {
   const out: StudentProfile[] = [];
   const limit = 200;
   // งานกวาดทั้งโรงเรียน (ผู้ใช้กดเอง รู้ว่านาน) — ให้งบมากกว่างานอื่น แต่ยังมีเพดาน
@@ -200,7 +212,7 @@ export async function listAllStudents(): Promise<StudentProfile[]> {
   let page = 1;
   for (;;) {
     checkTime();
-    const { data, meta } = await listStudents({ page, limit });
+    const { data, meta } = await listStudents({ status, page, limit });
     out.push(...data);
     if (data.length === 0 || page * limit >= meta.total || page >= 30) break;
     page++;

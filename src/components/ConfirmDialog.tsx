@@ -7,6 +7,8 @@ export type ConfirmOptions = {
   confirmText?: string;
   cancelText?: string;
   danger?: boolean;
+  /** ซ่อนปุ่มยกเลิก → กลายเป็นกล่องแจ้งผล (alert) ที่มีแค่ปุ่ม "ตกลง" */
+  hideCancel?: boolean;
 };
 
 const ConfirmContext = createContext<((opts: ConfirmOptions) => Promise<boolean>) | null>(null);
@@ -16,6 +18,25 @@ export function useConfirm() {
   const ctx = useContext(ConfirmContext);
   if (!ctx) throw new Error("useConfirm must be used within <ConfirmProvider>");
   return ctx;
+}
+
+/**
+ * modal แจ้งผล — ใช้แทนแถบ alert บนหัวหน้า ซึ่งคนไม่เห็นถ้าไม่เลื่อนจอขึ้นไป
+ * (หน้ายาว ๆ อย่างหน้าออกแบบเกียรติบัตร ปุ่มบันทึกอยู่ล่างสุด แต่ข้อความอยู่บนสุด)
+ */
+export function useAlert() {
+  const confirm = useConfirm();
+  return useCallback(
+    (message: string, opts?: { title?: string; danger?: boolean; confirmText?: string }) =>
+      confirm({
+        message,
+        title: opts?.title,
+        danger: opts?.danger,
+        confirmText: opts?.confirmText ?? "ตกลง",
+        hideCancel: true,
+      }).then(() => undefined),
+    [confirm]
+  );
 }
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
@@ -63,9 +84,11 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             {pending.title && <h3 className="modal-title">{pending.title}</h3>}
             <p className="modal-message">{pending.message}</p>
             <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => close(false)}>
-                {pending.cancelText ?? "ยกเลิก"}
-              </button>
+              {!pending.hideCancel && (
+                <button className="btn btn-ghost" onClick={() => close(false)}>
+                  {pending.cancelText ?? "ยกเลิก"}
+                </button>
+              )}
               <button
                 ref={confirmBtnRef}
                 className={`btn ${pending.danger ? "btn-danger" : "btn-primary"}`}

@@ -30,6 +30,7 @@ async function resolveMembers(codes: string[], selfSnapshot?: MemberInput): Prom
         name: studentFullName(s),
         classLevel: s.class_level,
         classRoom: s.class_room,
+        classNumber: s.class_number,
       };
     })
   );
@@ -53,6 +54,7 @@ export async function POST(req: Request) {
         name: session.name,
         classLevel: session.classLevel ?? "",
         classRoom: session.classRoom ?? "",
+        classNumber: session.classNumber ?? "",
       };
       // นักเรียนต้องอยู่ในรายชื่อที่ลงทะเบียนเสมอ
       if (!memberCodes.includes(session.code)) memberCodes = [session.code, ...memberCodes];

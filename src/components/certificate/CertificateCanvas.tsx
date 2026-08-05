@@ -99,14 +99,25 @@ export function CertificateCanvas({
         if (b.kind === "qr") {
           const size = wpc(b.w);
           const left = b.align === "right" ? `calc(${wpc(b.x)} - ${size})` : b.align === "center" ? `calc(${wpc(b.x)} - ${size} / 2)` : wpc(b.x);
-          const boxStyle: CSSProperties = { position: "absolute", left, top: wpc(b.y), width: size, height: size };
+          // พื้นขาว + ขอบขาวรอบ QR (quiet zone): เกียรติบัตรพื้นสีเข้มทำให้ QR จมหายและสแกนไม่ติด
+          // ถ้าไม่มีกรอบขาวคั่น — QR ที่สร้างมามี margin 0 จึงต้องเว้นขอบให้ตรงนี้
+          const boxStyle: CSSProperties = {
+            position: "absolute",
+            left,
+            top: wpc(b.y),
+            width: size,
+            height: size,
+            background: "#fff",
+            padding: wpc(b.w * 0.08),
+            boxSizing: "border-box",
+          };
           // ⚠ ห้ามใส่ children กับ dangerouslySetInnerHTML พร้อมกัน แม้ children จะเป็น false
           //    (React โยน "Can only set one of children or props.dangerouslySetInnerHTML" → หน้าพิมพ์ 500 ทั้งใบ)
           //    จึงต้องแยกเป็นสองสาขา ไม่ใช่เขียนรวมกันแล้วให้ค่าใดค่าหนึ่งเป็น undefined
           return qrSvg ? (
-            <div key={b.id} style={boxStyle} dangerouslySetInnerHTML={{ __html: qrSvg }} />
+            <div key={b.id} className="cert-qr-box" style={boxStyle} dangerouslySetInnerHTML={{ __html: qrSvg }} />
           ) : (
-            <div key={b.id} style={boxStyle}>
+            <div key={b.id} className="cert-qr-box" style={boxStyle}>
               <div style={{ width: "100%", height: "100%", border: "1px dashed #9ca3af", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#9ca3af" }}>
                 QR
               </div>

@@ -18,6 +18,8 @@ export type MemberInput = {
   name: string;
   classLevel: string;
   classRoom: string;
+  /** เลขที่ในห้อง — "" ได้ (SchoolOS ไม่ได้ส่งมา) เอกสารจะพิมพ์เป็น "-" */
+  classNumber?: string;
 };
 
 export type RegisterArgs = {
@@ -229,6 +231,7 @@ export async function registerEntry(args: RegisterArgs): Promise<RegisterResult>
         nameSnapshot: m.name,
         classLevelSnapshot: m.classLevel,
         classRoomSnapshot: m.classRoom,
+        classNumberSnapshot: m.classNumber ?? "",
       }))
     );
     return newEntryId;

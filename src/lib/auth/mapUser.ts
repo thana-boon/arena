@@ -55,5 +55,6 @@ export function sessionForStudent(student: StudentProfile): SessionPayload {
     photo: student.photo_url ?? undefined,
     classLevel: student.class_level,
     classRoom: student.class_room,
+    classNumber: student.class_number,
   };
 }

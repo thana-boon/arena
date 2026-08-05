@@ -6,7 +6,7 @@ import { eq, and } from "drizzle-orm";
 export type RosterEntry = {
   entryId: number;
   teamName: string | null;
-  members: { studentCode: string; name: string; classLevel: string; classRoom: string }[];
+  members: { studentCode: string; name: string; classLevel: string; classRoom: string; classNumber: string }[];
 };
 
 export async function getRoster(competitionId: number): Promise<RosterEntry[]> {
@@ -26,6 +26,7 @@ export async function getRoster(competitionId: number): Promise<RosterEntry[]> {
         name: m.nameSnapshot,
         classLevel: m.classLevelSnapshot,
         classRoom: m.classRoomSnapshot,
+        classNumber: m.classNumberSnapshot,
       })),
   }));
 }

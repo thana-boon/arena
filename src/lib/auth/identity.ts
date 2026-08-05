@@ -18,6 +18,7 @@ export type SessionPayload = {
   photo?: string; // path รูปบน SchoolOS — ไม่มีรูป = undefined (ดู /api/me/photo)
   classLevel?: string; // สำหรับนักเรียน
   classRoom?: string;
+  classNumber?: string; // เลขที่ในห้อง — ใช้ทำ snapshot ตอนนักเรียนสมัครเอง (ไม่ต้องยิง API ซ้ำ)
   subjectGroupId?: number; // หมวด (กลุ่มสาระ) ของครู — ใช้กรองรายการที่เห็น
   /**
    * session นี้ผูกกับ SSO ของแพลตฟอร์มอยู่ (มาจาก handoff)
@@ -72,6 +73,7 @@ export function identityOf(claims: SessionPayload): TokenClaims {
     photo: claims.photo,
     classLevel: claims.classLevel,
     classRoom: claims.classRoom,
+    classNumber: claims.classNumber,
     subjectGroupId: claims.subjectGroupId,
     sso: claims.sso,
     ssoSub: claims.ssoSub,

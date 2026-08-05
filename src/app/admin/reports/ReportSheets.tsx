@@ -1,5 +1,12 @@
 import { formatThaiDate, formatLevels, hhmm, isUnlimited } from "@/lib/domain";
 import type { ReportBundle } from "@/lib/reportBundle";
+import {
+  PersonHeadCells,
+  SheetEntryRows,
+  SheetHeader,
+  SignatureBlock,
+  personColCount,
+} from "@/components/report/sheetLayout";
 
 export type DocType = "roster" | "scoresheet" | "announce" | "summary" | "regcount" | "venues" | "catalog";
 export const DOC_LABEL: Record<DocType, string> = {
@@ -74,18 +81,19 @@ export function SummarySheet({
 
   return (
     <section className="report-section report-web" style={{ breakBefore: "auto" }}>
-      <div className="print-title" style={{ marginBottom: 16, textAlign: "center" }}>
-        <div style={{ fontWeight: 700 }}>โรงเรียนสุคนธีรวิทย์</div>
-        <div>{eventName}</div>
-        <h2 style={{ margin: "8px 0 4px" }}>{DOC_LABEL[docType]}</h2>
-        <div className="text-sm">
-          ปีการศึกษา {yearBe} · {bundles.length} รายการ
-          {docType === "regcount" && ` · ผู้สมัครรวม ${totalStudents} คน`}
-        </div>
-      </div>
+      <SheetHeader
+        docLabel={DOC_LABEL[docType]}
+        eventName={eventName}
+        note={
+          <>
+            ปีการศึกษา {yearBe} · {bundles.length} รายการ
+            {docType === "regcount" && ` · ผู้สมัครรวม ${totalStudents} คน`}
+          </>
+        }
+      />
 
       <div className="table-wrap" style={{ boxShadow: "none" }}>
-        <table className="table">
+        <table className="table sheet-table">
           <thead>
             {docType === "summary" ? (
               <tr>
@@ -217,17 +225,14 @@ export function VenueUsageSheet({
 
   return (
     <section className="report-section report-web" style={{ breakBefore: "auto" }}>
-      <div className="print-title" style={{ marginBottom: 16, textAlign: "center" }}>
-        <div style={{ fontWeight: 700 }}>โรงเรียนสุคนธีรวิทย์</div>
-        <div>{eventName}</div>
-        <h2 style={{ margin: "8px 0 4px" }}>{DOC_LABEL.venues}</h2>
-        <div className="text-sm">
-          ปีการศึกษา {yearBe} · ใช้ {venueCount} ห้อง · {bundles.length} รายการ
-        </div>
-      </div>
+      <SheetHeader
+        docLabel={DOC_LABEL.venues}
+        eventName={eventName}
+        note={`ปีการศึกษา ${yearBe} · ใช้ ${venueCount} ห้อง · ${bundles.length} รายการ`}
+      />
 
       <div className="table-wrap" style={{ boxShadow: "none" }}>
-        <table className="table">
+        <table className="table sheet-table">
           <thead>
             <tr>
               <th className="col-fit" style={{ width: 45 }}>ลำดับ</th>
@@ -348,20 +353,18 @@ function CatalogPage({
 
   return (
     <section className="report-section report-web report-catalog" style={pageBreak ? undefined : { breakBefore: "auto" }}>
-      {/* หัวเอกสารแบบกระชับ: ตัวอักษรขนาดเดียวกันทั้งหมด 2 บรรทัด ไม่กินพื้นที่กระดาษ */}
-      <div className="print-title report-catalog-head" style={{ marginBottom: 8, textAlign: "center" }}>
-        <div style={{ fontWeight: 700 }}>
-          {DOC_LABEL.catalog} · {eventName}
-          {soleGroup ? ` · ${soleGroup === "-" ? "ไม่ระบุหมวด" : soleGroup}` : ""}
-        </div>
-        <div>
-          โรงเรียนสุคนธีรวิทย์ · ปีการศึกษา {yearBe} · {count} รายการ
-          {levelNote ? ` · ${levelNote}` : ""}
-        </div>
-      </div>
+      {/* หัวเอกสารแบบกระชับ: ตัวอักษรขนาดเดียวกันทั้งหมด ไม่กินพื้นที่กระดาษ */}
+      <SheetHeader
+        compact
+        docLabel={
+          DOC_LABEL.catalog + (soleGroup ? ` · ${soleGroup === "-" ? "ไม่ระบุหมวด" : soleGroup}` : "")
+        }
+        eventName={eventName}
+        note={`ปีการศึกษา ${yearBe} · ${count} รายการ${levelNote ? ` · ${levelNote}` : ""}`}
+      />
 
       <div className="table-wrap" style={{ boxShadow: "none" }}>
-        <table className="table">
+        <table className="table sheet-table">
           <thead>
             <tr>
               <th className="col-fit" style={{ width: 45 }}>ลำดับ</th>
@@ -418,16 +421,18 @@ export function ReportSheet({ bundle, docType, eventName }: { bundle: ReportBund
     : "";
   // รายการที่ไม่มีการแข่งขันไม่มีคะแนน/อันดับ — ใบกรอกคะแนนและใบประกาศผลจึงไม่มีความหมาย
   const scoreDoc = docType === "scoresheet" || docType === "announce";
+  const isTeam = meta.type === "team";
+  const personCols = personColCount(isTeam);
 
   return (
     <section className="report-section">
-      <div className="print-title" style={{ marginBottom: 16, textAlign: "center" }}>
-        <div style={{ fontWeight: 700 }}>โรงเรียนสุคนธีรวิทย์</div>
-        <div>{eventName}</div>
-        <h2 style={{ margin: "8px 0 4px" }}>{DOC_LABEL[docType]}</h2>
-        <div>รายการ: {meta.competitionName}{meta.groupName ? ` (${meta.groupName})` : ""}</div>
-        {timeStr && <div className="text-sm">{timeStr}</div>}
-      </div>
+      <SheetHeader
+        docLabel={DOC_LABEL[docType]}
+        eventName={eventName}
+        competitionName={meta.competitionName}
+        groupName={meta.groupName}
+        timeStr={timeStr}
+      />
 
       {noContest && scoreDoc && (
         <p style={{ textAlign: "center", marginTop: 32 }}>
@@ -436,98 +441,79 @@ export function ReportSheet({ bundle, docType, eventName }: { bundle: ReportBund
       )}
 
       {docType === "roster" && (
-        <table className="table">
+        <table className="table sheet-table">
           <thead>
             <tr>
-              <th style={{ width: 50 }}>ลำดับ</th>
-              {meta.type === "team" && <th>ชื่อทีม</th>}
-              <th>ชื่อ-สกุล</th>
-              <th style={{ width: 90 }}>ชั้น</th>
-              <th style={{ width: 70 }}>ห้อง</th>
+              <PersonHeadCells isTeam={isTeam} />
             </tr>
           </thead>
           <tbody>
-            {roster.flatMap((e, ei) =>
-              e.members.map((m, mi) => (
-                <tr key={`${e.entryId}-${m.studentCode}`}>
-                  <td>{meta.type === "team" ? (mi === 0 ? ei + 1 : "") : ei + 1}</td>
-                  {meta.type === "team" && <td>{mi === 0 ? e.teamName || `ทีม ${ei + 1}` : ""}</td>}
-                  <td>{m.name}</td>
-                  <td>{m.classLevel}</td>
-                  <td>{m.classRoom}</td>
-                </tr>
-              ))
-            )}
-            {!roster.length && <tr><td colSpan={meta.type === "team" ? 5 : 4} className="text-center muted">ยังไม่มีผู้ลงทะเบียน</td></tr>}
+            <SheetEntryRows entries={roster} isTeam={isTeam} leadCell={(_e, i) => i + 1} />
+            {!roster.length && <tr><td colSpan={personCols} className="text-center muted">ยังไม่มีผู้ลงทะเบียน</td></tr>}
           </tbody>
         </table>
       )}
 
       {docType === "scoresheet" && !noContest && (
         <>
-          <table className="table">
+          <table className="table sheet-table">
             <thead>
               <tr>
-                <th style={{ width: 50 }}>ลำดับ</th>
-                <th>{meta.type === "team" ? "ทีม / สมาชิก" : "ชื่อ-สกุล"}</th>
+                <PersonHeadCells isTeam={isTeam} />
                 {criteria.map((c) => <th key={c.id} className="num">{c.name}<div className="text-xs">({c.max})</div></th>)}
                 <th className="num">รวม ({fullScore})</th>
               </tr>
             </thead>
             <tbody>
-              {roster.map((e, i) => (
-                <tr key={e.entryId} style={{ height: 44 }}>
-                  <td>{i + 1}</td>
-                  <td>
-                    {meta.type === "team" && e.teamName && <div style={{ fontWeight: 600 }}>{e.teamName}</div>}
-                    {e.members.map((m) => `${m.name} (${m.classLevel}/${m.classRoom})`).join(", ")}
-                  </td>
-                  {criteria.map((c) => <td key={c.id} className="num"></td>)}
-                  <td className="num"></td>
-                </tr>
-              ))}
-              {!roster.length && <tr><td colSpan={criteria.length + 3} className="text-center muted">ยังไม่มีผู้ลงทะเบียน</td></tr>}
+              <SheetEntryRows
+                entries={roster}
+                isTeam={isTeam}
+                leadCell={(_e, i) => i + 1}
+                rowHeight={32}
+                trailingCells={(_e, _i, rowSpan) => (
+                  <>
+                    {criteria.map((c) => <td key={c.id} className="num" rowSpan={rowSpan}></td>)}
+                    <td className="num" rowSpan={rowSpan}></td>
+                  </>
+                )}
+              />
+              {!roster.length && <tr><td colSpan={personCols + criteria.length + 1} className="text-center muted">ยังไม่มีผู้ลงทะเบียน</td></tr>}
             </tbody>
           </table>
-          <div style={{ marginTop: 48, textAlign: "right", paddingRight: 24 }}>
-            <div>ลงชื่อ ......................................................... กรรมการ</div>
-            <div style={{ marginTop: 8 }}>( ......................................................... )</div>
-          </div>
+          <SignatureBlock role="กรรมการ" />
         </>
       )}
 
       {docType === "announce" && !noContest && (
         <>
-          <table className="table">
+          <table className="table sheet-table">
             <thead>
               <tr>
-                <th style={{ width: 50 }}>อันดับ</th>
-                <th>{meta.type === "team" ? "ทีม / สมาชิก" : "ชื่อ-สกุล"}</th>
+                <PersonHeadCells isTeam={isTeam} leadLabel="อันดับ" />
                 {criteria.map((c) => <th key={c.id} className="num">{c.name}</th>)}
                 <th className="num">รวม</th>
-                <th style={{ width: 110 }}>เหรียญ</th>
+                <th className="col-medal">เหรียญ</th>
               </tr>
             </thead>
             <tbody>
-              {results.map((r) => (
-                <tr key={r.entryId}>
-                  <td style={{ fontWeight: 700 }}>{r.rank}</td>
-                  <td>
-                    {meta.type === "team" && r.teamName && <div style={{ fontWeight: 600 }}>{r.teamName}</div>}
-                    <div className="text-sm">{r.members.map((m) => `${m.name} (${m.classLevel}/${m.classRoom})`).join(", ")}</div>
-                  </td>
-                  {criteria.map((c) => <td key={c.id} className="num">{r.scoresByCriterion[c.id]?.toFixed(2) ?? "-"}</td>)}
-                  <td className="num" style={{ fontWeight: 600 }}>{r.total.toFixed(2)}</td>
-                  <td>{r.medalLabel}</td>
-                </tr>
-              ))}
-              {!results.length && <tr><td colSpan={criteria.length + 4} className="text-center muted">ยังไม่มีผลการแข่งขัน</td></tr>}
+              <SheetEntryRows
+                entries={results}
+                isTeam={isTeam}
+                leadCell={(r) => <strong>{r.rank}</strong>}
+                trailingCells={(r, _i, rowSpan) => (
+                  <>
+                    {criteria.map((c) => (
+                      <td key={c.id} className="num" rowSpan={rowSpan}>{r.scoresByCriterion[c.id]?.toFixed(2) ?? "-"}</td>
+                    ))}
+                    <td className="num" rowSpan={rowSpan} style={{ fontWeight: 600 }}>{r.total.toFixed(2)}</td>
+                    <td className="col-medal" rowSpan={rowSpan}>{r.medalLabel}</td>
+                  </>
+                )}
+              />
+              {!results.length && <tr><td colSpan={personCols + criteria.length + 2} className="text-center muted">ยังไม่มีผลการแข่งขัน</td></tr>}
             </tbody>
           </table>
-          <div style={{ marginTop: 48, textAlign: "right", paddingRight: 24 }}>
-            <div>ลงชื่อ ......................................................... ประธานกรรมการ</div>
-            <div style={{ marginTop: 8 }}>( ......................................................... )</div>
-          </div>
+          <SignatureBlock role="ประธานกรรมการ" />
         </>
       )}
     </section>

@@ -8,11 +8,14 @@ import {
   certificateSignatures,
   certificateTemplates,
   competitions,
+  entries,
+  entryMembers,
 } from "@/db/schema";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { randomBytes } from "crypto";
+import { headers } from "next/headers";
 import type { PoolClient } from "pg";
-import type { CertAward, Medal } from "@/lib/domain";
+import { formatThaiDate, type CertAward, type Medal } from "@/lib/domain";
 import {
   type CertBlock,
   type CertLayout,
@@ -142,6 +145,74 @@ export async function getEventTemplates(eventId: number): Promise<CertTemplateVi
         width: Number(s.width),
       })),
   }));
+}
+
+/**
+ * ข้อมูลตัวอย่างของงานหนึ่ง สำหรับ preview ในหน้าออกแบบและใบทดลองพิมพ์
+ *
+ * ใช้ "ชื่อที่ยาวที่สุด" ของคนที่อยู่ในงานจริง ๆ เพื่อให้เห็นปัญหาชื่อล้นกรอบตั้งแต่ตอนออกแบบ
+ * เลขทะเบียนตั้งเป็น 0000 ซึ่งตัวเดินเลขไม่มีวันแจก (เริ่มที่ 1) — ใบทดลองจึงไม่ถูกเข้าใจผิดว่าเป็นใบจริง
+ */
+export async function sampleRenderData(
+  eventId: number,
+  eventName: string,
+  yearBe: number
+): Promise<CertRenderData> {
+  const comps = await db
+    .select()
+    .from(competitions)
+    .where(eq(competitions.eventId, eventId))
+    .orderBy(asc(competitions.name));
+
+  let studentName = "เด็กหญิงตัวอย่าง นามสกุลยาวมากพอสมควร";
+  let className = "ม.3/8";
+  let competitionName = comps[0]?.name ?? "การแข่งขันตัวอย่าง";
+
+  if (comps.length) {
+    const entRows = await db
+      .select({ id: entries.id, competitionId: entries.competitionId })
+      .from(entries)
+      .where(and(inArray(entries.competitionId, comps.map((c) => c.id)), eq(entries.status, "active")));
+    if (entRows.length) {
+      const members = await db
+        .select()
+        .from(entryMembers)
+        .where(inArray(entryMembers.entryId, entRows.map((e) => e.id)));
+      const longest = members.sort((a, b) => b.nameSnapshot.length - a.nameSnapshot.length)[0];
+      if (longest) {
+        studentName = longest.nameSnapshot;
+        className = [longest.classLevelSnapshot, longest.classRoomSnapshot].filter(Boolean).join("/");
+        const ent = entRows.find((e) => e.id === longest.entryId);
+        const comp = comps.find((c) => c.id === ent?.competitionId);
+        if (comp) competitionName = comp.name;
+      }
+    }
+  }
+
+  return {
+    studentName,
+    className,
+    teamName: null,
+    competitionName,
+    eventName,
+    medal: "gold",
+    rank: 1,
+    serialNo: formatSerial(yearBe, 0),
+    verifyToken: "sample",
+    dateText: formatThaiDate(new Date()),
+  };
+}
+
+/**
+ * URL ฐานสำหรับ QR — ต้องเป็น absolute เพื่อให้สแกนจากมือถือแล้วเปิดได้จริง
+ * สร้างจาก host ที่ request วิ่งเข้ามา + basePath (ไม่ hardcode โดเมน เพราะขึ้นกับที่ deploy)
+ */
+export async function verifyBaseUrl(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost";
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  return `${proto}://${host}${base}/verify`;
 }
 
 /**

@@ -225,6 +225,16 @@ export const entryMembers = pgTable(
     nameSnapshot: varchar("name_snapshot", { length: 191 }).notNull(),
     classLevelSnapshot: varchar("class_level_snapshot", { length: 32 }).notNull().default(""),
     classRoomSnapshot: varchar("class_room_snapshot", { length: 32 }).notNull().default(""),
+    /**
+     * เลขที่ในห้อง ณ ตอนสมัคร — freeze ไว้เหมือนชื่อ/ชั้น/ห้อง
+     *
+     * ⚠ เหตุผลที่ต้อง freeze ไม่ใช่แค่ความสะดวก: enrollments ของ SchoolOS แยกตามปีการศึกษา
+     * พอขึ้นปีใหม่ เด็กที่จบ/ลาออกไปแล้วจะไม่มีแถวของปีใหม่ ถามกลับไปก็ไม่เหลืออะไรให้ตอบ
+     * เอกสารย้อนหลังจะพิมพ์เลขที่ไม่ได้อีกเลย ถ้าไม่ได้เก็บไว้ตอนนั้น
+     *
+     * เก็บเป็นข้อความ: "" = ไม่รู้ (สมัครก่อนมีคอลัมน์นี้ / SchoolOS ไม่ได้ส่งมา) ซึ่ง 0 สื่อผิด
+     */
+    classNumberSnapshot: varchar("class_number_snapshot", { length: 16 }).notNull().default(""),
   },
   (t) => [
     index("member_entry_idx").on(t.entryId),

@@ -7,7 +7,7 @@ import { decideMedal, scorePercent, type Medal, parseJsonArray, UNLIMITED_CAPACI
 export type EntryResult = {
   entryId: number;
   teamName: string | null;
-  members: { studentCode: string; name: string; classLevel: string; classRoom: string }[];
+  members: { studentCode: string; name: string; classLevel: string; classRoom: string; classNumber: string }[];
   total: number;
   fullScore: number;
   percent: number;
@@ -60,6 +60,7 @@ export async function computeCompetitionResults(
         name: m.nameSnapshot,
         classLevel: m.classLevelSnapshot,
         classRoom: m.classRoomSnapshot,
+        classNumber: m.classNumberSnapshot,
       }));
     const byCrit: Record<number, number> = {};
     let total = 0;

@@ -83,6 +83,45 @@ export function defaultLayout(): CertLayout {
   ];
 }
 
+// ===== เรขาคณิตของหน้ากระดาษ (ใช้ร่วมกับ CertificateCanvas) =====
+// ทุกพิกัด/ขนาดเป็น % ของ "ความกว้าง" หน้ากระดาษ ทั้งแกน x และ y
+// ขอบล่างสุดของกระดาษจึงไม่ใช่ 100 แต่เป็น 100 × (สูง/กว้าง): แนวนอน ≈ 70.7, แนวตั้ง ≈ 141.4
+
+export type Orientation = "landscape" | "portrait";
+
+/** อัตราส่วน สูง/กว้าง ของ A4 ตามแนวกระดาษ */
+export function pageRatio(orientation: Orientation): number {
+  return orientation === "portrait" ? 297 / 210 : 210 / 297;
+}
+
+/** ค่า y สูงสุดที่ยังอยู่ในหน้ากระดาษ (หน่วยเดียวกับพิกัดทั้งหมด) */
+export function pageMaxY(orientation: Orientation): number {
+  return 100 * pageRatio(orientation);
+}
+
+export type Rect = { left: number; top: number; w: number; h: number };
+
+/** กรอบจริงของบล็อกบนหน้ากระดาษ — ต้องตรงกับที่ CertificateCanvas วาง ไม่งั้นกรอบเลือกเพี้ยน */
+export function blockRect(b: CertBlock, orientation: Orientation): Rect {
+  if (b.kind === "qr") {
+    const left = b.align === "right" ? b.x - b.w : b.align === "center" ? b.x - b.w / 2 : b.x;
+    return { left, top: b.y, w: b.w, h: b.w };
+  }
+  const left = b.align === "center" ? b.x - b.w / 2 : b.align === "right" ? b.x - b.w : b.x;
+  return { left, top: b.y, w: b.w, h: b.fontSize * 1.2 };
+}
+
+/** กรอบจริงของผู้ลงนาม (เส้น/รูป + ชื่อ + ตำแหน่ง) — ผู้ลงนามวางกึ่งกลางที่ x เสมอ */
+export function sigRect(
+  s: { x: number; y: number; width: number; name?: string; roleLabel?: string },
+  orientation: Orientation
+): Rect {
+  const line = s.width * pageRatio(orientation) * 0.5;
+  const nameH = s.name ? 1.2 * 1.2 + 0.5 : 0;
+  const roleH = s.roleLabel ? 1 * 1.2 : 0;
+  return { left: s.x - s.width / 2, top: s.y, w: s.width, h: line + nameH + roleH };
+}
+
 export function parseLayout(raw: string): CertLayout {
   try {
     const v = JSON.parse(raw);

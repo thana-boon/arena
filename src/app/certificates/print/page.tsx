@@ -1,24 +1,14 @@
 import { redirect } from "next/navigation";
 import { requireAuth } from "@/lib/auth/guards";
 import { isStaff } from "@/lib/auth/session";
-import { getIssuesByIds, loadTemplatesForPrint, type CertRenderData } from "@/lib/certificates";
+import { getIssuesByIds, loadTemplatesForPrint, verifyBaseUrl, type CertRenderData } from "@/lib/certificates";
 import { CertificateCanvas } from "@/components/certificate/CertificateCanvas";
 import { formatThaiDate } from "@/lib/domain";
 import type { CertAward } from "@/lib/domain";
-import { headers } from "next/headers";
 import QRCode from "qrcode";
 import { PrintTrigger } from "./PrintTrigger";
 
 export const dynamic = "force-dynamic";
-
-/** URL ฐานสำหรับ QR (ต้องเป็น absolute เพื่อสแกนจากมือถือได้) — สร้างจาก host จริง + basePath */
-async function verifyBaseUrl(): Promise<string> {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost";
-  const proto = h.get("x-forwarded-proto") ?? "http";
-  const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-  return `${proto}://${host}${base}/verify`;
-}
 
 export default async function CertificatePrintPage({
   searchParams,

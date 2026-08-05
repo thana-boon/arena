@@ -64,7 +64,10 @@ export async function CompetitionDetailBody({
       </div>
 
       {!comp.visibleToStudents && (
-        <div className="alert alert-warning">รายการนี้ซ่อนจากนักเรียน — นักเรียนมองไม่เห็นและสมัครเองไม่ได้ ครูเป็นผู้ลงชื่อให้เท่านั้น</div>
+        <div className="alert alert-warning">
+          รายการนี้ซ่อนจากนักเรียน — นักเรียนมองไม่เห็นและสมัครเองไม่ได้ และไม่ขึ้นในหน้า “การสมัครรายห้อง”
+          ของครูประจำชั้น ลงชื่อให้ได้เฉพาะครูเจ้าของรายการ ครูในหมวดเดียวกัน หรือผู้ดูแลระบบ
+        </div>
       )}
 
       {comp.description && (

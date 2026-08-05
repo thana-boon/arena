@@ -1,9 +1,10 @@
 import "server-only";
 import { db } from "@/db";
-import { competitions, competitionCapacity, entries, entryMembers, events } from "@/db/schema";
+import { competitions, competitionCapacity, entries, entryMembers, events, subjectGroups } from "@/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { parseJsonArray } from "@/lib/domain";
+import { canRegisterHiddenCompetition } from "@/lib/permit";
 import type { Role } from "@/lib/auth/session";
 
 export class RegistrationError extends Error {
@@ -25,6 +26,8 @@ export type RegisterArgs = {
   teamName?: string | null;
   byRole: Role;
   byCode: string;
+  /** เลขหมวดของครูผู้กด (session.subjectGroupId) — ใช้ตัดสินสิทธิ์รายการที่ซ่อนจากนักเรียน */
+  bySubjectGroupId?: number;
   override?: boolean; // admin override เท่านั้น
 };
 
@@ -68,9 +71,30 @@ export async function registerEntry(args: RegisterArgs): Promise<RegisterResult>
     if (event.regEnd && now > new Date(event.regEnd)) throw new RegistrationError("หมดเวลารับสมัครแล้ว");
   }
 
-  // รายการที่ซ่อนจากนักเรียน — ครูเป็นผู้ลงชื่อให้เท่านั้น (คุมซ้อนระดับรายการ)
-  if (args.byRole === "student" && !comp.visibleToStudents)
-    throw new RegistrationError("รายการนี้ไม่เปิดให้นักเรียนสมัครเอง", 403);
+  // รายการที่ซ่อนจากนักเรียน — คุมซ้อนระดับรายการ (นอกเหนือจากช่วงรับสมัครระดับงาน)
+  // ไม่ใช่แค่กันนักเรียนสมัครเอง: ครูประจำชั้นก็หยิบไปสมัครแทนนักเรียนไม่ได้ เพราะรายการแบบนี้
+  // ต้องคัดตัวก่อน · เหลือเฉพาะครูที่ดูแลรายการนั้น (เจ้าของ/หมวดเดียวกัน) กับ recorder/admin
+  // บังคับกับ override ด้วย (admin ผ่านเงื่อนไขนี้อยู่แล้ว จึงไม่กระทบการ override ของ admin)
+  if (!comp.visibleToStudents) {
+    const group =
+      comp.subjectGroupId == null
+        ? null
+        : (
+            await db
+              .select({ catalogNo: subjectGroups.catalogNo })
+              .from(subjectGroups)
+              .where(eq(subjectGroups.id, comp.subjectGroupId))
+              .limit(1)
+          )[0] ?? null;
+    const actor = { role: args.byRole, code: args.byCode, subjectGroupId: args.bySubjectGroupId };
+    if (!canRegisterHiddenCompetition(actor, comp.createdBy, group?.catalogNo ?? null))
+      throw new RegistrationError(
+        args.byRole === "student"
+          ? "รายการนี้ไม่เปิดให้นักเรียนสมัครเอง"
+          : "รายการนี้ซ่อนจากนักเรียน — ลงชื่อให้ได้เฉพาะครูเจ้าของรายการ ครูในหมวดเดียวกัน หรือผู้ดูแลระบบ",
+        403
+      );
+  }
 
   const allowed = parseJsonArray(comp.allowedClassLevels);
   const isTeam = comp.type === "team";

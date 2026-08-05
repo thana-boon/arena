@@ -66,6 +66,7 @@ export async function POST(req: Request) {
         teamName: body.teamName ?? null,
         byRole: session.role,
         byCode: session.code,
+        bySubjectGroupId: session.subjectGroupId,
         override,
       });
 

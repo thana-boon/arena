@@ -3,6 +3,7 @@ import { competitions, competitionCapacity, entries, entryMembers, events, subje
 import { and, eq, inArray } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
+import { canRegisterHiddenCompetition } from "@/lib/permit";
 import { getActiveYear } from "@/lib/queries";
 import { listStudentsInRoom, studentFullName } from "@/lib/external/student-api";
 import { fetchTeacherHomerooms } from "@/lib/external/teacher-api";
@@ -95,7 +96,21 @@ export async function GET(req: Request) {
 
     // ===== รายการแข่งขันที่เปิดรับระดับชั้นนี้ (ปุ่ม "สมัครให้" ใช้เลือก) =====
     const compsThisYear = await db.select().from(competitions).where(eq(competitions.yearId, year.id));
-    const eligible = compsThisYear.filter((c) => parseJsonArray(c.allowedClassLevels).includes(classLevel));
+
+    const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
+    const groupOf = (id: number | null) => (id == null ? null : groups.find((g) => g.id === id) ?? null);
+    const groupName = (id: number | null) => (id == null ? "ทั่วไป" : groupOf(id)?.name ?? "-");
+    // ไม่มีหมวด/หาไม่เจอ → ไว้ท้ายสุดของ dropdown
+    const groupSort = (id: number | null) => groupOf(id)?.sortOrder ?? 9999;
+
+    const eligible = compsThisYear.filter((c) => {
+      if (!parseJsonArray(c.allowedClassLevels).includes(classLevel)) return false;
+      // รายการที่ซ่อนจากนักเรียนไม่ใช่ของให้ครูประจำชั้นหยิบไปสมัครแทน — ตัดออกตั้งแต่ในลิสต์
+      // จะได้ไม่เลือกไปแล้วโดน server ปฏิเสธทีหลัง (server ก็บังคับซ้ำอีกชั้นใน registerEntry)
+      if (!c.visibleToStudents)
+        return canRegisterHiddenCompetition(session, c.createdBy, groupOf(c.subjectGroupId)?.catalogNo ?? null);
+      return true;
+    });
 
     const eventRows = await db.select().from(events).where(eq(events.yearId, year.id));
     const eventById = new Map(eventRows.map((e) => [e.id, e]));
@@ -107,12 +122,6 @@ export async function GET(req: Request) {
       if (e.regEnd && now > new Date(e.regEnd)) return false;
       return true;
     };
-
-    const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
-    const groupOf = (id: number | null) => (id == null ? null : groups.find((g) => g.id === id) ?? null);
-    const groupName = (id: number | null) => (id == null ? "ทั่วไป" : groupOf(id)?.name ?? "-");
-    // ไม่มีหมวด/หาไม่เจอ → ไว้ท้ายสุดของ dropdown
-    const groupSort = (id: number | null) => groupOf(id)?.sortOrder ?? 9999;
 
     const compIds = eligible.map((c) => c.id);
     const caps = compIds.length
@@ -144,6 +153,7 @@ export async function GET(req: Request) {
         capacity: capRow?.capacity ?? 0,
         registered: capRow?.registeredCount ?? 0,
         open: eventOpen(c.eventId),
+        hiddenFromStudents: !c.visibleToStudents,
       };
     });
 

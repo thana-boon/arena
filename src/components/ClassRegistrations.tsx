@@ -733,6 +733,7 @@ function RegisterModal({
                           ? `ทีม ${teamSizeLabel("team", c.teamSizeMin, c.teamSizeMax)}`.trim()
                           : "เดี่ยว 1 คน"}
                         {!c.open ? " · ปิดรับสมัคร" : ""}
+                        {c.hiddenFromStudents ? " · ซ่อนจากนักเรียน" : ""}
                       </option>
                     ))}
                   </optgroup>
@@ -747,6 +748,8 @@ function RegisterModal({
                   <span className="badge badge-purple">{comp.eventName}</span>
                   {full && <span className="badge badge-error">เต็ม</span>}
                   {closed && <span className="badge badge-warning">ปิดรับสมัคร</span>}
+                  {/* เห็นได้เฉพาะครูที่ดูแลรายการนี้/แอดมิน — บอกไว้ว่านักเรียนสมัครเองไม่ได้ */}
+                  {comp.hiddenFromStudents && <span className="badge">ซ่อนจากนักเรียน</span>}
                 </div>
                 ที่นั่ง {formatSeats(comp.registered, comp.capacity)}
                 {comp.eventDate && ` · ${formatThaiDate(comp.eventDate)} ${hhmm(comp.startTime)}–${hhmm(comp.endTime)}`}

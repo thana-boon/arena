@@ -227,6 +227,7 @@ export type RoomComp = {
   eventId: number | null;
   eventName: string;
   groupName: string;
+  groupSort: number; // ลำดับหมวดตามที่ admin ตั้งไว้ — ใช้เรียง optgroup ใน dropdown ให้ตรงกับหน้าหมวด
   levels: string[]; // ระดับชั้นที่รายการรับ — ใช้จำกัด StudentPicker ตอนเพิ่มสมาชิกทีม
   teamSizeMin: number | null;
   teamSizeMax: number | null;

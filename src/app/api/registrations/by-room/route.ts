@@ -109,7 +109,10 @@ export async function GET(req: Request) {
     };
 
     const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
-    const groupName = (id: number | null) => (id == null ? "ทั่วไป" : groups.find((g) => g.id === id)?.name ?? "-");
+    const groupOf = (id: number | null) => (id == null ? null : groups.find((g) => g.id === id) ?? null);
+    const groupName = (id: number | null) => (id == null ? "ทั่วไป" : groupOf(id)?.name ?? "-");
+    // ไม่มีหมวด/หาไม่เจอ → ไว้ท้ายสุดของ dropdown
+    const groupSort = (id: number | null) => groupOf(id)?.sortOrder ?? 9999;
 
     const compIds = eligible.map((c) => c.id);
     const caps = compIds.length
@@ -130,6 +133,7 @@ export async function GET(req: Request) {
         eventId: c.eventId,
         eventName: c.eventId != null ? eventById.get(c.eventId)?.name ?? "-" : "ทั่วไป",
         groupName: groupName(c.subjectGroupId),
+        groupSort: groupSort(c.subjectGroupId),
         levels: parseJsonArray(c.allowedClassLevels),
         teamSizeMin: c.teamSizeMin,
         teamSizeMax: c.teamSizeMax,

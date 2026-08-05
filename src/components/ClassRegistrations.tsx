@@ -576,6 +576,43 @@ function Bar({ pct, label }: { pct: number; label?: string }) {
 
 /* ---------- ฟอร์มสมัครแทนนักเรียน 1 คน ---------- */
 
+/**
+ * จัดรายการแข่งขันเป็นหมวด (สาระ) สำหรับ <optgroup> — ครูสะท้อนว่าลิสต์ยาวเรียงมั่ว หาไม่เจอ
+ * - เรียงหมวดตาม sortOrder ที่ admin ตั้งไว้ ให้ตรงลำดับกับหน้าหมวด
+ * - ในหมวดเดียวกัน: ที่ยังเปิดรับขึ้นก่อน แล้วเรียงชื่อไทย
+ * - มีหลายงานในปีเดียวกัน → ใส่ชื่องานนำหน้าชื่อหมวด ไม่งั้นหมวดชื่อซ้ำข้ามงานจะแยกไม่ออก
+ */
+function groupByCategory(comps: RoomComp[]) {
+  const multiEvent = new Set(comps.map((c) => c.eventId)).size > 1;
+  const map = new Map<string, { key: string; label: string; sort: number; eventName: string; items: RoomComp[] }>();
+  for (const c of comps) {
+    const key = `${c.eventId ?? 0}|${c.groupName}`;
+    let g = map.get(key);
+    if (!g) {
+      g = {
+        key,
+        label: multiEvent ? `${c.eventName} · ${c.groupName}` : c.groupName,
+        sort: c.groupSort,
+        eventName: c.eventName,
+        items: [],
+      };
+      map.set(key, g);
+    }
+    g.items.push(c);
+  }
+  const groups = [...map.values()];
+  for (const g of groups) {
+    g.items.sort((a, b) => Number(b.open) - Number(a.open) || a.name.localeCompare(b.name, "th"));
+  }
+  groups.sort(
+    (a, b) =>
+      (multiEvent ? a.eventName.localeCompare(b.eventName, "th") : 0) ||
+      a.sort - b.sort ||
+      a.label.localeCompare(b.label, "th")
+  );
+  return groups;
+}
+
 function toPicked(s: RoomStudent): PickedStudent {
   return { studentCode: s.studentCode, name: s.name, classLevel: s.classLevel, classRoom: s.classRoom };
 }
@@ -597,6 +634,7 @@ function RegisterModal({
   // ตัดรายการที่นักเรียนคนนี้ลงไปแล้ว
   const registeredIds = new Set(student.registrations.map((r) => r.competitionId));
   const available = comps.filter((c) => !registeredIds.has(c.id));
+  const categories = groupByCategory(available);
 
   const [compId, setCompId] = useState<number | "">("");
   const comp = available.find((c) => c.id === compId) ?? null;
@@ -674,22 +712,30 @@ function RegisterModal({
         ) : (
           <div className="stack" style={{ gap: 12 }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">รายการแข่งขัน</label>
+              <label className="form-label">
+                รายการแข่งขัน{" "}
+                <span className="muted" style={{ fontWeight: 400 }}>— แบ่งตามหมวด ({available.length} รายการ)</span>
+              </label>
               <select
                 className="form-select"
                 value={compId}
                 onChange={(e) => pickComp(e.target.value ? Number(e.target.value) : "")}
               >
                 <option value="">— เลือกรายการ —</option>
-                {available.map((c) => (
-                  <option key={c.id} value={c.id} disabled={!c.open && !isAdmin}>
-                    {/* บอกประเภทเสมอ (เดิมบอกเฉพาะทีม → รายการเดี่ยวไม่มีอะไรให้เทียบ เลยดูไม่ออกว่าอันไหนเป็นทีม) */}
-                    [{c.groupName}] {c.name} ·{" "}
-                    {c.type === "team"
-                      ? `ทีม ${teamSizeLabel("team", c.teamSizeMin, c.teamSizeMax)}`.trim()
-                      : "เดี่ยว 1 คน"}
-                    {!c.open ? " · ปิดรับสมัคร" : ""}
-                  </option>
+                {/* หัวข้อหมวดใน dropdown — เดิมเป็นลิสต์ยาวแถบเดียว ครูต้องไล่อ่านทีละบรรทัด */}
+                {categories.map((g) => (
+                  <optgroup key={g.key} label={`${g.label} (${g.items.length})`}>
+                    {g.items.map((c) => (
+                      <option key={c.id} value={c.id} disabled={!c.open && !isAdmin}>
+                        {/* บอกประเภทเสมอ (เดิมบอกเฉพาะทีม → รายการเดี่ยวไม่มีอะไรให้เทียบ เลยดูไม่ออกว่าอันไหนเป็นทีม) */}
+                        {c.name} ·{" "}
+                        {c.type === "team"
+                          ? `ทีม ${teamSizeLabel("team", c.teamSizeMin, c.teamSizeMax)}`.trim()
+                          : "เดี่ยว 1 คน"}
+                        {!c.open ? " · ปิดรับสมัคร" : ""}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>

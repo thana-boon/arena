@@ -11,6 +11,7 @@ import {
 
 export type StudentProfile = {
   student_code: string;
+  title: string; // คำนำหน้า เช่น "เด็กหญิง" — "" ถ้า SchoolOS ไม่ได้ส่งมา (ชื่อฟิลด์ตรงกับฝั่งครู)
   first_name: string;
   last_name: string;
   class_level: string; // เช่น "ม.1"
@@ -23,6 +24,7 @@ export type StudentProfile = {
 function toProfile(s: SosStudent): StudentProfile {
   return {
     student_code: s.studentCode,
+    title: s.prefix ?? "",
     first_name: s.firstName,
     last_name: s.lastName,
     class_level: s.gradeLevel ?? "",
@@ -32,8 +34,15 @@ function toProfile(s: SosStudent): StudentProfile {
   };
 }
 
-export function studentFullName(s: { first_name: string; last_name: string }): string {
-  return `${s.first_name} ${s.last_name}`.trim();
+/**
+ * ชื่อเต็มที่ใช้ทุกที่ในระบบ — คำนำหน้าติดกับชื่อไม่เว้นวรรค ("เด็กหญิงสมหญิง ใจดี")
+ * ตามแบบเอกสารราชการ และตรงกับ teacherFullName ของฝั่งครู
+ *
+ * ชื่อนี้คือตัวที่ถูก freeze ลง entry_members.name_snapshot ตอนสมัคร เอกสารทุกใบจึงได้คำนำหน้าตามไปด้วย
+ * (ผู้สมัครเก่าที่ยังไม่มีคำนำหน้า เติมด้วย drizzle/backfill_name_prefix.mjs)
+ */
+export function studentFullName(s: { title?: string; first_name: string; last_name: string }): string {
+  return `${s.title ?? ""}${s.first_name} ${s.last_name}`.trim();
 }
 
 /**
@@ -95,9 +104,11 @@ export async function studentLogin(
   if (profile) return profile;
 
   // ไม่มีแถวนักเรียน (เช่น key ไม่มี students:read) — สร้าง profile ขั้นต่ำจากผล verify
+  // ชื่อจาก verify รวมคำนำหน้ามาในตัวอยู่แล้ว จึงปล่อย title ว่างไว้ ไม่งั้นได้คำนำหน้าซ้อนสองชั้น
   const [first, ...rest] = (user.name ?? "").split(" ");
   return {
     student_code: user.code,
+    title: "",
     first_name: first ?? user.name,
     last_name: rest.join(" "),
     class_level: "",

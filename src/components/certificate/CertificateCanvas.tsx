@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { CertBlock, CertLayout, CertRenderData } from "@/lib/certificateLayout";
+import { LINE_H, type CertBlock, type CertLayout, type CertRenderData } from "@/lib/certificateLayout";
 import { AWARD_LABEL, rankAwardLabel } from "@/lib/domain";
 
 /**
@@ -142,7 +142,7 @@ export function CertificateCanvas({
               fontSize: wpc(b.fontSize),
               fontWeight: b.weight,
               color: b.color,
-              lineHeight: 1.2,
+              lineHeight: LINE_H,
               whiteSpace: "nowrap",
               overflow: "hidden",
             }}

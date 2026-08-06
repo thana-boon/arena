@@ -101,6 +101,12 @@ export function pageMaxY(orientation: Orientation): number {
 
 export type Rect = { left: number; top: number; w: number; h: number };
 
+/**
+ * ระยะบรรทัดของบล็อกข้อความ — ความสูงกรอบ = fontSize × LINE_H
+ * ต้องเป็นค่าเดียวกับ lineHeight ที่ CertificateCanvas ใช้วาด ไม่งั้นกรอบตอนลากไม่ตรงกับตัวหนังสือ
+ */
+export const LINE_H = 1.2;
+
 /** กรอบจริงของบล็อกบนหน้ากระดาษ — ต้องตรงกับที่ CertificateCanvas วาง ไม่งั้นกรอบเลือกเพี้ยน */
 export function blockRect(b: CertBlock, orientation: Orientation): Rect {
   if (b.kind === "qr") {
@@ -108,7 +114,7 @@ export function blockRect(b: CertBlock, orientation: Orientation): Rect {
     return { left, top: b.y, w: b.w, h: b.w };
   }
   const left = b.align === "center" ? b.x - b.w / 2 : b.align === "right" ? b.x - b.w : b.x;
-  return { left, top: b.y, w: b.w, h: b.fontSize * 1.2 };
+  return { left, top: b.y, w: b.w, h: b.fontSize * LINE_H };
 }
 
 /** กรอบจริงของผู้ลงนาม (เส้น/รูป + ชื่อ + ตำแหน่ง) — ผู้ลงนามวางกึ่งกลางที่ x เสมอ */

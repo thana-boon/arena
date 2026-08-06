@@ -12,6 +12,7 @@ import {
   BLOCK_KINDS,
   BLOCK_LABEL,
   blockRect,
+  LINE_H,
   pageMaxY,
   pageRatio,
   sigRect,
@@ -32,6 +33,9 @@ const SNAP = 0.8;
 const MIN_W = 2;
 /** ระยะขอบมาตรฐานของปุ่มชิดซ้าย/ขวา/บน/ล่าง */
 const MARGIN = 8;
+/** ขนาดตัวอักษรที่ลากมุมได้ (% ของความกว้างหน้า) — ล่างสุดยังพออ่านออก บนสุดคือเต็มหน้ากระดาษพอดี */
+const MIN_FONT = 0.5;
+const MAX_FONT = 20;
 
 type SigEdit = {
   name: string;
@@ -215,14 +219,34 @@ export function CertEditor(props: {
         return;
       }
 
-      // scale (มุมขวาล่าง): ข้อความให้ตัวอักษรโตตามกรอบ, QR/ลายเซ็นเป็นสี่เหลี่ยมจึงโตตามความกว้างอยู่แล้ว
-      const f = Math.max(0.15, (rect0.w + dx) / Math.max(MIN_W, rect0.w));
-      const w = Math.max(MIN_W, Math.min(100 - rect0.left, rect0.w * f));
+      // scale (มุมขวาล่าง) — ข้อความ: ลากลง = ตัวอักษรโต, ลากขึ้น = เล็กลง
+      //
+      // ผูกกับ "ความสูง" ไม่ใช่ความกว้าง เพราะกรอบกว้างของบล็อกข้อความคือความกว้างที่ให้ตัดบรรทัด
+      // ไม่ใช่ขนาดตัวอักษร ของเดิมผูกกับความกว้างแล้วเจอสองอาการ: กรอบชนขอบขวากระดาษตั้งแต่ยัง
+      // โตไม่ทันไร (บล็อกกว้าง 80% โตได้อีกแค่ 10%) และพอกรอบติดแล้วตัวอักษรยังโตต่อจนล้นกรอบ
+      // ตอนนี้ความสูงกรอบ = fontSize × LINE_H พอดี ขอบล่างจึงวิ่งตามปลายนิ้วเป๊ะ ๆ
       if (t.kind === "block" && font0 && !isQr) {
-        setLayout((L) =>
-          L.map((b) => (b.id === t.id ? { ...b, fontSize: round2(Math.max(0.3, font0 * f)) } : b))
-        );
+        // กรอบกว้างโตตามสัดส่วนไปด้วย เพราะ CertificateCanvas วาดข้อความแบบ nowrap แล้วตัดส่วนที่ล้นกรอบ
+        // ถ้าตัวอักษรโตอยู่ฝ่ายเดียว ชื่อยาว ๆ จะโดนตัดหัวท้ายหายไปเงียบ ๆ
+        // เพดานคือกรอบเต็มความกว้างกระดาษ — เลยจากนั้นตัวอักษรก็โดนขอบกระดาษตัดอยู่ดี
+        const fMax = 100 / Math.max(MIN_W, rect0.w);
+        const font = Math.min(MAX_FONT, font0 * fMax, Math.max(MIN_FONT, font0 + dy / LINE_H));
+        const w = Math.max(MIN_W, Math.min(100, rect0.w * (font / font0)));
+        // ยึดจุดอ้างอิงเดิม (กลาง/ซ้าย/ขวา) ไม่ให้บล็อกที่จัดกลางไหลไปทางขวาทีละนิดทุกครั้งที่ขยาย
+        const al = dragged?.align ?? "left";
+        const left =
+          al === "center"
+            ? rect0.left + rect0.w / 2 - w / 2
+            : al === "right"
+              ? rect0.left + rect0.w - w
+              : rect0.left;
+        setLayout((L) => L.map((b) => (b.id === t.id ? { ...b, fontSize: round2(font) } : b)));
+        applyRect(t, { left: clampLeft(left, w), top: clampTop(rect0.top, font * LINE_H), w });
+        return;
       }
+
+      // QR/ลายเซ็น เป็นสี่เหลี่ยมที่ความกว้างคือขนาดจริง มุมขวาล่างจึงลากตามแนวนอน
+      const w = Math.max(MIN_W, Math.min(100 - rect0.left, rect0.w + dx));
       applyRect(t, { left: rect0.left, top: rect0.top, w });
     };
 
@@ -1044,7 +1068,7 @@ export function CertEditor(props: {
           </div>
 
           <div className="cert-fs-foot">
-            ลากตรงกลางเพื่อย้าย · ลากจุดซ้าย/ขวาเพื่อปรับความกว้าง · ลากจุดมุมขวาล่างเพื่อขยายตัวอักษร · ปุ่มลูกศรขยับทีละน้อย (กด Shift = ทีละมาก) · Delete = ลบ
+            ลากตรงกลางเพื่อย้าย · ลากจุดซ้าย/ขวาเพื่อปรับความกว้างกรอบ · ลากจุดมุมขวาล่าง <strong>ขึ้น/ลง</strong> เพื่อย่อ-ขยายตัวอักษร · ปุ่มลูกศรขยับทีละน้อย (กด Shift = ทีละมาก) · Delete = ลบ
           </div>
         </div>,
         document.body
@@ -1155,7 +1179,7 @@ function ElementBox({
           <span className="cert-box-tag">{label}</span>
           <span className="cert-h l" title="ปรับความกว้าง" onPointerDown={(e) => onDown(e, t, "resize-l")} />
           <span className="cert-h r" title="ปรับความกว้าง" onPointerDown={(e) => onDown(e, t, "resize-r")} />
-          <span className="cert-h br" title="ขยาย/ย่อทั้งกล่อง" onPointerDown={(e) => onDown(e, t, "scale")} />
+          <span className="cert-h br" title="ลากขึ้น/ลงเพื่อย่อ-ขยายตัวอักษร" onPointerDown={(e) => onDown(e, t, "scale")} />
         </>
       )}
     </div>

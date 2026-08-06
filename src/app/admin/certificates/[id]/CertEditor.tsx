@@ -8,10 +8,12 @@ import { useToast } from "@/components/Toast";
 import { Icon } from "@/components/Icon";
 import { CertificateCanvas, type CanvasTemplate } from "@/components/certificate/CertificateCanvas";
 import { compressImage, presetFor } from "@/lib/imageCompress";
+import { fitCertTexts } from "@/lib/certFit";
 import {
   BLOCK_KINDS,
   BLOCK_LABEL,
   blockRect,
+  blockShrinks,
   COMBO_TOKENS,
   LINE_H,
   pageMaxY,
@@ -852,6 +854,20 @@ export function CertEditor(props: {
                         เปิดไว้ = กรอบฟ้าเท่ากับตัวหนังสือจริง จัดชิดซ้าย/ขวาแล้วได้ตำแหน่งที่เห็นเป๊ะ ๆ ·
                         ปิด = กรอบกว้างคงที่ตามค่า “กว้าง %” แล้วจัดข้อความในกรอบตาม “จัดวาง”
                       </div>
+                      <label className="row" style={{ gap: 6, alignItems: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={blockShrinks(selectedBlock)}
+                          onChange={(e) => updateBlock(selectedBlock.id, { shrink: e.target.checked })}
+                          disabled={locked}
+                        />
+                        <span>ย่อให้พอดีกรอบเมื่อข้อความยาว</span>
+                      </label>
+                      <div className="subtitle">
+                        ชื่อยาว ๆ จะย่อขนาดตัวอักษรลงจนพอดี — ยังอยู่บรรทัดเดียวและอยู่กลางกรอบเหมือนเดิม
+                        ไม่ตัดคำ ไม่ขึ้นบรรทัดใหม่ · กรอบพอดีข้อความก็ย่อ แต่ยึดขอบกระดาษเป็นเพดานแทนค่า “กว้าง %”
+                        · ปิด = ยาวเกินกรอบแล้วโดนตัดหัวท้ายหายแบบเดิม
+                      </div>
                       <div className="form-row">
                         <label className="field">
                           <span>ขนาดฟอนต์</span>
@@ -1164,6 +1180,14 @@ export function CertEditor(props: {
                     >
                       พอดีข้อความ
                     </button>
+                    <button
+                      className={`btn btn-sm${blockShrinks(selectedBlock) ? " btn-primary" : ""}`}
+                      onClick={() => updateBlock(selectedBlock.id, { shrink: !blockShrinks(selectedBlock) })}
+                      disabled={locked}
+                      title="ข้อความยาวเกินกรอบให้ย่อตัวอักษรลงจนพอดี — ไม่ตัดคำ ไม่ขึ้นบรรทัดใหม่"
+                    >
+                      ย่อพอดีกรอบ
+                    </button>
                   </>
                 )}
 
@@ -1253,7 +1277,7 @@ export function CertEditor(props: {
           <div className="cert-fs-foot">
             ลากตรงกลางเพื่อย้าย · ลากจุดซ้าย/ขวาเพื่อปรับความกว้างกรอบ · ลากจุดมุมขวาล่าง <strong>ขึ้น/ลง</strong> เพื่อย่อ-ขยายตัวอักษร · ปุ่มลูกศรขยับทีละน้อย (กด Shift = ทีละมาก) · Delete = ลบ
             <br />
-            กรอบ<strong>เส้นทึบ</strong> = พอดีข้อความ (กว้างเท่าตัวหนังสือ ไม่มีจุดปรับความกว้าง) · กรอบ<strong>เส้นประ</strong> = กว้างคงที่ โดยมีกรอบชมพูบอกว่าตัวหนังสือกินที่จริงแค่ไหน
+            กรอบ<strong>เส้นทึบ</strong> = พอดีข้อความ (กว้างเท่าตัวหนังสือ ไม่มีจุดปรับความกว้าง) · กรอบ<strong>เส้นประ</strong> = กว้างคงที่ โดยมีกรอบชมพูบอกว่าตัวหนังสือกินที่จริงแค่ไหน · เปิด “ย่อพอดีกรอบ” ไว้ = ชื่อยาวเกินกรอบจะย่อลงเองจนพอดี ไม่ตัดคำ ไม่ขึ้นบรรทัดใหม่
           </div>
         </div>,
         document.body
@@ -1304,10 +1328,14 @@ function CertStage(props: {
   const onMeasure = props.onMeasure;
   useLayoutEffect(() => {
     const el = elRef.current;
-    if (!el || !onMeasure) return;
+    if (!el) return;
     let alive = true;
     const measure = () => {
       if (!alive || !elRef.current) return;
+      // ย่อข้อความที่ล้นกรอบก่อนวัดเสมอ — ไม่งั้นกรอบชมพู/กรอบพอดีข้อความรายงานความกว้างก่อนย่อ
+      // (ทำทั้งภาพย่อและโหมดเต็มจอ ที่เห็นบนจอจึงเป็นของจริงเหมือนตอนพิมพ์)
+      fitCertTexts(elRef.current);
+      if (!onMeasure) return;
       const sb = elRef.current.getBoundingClientRect();
       if (!sb.width) return;
       const m: TextRects = {};

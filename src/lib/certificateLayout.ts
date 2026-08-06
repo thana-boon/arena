@@ -69,6 +69,12 @@ export type CertBlock = {
    * จุดอ้างอิงยังเป็น x ตาม align เหมือนเดิม — ชิดซ้ายคือขอบซ้ายของ "ตัวอักษร" ไม่ใช่ขอบกรอบเปล่า ๆ
    */
   autoFit?: boolean;
+  /**
+   * ข้อความยาวเกินกรอบให้ย่อขนาดตัวอักษรลงจนพอดี (เหมือน "ย่อข้อความเมื่อล้น" ของกล่องข้อความใน Word)
+   * ไม่ระบุ = เปิด — ของเดิมที่ล้นแล้วถูกตัดหัวท้ายหายไปเงียบ ๆ จึงกลายเป็นย่อให้อ่านครบแทน
+   * กรอบพอดีข้อความก็ย่อ แต่เพดานคือขอบกระดาษ (ดู autoFitMaxW) ไม่ใช่ค่า w
+   */
+  shrink?: boolean;
 };
 
 export type CertLayout = CertBlock[];
@@ -132,6 +138,21 @@ export type Rect = { left: number; top: number; w: number; h: number };
  * ต้องเป็นค่าเดียวกับ lineHeight ที่ CertificateCanvas ใช้วาด ไม่งั้นกรอบตอนลากไม่ตรงกับตัวหนังสือ
  */
 export const LINE_H = 1.2;
+
+/**
+ * ที่ว่างสูงสุดของบล็อก "กรอบพอดีข้อความ" ก่อนจะทะลุขอบกระดาษ (% ของความกว้างหน้า)
+ * กรอบแบบนี้ไม่มีความกว้างของตัวเอง เพดานจึงเป็นขอบกระดาษด้านที่วิ่งไปชนก่อน
+ * (จัดกลาง = ยืดออกสองข้างพร้อมกัน จึงได้แค่สองเท่าของฝั่งที่แคบกว่า)
+ */
+export function autoFitMaxW(b: Pick<CertBlock, "x" | "align">): number {
+  const room = b.align === "center" ? 2 * Math.min(b.x, 100 - b.x) : b.align === "right" ? b.x : 100 - b.x;
+  return Math.max(1, room);
+}
+
+/** ย่อข้อความให้พอดีกรอบหรือไม่ — QR ไม่ใช่ตัวอักษร, แม่แบบเก่าที่ไม่มีค่านี้ถือว่าเปิด */
+export function blockShrinks(b: CertBlock): boolean {
+  return b.kind !== "qr" && b.shrink !== false;
+}
 
 /** กรอบจริงของบล็อกบนหน้ากระดาษ — ต้องตรงกับที่ CertificateCanvas วาง ไม่งั้นกรอบเลือกเพี้ยน */
 export function blockRect(b: CertBlock, orientation: Orientation): Rect {

@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react";
 import {
+  autoFitMaxW,
+  blockShrinks,
   COMBO_TOKENS,
   LINE_H,
   SIG_FONT_DEFAULT,
@@ -48,6 +50,18 @@ export type CanvasTemplate = {
 
 // A4 อัตราส่วน 297:210
 const RATIO = 210 / 297;
+
+/**
+ * ที่เผื่อบน-ล่างของกล่องข้อความ (เท่าของขนาดตัวอักษร)
+ *
+ * กล่องหนึ่งบรรทัดสูงแค่ fontSize × LINE_H ซึ่ง "เตี้ยกว่า" ช่วงที่ฟอนต์ไทยใช้วาดจริง
+ * คำที่ซ้อนสามชั้นอย่าง "เพื่อ" (พ + สระอือ + ไม้เอก) ยอดวรรณยุกต์จึงโผล่พ้นกล่องไปนิดหนึ่ง
+ * แล้วโดน overflow:hidden ตัดหายไปทั้งขีด — เห็นเป็น "เพือ"
+ *
+ * แก้ด้วยการเผื่อ padding บน-ล่าง แล้วดึง margin-top ขึ้นเท่ากัน: ขอบเขตการตัดกว้างขึ้น
+ * แต่ตัวอักษรยังตกอยู่ที่ y เดิมเป๊ะ ๆ (แม่แบบเดิมจึงไม่ขยับสักใบ)
+ */
+const MARK_PAD = "0.35em";
 
 /** ค่าดิบของแต่ละช่อง (ไม่มี prefix) — ใช้ทั้งบล็อกเดี่ยวและโทเคนในข้อความผสม */
 function fieldValue(kind: BlockKind, d: CertRenderData): string {
@@ -172,9 +186,20 @@ export function CertificateCanvas({
         const left = b.align === "center" ? `calc(${wpc(b.x)} - ${w} / 2)` : b.align === "right" ? `calc(${wpc(b.x)} - ${w})` : wpc(b.x);
         // ข้อความผสมวาดแบบ pre เพื่อให้ช่องว่างที่ผู้ใช้เคาะคั่นระหว่างช่อง (เช่น "รางวัล    รายการ") ไม่ถูกยุบ
         const ws = b.kind === "combo" ? "pre" : "nowrap";
+        const shrink = blockShrinks(b);
         const common: CSSProperties = {
           position: "absolute",
           top: wpc(b.y),
+          // สูงเท่าบรรทัดเดียวเป๊ะ ๆ แล้วจัดข้อความไว้กลางกล่อง — พอโดนย่อให้พอดีกรอบ
+          // ตัวอักษรที่เล็กลงจะยังนั่งอยู่กลางที่เดิม ไม่ลอยขึ้นไปชิดขอบบน
+          height: wpc(b.fontSize * LINE_H),
+          boxSizing: "content-box",
+          paddingTop: MARK_PAD,
+          paddingBottom: MARK_PAD,
+          marginTop: `-${MARK_PAD}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: b.align === "center" ? "center" : b.align === "right" ? "flex-end" : "flex-start",
           fontFamily: FONT_VAR[b.font],
           fontSize: wpc(b.fontSize),
           fontWeight: b.weight,
@@ -184,19 +209,25 @@ export function CertificateCanvas({
         };
         // กรอบพอดีข้อความ: ไม่กำหนดความกว้าง ปล่อยให้ตัวอักษรกำหนดเอง แล้วเลื่อนกล่องด้วย transform
         // ตาม align (ซ้าย = ขอบซ้ายของตัวอักษรอยู่ที่ x พอดี) — ที่เห็นบนจอกับที่พิมพ์ออกมาจึงตรงกัน
+        // เพดานของกรอบแบบนี้คือขอบกระดาษ: ยาวเกินนั้นให้ย่อ ไม่ใช่วิ่งออกนอกหน้าไปโดนตัด
         const style: CSSProperties = b.autoFit
           ? {
               ...common,
               left: wpc(b.x),
               width: "max-content",
+              maxWidth: shrink ? wpc(autoFitMaxW(b)) : undefined,
               transform:
                 b.align === "center" ? "translateX(-50%)" : b.align === "right" ? "translateX(-100%)" : undefined,
             }
-          : { ...common, left, width: w, textAlign: b.align, overflow: "hidden" };
-        // span ครอบข้อความไว้เพื่อให้หน้าออกแบบวัด "ความกว้างจริงของตัวอักษร" ได้ (ตอนพิมพ์ไม่มีผลใด ๆ)
+          : { ...common, left, width: w, overflow: "hidden" };
+        // span ครอบข้อความไว้เพื่อให้หน้าออกแบบวัด "ความกว้างจริงของตัวอักษร" ได้
+        // flex:0 0 auto — ห้ามให้ flex บีบ span ลงมาเท่ากรอบ ไม่งั้นวัดไม่เจอว่าข้อความล้นเท่าไร
+        // data-cert-fit ติดไว้ทุกอันแม้ตอนปิดย่อ (เป็น "off") — fitCertTexts จะได้ล้างขนาดที่ย่อค้างไว้ให้ด้วย
         return (
           <div key={b.id} style={style}>
-            <span data-cert-text={b.id}>{text}</span>
+            <span data-cert-text={b.id} data-cert-fit={shrink ? "" : "off"} style={{ flex: "0 0 auto" }}>
+              {text}
+            </span>
           </div>
         );
       })}

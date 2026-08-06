@@ -142,6 +142,8 @@ const certBlock = z.object({
   text: z.string().max(255).optional(),
   // กรอบพอดีข้อความ — แม่แบบเก่าไม่ส่งมา = กรอบความกว้างคงที่แบบเดิม
   autoFit: z.boolean().optional(),
+  // ย่อข้อความที่ล้นกรอบให้พอดี — แม่แบบเก่าไม่ส่งมา = เปิด (ดีกว่าปล่อยให้โดนตัดหายแบบเดิม)
+  shrink: z.boolean().optional(),
 });
 
 const certSignatureInput = z.object({

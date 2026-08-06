@@ -45,6 +45,7 @@ type SigEdit = {
   x: number;
   y: number;
   width: number;
+  color: string;
 };
 
 type CompRow = { id: number; name: string; type: string; isPublished: boolean };
@@ -102,6 +103,7 @@ export function CertEditor(props: {
       x: s.x,
       y: s.y,
       width: s.width,
+      color: s.color,
       imageSrc: s.mode === "image" ? assetUrl(s.assetId) : null,
     })),
   };
@@ -440,6 +442,8 @@ export function CertEditor(props: {
         x: Math.min(85, 20 + 15 * n),
         y: round(maxY * 0.72),
         width: 16,
+        // สืบสีจากคนก่อนหน้า — พื้นหลังโทนเข้มที่ตั้งสีอ่อนไว้แล้ว จะได้ไม่ต้องมาตั้งใหม่ทุกคน
+        color: S[S.length - 1]?.color ?? "#1f2937",
       },
     ]);
     setSel({ kind: "sig", i: n });
@@ -859,7 +863,12 @@ export function CertEditor(props: {
                         <input type="file" accept="image/*" hidden onChange={(e) => onSigFile(i, e)} />
                       </label>
                     )}
+                    <label className="field">
+                      <span>สี</span>
+                      <input type="color" value={s.color} onChange={(e) => updateSig(i, { color: e.target.value })} />
+                    </label>
                   </div>
+                  <div className="subtitle">สีนี้ใช้กับชื่อ ตำแหน่ง และเส้นสำหรับเซ็นสด (รูปลายเซ็นใช้สีตามไฟล์)</div>
                   <div className="form-row">
                     <label className="field">
                       <span>X %</span>
@@ -1051,6 +1060,12 @@ export function CertEditor(props: {
                       value={selectedSig.roleLabel}
                       onChange={(e) => updateSig(sel.i, { roleLabel: e.target.value })}
                       placeholder="ตำแหน่ง"
+                    />
+                    <input
+                      type="color"
+                      value={selectedSig.color}
+                      onChange={(e) => updateSig(sel.i, { color: e.target.value })}
+                      title="สีชื่อ/ตำแหน่ง/เส้นเซ็นสด"
                     />
                   </>
                 )}

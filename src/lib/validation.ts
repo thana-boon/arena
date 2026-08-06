@@ -150,6 +150,8 @@ const certSignatureInput = z.object({
   x: z.number(),
   y: z.number(),
   width: z.number(),
+  // แม่แบบเก่าที่บันทึกจากหน้าเดิมยังไม่ส่งสีมา → ใช้สีเดิมที่เคยฝังไว้ในโค้ด
+  color: z.string().max(32).optional().default("#1f2937"),
 });
 
 // บันทึกแม่แบบทั้งก้อน (พื้นหลัง + layout + ผู้ลงนาม) ในครั้งเดียว

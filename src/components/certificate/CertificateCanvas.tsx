@@ -25,6 +25,7 @@ export type SignatureView = {
   x: number;
   y: number;
   width: number;
+  color: string; // ใช้กับชื่อ ตำแหน่ง และเส้นสำหรับเซ็นสด
   imageSrc: string | null; // data URI หรือ url
 };
 
@@ -171,10 +172,10 @@ export function CertificateCanvas({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={sig.imageSrc} alt="" style={{ height: wpc(sig.width * ratio * 0.5), maxWidth: "100%", objectFit: "contain", margin: "0 auto", display: "block" }} />
             ) : (
-              <div style={{ height: wpc(sig.width * ratio * 0.5), borderBottom: "1px solid #374151", margin: `0 ${wpc(sig.width * 0.1)}` }} />
+              <div style={{ height: wpc(sig.width * ratio * 0.5), borderBottom: `1px solid ${sig.color}`, margin: `0 ${wpc(sig.width * 0.1)}` }} />
             )}
-            {sig.name && <div style={{ fontSize: wpc(1.2), marginTop: wpc(0.5), color: "#1f2937" }}>{sig.name}</div>}
-            {sig.roleLabel && <div style={{ fontSize: wpc(1), color: "#4b5563" }}>{sig.roleLabel}</div>}
+            {sig.name && <div style={{ fontSize: wpc(1.2), marginTop: wpc(0.5), color: sig.color }}>{sig.name}</div>}
+            {sig.roleLabel && <div style={{ fontSize: wpc(1), color: sig.color }}>{sig.roleLabel}</div>}
           </div>
         );
       })}

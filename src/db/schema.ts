@@ -391,6 +391,8 @@ export const certificateSignatures = pgTable(
     x: numeric("x", { precision: 6, scale: 3 }).notNull().default("50"), // % จุดกึ่งกลางแนวนอน
     y: numeric("y", { precision: 6, scale: 3 }).notNull().default("75"), // % จากขอบบน
     width: numeric("width", { precision: 6, scale: 3 }).notNull().default("18"), // % ของความกว้างหน้า
+    // สีของชื่อ/ตำแหน่ง/เส้นเซ็นสด — พื้นหลังเข้มต้องใช้สีอ่อน ไม่งั้นตัวหนังสือจมหาย
+    color: varchar("color", { length: 32 }).notNull().default("#1f2937"),
   },
   (t) => [index("cert_sig_tpl_idx").on(t.templateId)]
 );

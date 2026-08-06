@@ -28,6 +28,8 @@ const CHECKS = [
   { id: "0006", what: "รายการไม่มีการแข่งขัน", how: () => column("competitions", "no_contest"), fix: "node drizzle/apply_0006.mjs" },
   { id: "0007", what: "ประกาศ (announcement)", how: () => table("announcements"), fix: "node drizzle/apply_0007.mjs" },
   { id: "0008", what: "IP ใน audit log", how: () => column("audit_log", "ip"), fix: "node drizzle/apply_0008.mjs" },
+  { id: "0009", what: "เลขที่ในห้อง (snapshot)", how: () => column("entry_members", "class_number_snapshot"), fix: "node drizzle/apply_0009.mjs" },
+  { id: "0010", what: "สีผู้ลงนามบนเกียรติบัตร", how: () => column("certificate_signatures", "color"), fix: "node drizzle/apply_0010.mjs" },
 ];
 
 try {

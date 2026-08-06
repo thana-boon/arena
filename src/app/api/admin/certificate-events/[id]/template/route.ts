@@ -70,6 +70,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           x: String(sig.x),
           y: String(sig.y),
           width: String(sig.width),
+          color: sig.color,
         }))
       );
     }

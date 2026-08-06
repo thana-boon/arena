@@ -1,5 +1,14 @@
 import type { CSSProperties } from "react";
-import { LINE_H, type CertBlock, type CertLayout, type CertRenderData } from "@/lib/certificateLayout";
+import {
+  COMBO_TOKENS,
+  LINE_H,
+  SIG_FONT_DEFAULT,
+  SIG_ROLE_RATIO,
+  type BlockKind,
+  type CertBlock,
+  type CertLayout,
+  type CertRenderData,
+} from "@/lib/certificateLayout";
 import { AWARD_LABEL, rankAwardLabel } from "@/lib/domain";
 
 /**
@@ -26,6 +35,7 @@ export type SignatureView = {
   y: number;
   width: number;
   color: string; // ใช้กับชื่อ ตำแหน่ง และเส้นสำหรับเซ็นสด
+  fontSize?: number; // % ของความกว้างหน้า (ชื่อ) — ไม่ส่งมา = ค่าเดิม 1.2
   imageSrc: string | null; // data URI หรือ url
 };
 
@@ -39,21 +49,51 @@ export type CanvasTemplate = {
 // A4 อัตราส่วน 297:210
 const RATIO = 210 / 297;
 
+/** ค่าดิบของแต่ละช่อง (ไม่มี prefix) — ใช้ทั้งบล็อกเดี่ยวและโทเคนในข้อความผสม */
+function fieldValue(kind: BlockKind, d: CertRenderData): string {
+  switch (kind) {
+    case "student_name": return d.studentName;
+    case "class": return d.className;
+    case "team_name": return d.teamName ?? "";
+    case "competition_name": return d.competitionName;
+    case "event_name": return d.eventName;
+    // "activity" (ไม่มีการแข่งขัน) → "เข้าร่วมกิจกรรม" ; rank = 0 เสมอ บล็อกอันดับจึงว่างเปล่า
+    case "medal": return AWARD_LABEL[d.medal] ?? "";
+    case "rank": return d.rank ? rankAwardLabel(d.rank) : "";
+    case "date": return d.dateText;
+    case "serial": return d.serialNo;
+    default: return "";
+  }
+}
+
+const TOKEN_RE = /\{(\w+)\}([ \t]*)/g;
+
+/**
+ * ข้อความผสม — แทนที่ {competition_name} ฯลฯ ด้วยค่าจริง
+ * ช่องที่ไม่มีค่า (เช่นไม่มีชื่อทีม) ถูกตัดทิ้งพร้อมช่องว่างที่ตามหลัง ไม่งั้นเหลือรูโหว่กลางบรรทัด
+ * ช่องว่างที่ผู้ใช้เคาะเองยังอยู่ครบ (บล็อกนี้วาดด้วย white-space: pre) — เว้นวรรคยาว ๆ คั่นคำได้ตามต้องการ
+ */
+export function comboText(tpl: string, d: CertRenderData): string {
+  return tpl
+    .replace(TOKEN_RE, (m, key: string, gap: string) => {
+      if (!(COMBO_TOKENS as readonly string[]).includes(key)) return m;
+      const v = fieldValue(key as BlockKind, d);
+      return v ? v + gap : "";
+    })
+    .trim();
+}
+
 function blockText(kind: CertBlock["kind"], d: CertRenderData, prefix?: string): string {
   const p = prefix ?? "";
   switch (kind) {
-    case "student_name": return p + d.studentName;
-    case "class": return d.className ? p + d.className : "";
-    case "team_name": return d.teamName ? p + d.teamName : "";
-    case "competition_name": return p + d.competitionName;
-    case "event_name": return p + d.eventName;
-    // "activity" (ไม่มีการแข่งขัน) → "เข้าร่วมกิจกรรม" ; rank = 0 เสมอ บล็อกอันดับจึงว่างเปล่า
-    case "medal": return AWARD_LABEL[d.medal] ? p + AWARD_LABEL[d.medal] : "";
-    case "rank": return d.rank ? p + rankAwardLabel(d.rank) : "";
-    case "date": return p + d.dateText;
-    case "serial": return (p || "เลขที่ ") + d.serialNo;
+    case "qr": return "";
     case "static_text": return p;
-    default: return "";
+    case "combo": return comboText(p, d);
+    case "serial": return (p || "เลขที่ ") + d.serialNo;
+    default: {
+      const v = fieldValue(kind, d);
+      return v ? p + v : "";
+    }
   }
 }
 
@@ -130,25 +170,33 @@ export function CertificateCanvas({
         if (!text) return null;
         const w = wpc(b.w);
         const left = b.align === "center" ? `calc(${wpc(b.x)} - ${w} / 2)` : b.align === "right" ? `calc(${wpc(b.x)} - ${w})` : wpc(b.x);
+        // ข้อความผสมวาดแบบ pre เพื่อให้ช่องว่างที่ผู้ใช้เคาะคั่นระหว่างช่อง (เช่น "รางวัล    รายการ") ไม่ถูกยุบ
+        const ws = b.kind === "combo" ? "pre" : "nowrap";
+        const common: CSSProperties = {
+          position: "absolute",
+          top: wpc(b.y),
+          fontFamily: FONT_VAR[b.font],
+          fontSize: wpc(b.fontSize),
+          fontWeight: b.weight,
+          color: b.color,
+          lineHeight: LINE_H,
+          whiteSpace: ws,
+        };
+        // กรอบพอดีข้อความ: ไม่กำหนดความกว้าง ปล่อยให้ตัวอักษรกำหนดเอง แล้วเลื่อนกล่องด้วย transform
+        // ตาม align (ซ้าย = ขอบซ้ายของตัวอักษรอยู่ที่ x พอดี) — ที่เห็นบนจอกับที่พิมพ์ออกมาจึงตรงกัน
+        const style: CSSProperties = b.autoFit
+          ? {
+              ...common,
+              left: wpc(b.x),
+              width: "max-content",
+              transform:
+                b.align === "center" ? "translateX(-50%)" : b.align === "right" ? "translateX(-100%)" : undefined,
+            }
+          : { ...common, left, width: w, textAlign: b.align, overflow: "hidden" };
+        // span ครอบข้อความไว้เพื่อให้หน้าออกแบบวัด "ความกว้างจริงของตัวอักษร" ได้ (ตอนพิมพ์ไม่มีผลใด ๆ)
         return (
-          <div
-            key={b.id}
-            style={{
-              position: "absolute",
-              left,
-              top: wpc(b.y),
-              width: w,
-              textAlign: b.align,
-              fontFamily: FONT_VAR[b.font],
-              fontSize: wpc(b.fontSize),
-              fontWeight: b.weight,
-              color: b.color,
-              lineHeight: LINE_H,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-            }}
-          >
-            {text}
+          <div key={b.id} style={style}>
+            <span data-cert-text={b.id}>{text}</span>
           </div>
         );
       })}
@@ -156,6 +204,7 @@ export function CertificateCanvas({
       {template.signatures.map((sig) => {
         const w = wpc(sig.width);
         const left = `calc(${wpc(sig.x)} - ${w} / 2)`;
+        const sf = sig.fontSize ?? SIG_FONT_DEFAULT;
         return (
           <div
             key={sig.id}
@@ -174,8 +223,12 @@ export function CertificateCanvas({
             ) : (
               <div style={{ height: wpc(sig.width * ratio * 0.5), borderBottom: `1px solid ${sig.color}`, margin: `0 ${wpc(sig.width * 0.1)}` }} />
             )}
-            {sig.name && <div style={{ fontSize: wpc(1.2), marginTop: wpc(0.5), color: sig.color }}>{sig.name}</div>}
-            {sig.roleLabel && <div style={{ fontSize: wpc(1), color: sig.color }}>{sig.roleLabel}</div>}
+            {sig.name && (
+              <div style={{ fontSize: wpc(sf), lineHeight: LINE_H, marginTop: wpc(0.5), color: sig.color }}>{sig.name}</div>
+            )}
+            {sig.roleLabel && (
+              <div style={{ fontSize: wpc(sf * SIG_ROLE_RATIO), lineHeight: LINE_H, color: sig.color }}>{sig.roleLabel}</div>
+            )}
           </div>
         );
       })}

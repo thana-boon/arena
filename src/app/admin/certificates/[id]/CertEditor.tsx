@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
@@ -12,9 +12,11 @@ import {
   BLOCK_KINDS,
   BLOCK_LABEL,
   blockRect,
+  COMBO_TOKENS,
   LINE_H,
   pageMaxY,
   pageRatio,
+  SIG_FONT_DEFAULT,
   sigRect,
   type BlockKind,
   type CertBlock,
@@ -46,7 +48,27 @@ type SigEdit = {
   y: number;
   width: number;
   color: string;
+  fontSize: number; // ขนาดชื่อ (% ของความกว้างหน้า) — ตำแหน่งย่อตามอัตโนมัติ
 };
+
+/** กรอบของข้อความจริงบนกระดาษ ที่วัดจาก DOM (คีย์ = id ของบล็อก) */
+type TextRects = Record<string, Rect>;
+
+const RECT_EPS = 0.02; // % ของความกว้างหน้า — ต่ำกว่านี้ถือว่ากรอบเท่าเดิม ไม่ต้อง setState ซ้ำ
+function sameRects(a: TextRects, b: TextRects): boolean {
+  const ka = Object.keys(a);
+  if (ka.length !== Object.keys(b).length) return false;
+  return ka.every((k) => {
+    const x = a[k], y = b[k];
+    return (
+      y != null &&
+      Math.abs(x.left - y.left) < RECT_EPS &&
+      Math.abs(x.top - y.top) < RECT_EPS &&
+      Math.abs(x.w - y.w) < RECT_EPS &&
+      Math.abs(x.h - y.h) < RECT_EPS
+    );
+  });
+}
 
 type CompRow = { id: number; name: string; type: string; isPublished: boolean };
 
@@ -54,6 +76,20 @@ type CompRow = { id: number; name: string; type: string; isPublished: boolean };
 type Target = { kind: "block"; id: string } | { kind: "sig"; i: number };
 
 type DragMode = "move" | "resize-l" | "resize-r" | "scale";
+
+/** บล็อกนี้ใช้กรอบพอดีข้อความอยู่หรือไม่ — QR ไม่นับ (ไม่ใช่ตัวอักษร ความกว้างคือขนาดรูปจริง) */
+const isFit = (b: CertBlock) => b.kind !== "qr" && b.autoFit === true;
+
+/**
+ * กรอบสำหรับลาก/จัดตำแหน่งของบล็อก
+ * กรอบพอดีข้อความเอา "ซ้าย/กว้าง" จากตัวอักษรจริงที่วัดได้ แต่ "บน/สูง" ยังยึดบรรทัดตามที่ canvas วาง
+ * — ที่วัดได้เป็นกรอบของตัวอักษรล้วน ซึ่งลอยสูงกว่าขอบบนของบรรทัดอยู่นิดหนึ่งตามฟอนต์
+ *   ถ้าเอาค่านั้นไปเขียนกลับเป็น y ทุกครั้งที่เริ่มลาก บล็อกจะขยับขึ้นทีละนิดสะสมไปเรื่อย ๆ
+ */
+function fitRect(b: CertBlock, orientation: Orientation, measured?: Rect): Rect {
+  const r = blockRect(b, orientation);
+  return measured && isFit(b) ? { left: measured.left, top: r.top, w: measured.w, h: r.h } : r;
+}
 
 const sameTarget = (a: Target | null, b: Target) =>
   a != null && (a.kind === "block" && b.kind === "block" ? a.id === b.id : a.kind === "sig" && b.kind === "sig" ? a.i === b.i : false);
@@ -67,6 +103,7 @@ export function CertEditor(props: {
   initialSignatures: SigEdit[];
   competitions: CompRow[];
   sample: CertRenderData;
+  sampleQrSvg: string;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -82,6 +119,16 @@ export function CertEditor(props: {
   const [signatures, setSignatures] = useState<SigEdit[]>(props.initialSignatures);
   const [sel, setSel] = useState<Target | null>(null);
   const [busy, setBusy] = useState(false);
+
+  /**
+   * ความกว้างจริงของตัวอักษรแต่ละบล็อก วัดจากกระดาษที่กำลังแสดงอยู่
+   * ใช้สองอย่าง: (1) บล็อกที่ตั้ง "กรอบพอดีข้อความ" ใช้ค่านี้เป็นกรอบลากจริง ๆ
+   * (2) บล็อกกรอบคงที่เอาไปวาดเส้นบาง ๆ ให้เห็นว่าตัวหนังสือกินที่จริงแค่ไหนในกรอบ
+   */
+  const [textRects, setTextRects] = useState<TextRects>({});
+  const onMeasure = useCallback((m: TextRects) => {
+    setTextRects((prev) => (sameRects(prev, m) ? prev : m));
+  }, []);
 
   // เต็มจอ = โต๊ะทำงานจริง (ลาก/ย่อขยาย/จัดตำแหน่ง) — ตัวอย่างในหน้าปกติเป็นแค่ภาพย่อไว้กดเข้ามา
   const [full, setFull] = useState(false);
@@ -104,6 +151,7 @@ export function CertEditor(props: {
       y: s.y,
       width: s.width,
       color: s.color,
+      fontSize: s.fontSize,
       imageSrc: s.mode === "image" ? assetUrl(s.assetId) : null,
     })),
   };
@@ -113,10 +161,19 @@ export function CertEditor(props: {
 
   // ===== เรขาคณิต: อ่าน/เขียนกรอบของสิ่งที่เลือก =====
 
+  /**
+   * กรอบที่ "เห็นบนจอจริง" ของบล็อกหนึ่ง
+   * กรอบพอดีข้อความต้องใช้ค่าที่วัดจาก DOM เพราะความกว้างของตัวอักษรไทยคำนวณล่วงหน้าไม่ได้
+   * (ยังไม่ทันวัด เช่นเพิ่งเปิดหน้ามา ก็ถอยไปใช้กรอบตามค่า w ที่เก็บไว้ล่าสุด)
+   */
+  function liveRect(b: CertBlock): Rect {
+    return fitRect(b, orientation, textRects[b.id]);
+  }
+
   function rectFor(t: Target): Rect | null {
     if (t.kind === "block") {
       const b = layout.find((x) => x.id === t.id);
-      return b ? blockRect(b, orientation) : null;
+      return b ? liveRect(b) : null;
     }
     const s = signatures[t.i];
     return s ? sigRect(s, orientation) : null;
@@ -313,10 +370,26 @@ export function CertEditor(props: {
         font: "th-serif",
         weight: 400,
         color: "#1f2937",
+        // ของใหม่ให้กรอบพอดีข้อความไว้ก่อน — จะได้เห็นตั้งแต่แรกว่าข้อความจริงกินที่แค่ไหน
+        // (ยกเว้น QR ที่ไม่ใช่ตัวอักษร ความกว้างคือขนาดจริงของรูป)
+        ...(kind === "qr" ? {} : { autoFit: true }),
         ...(kind === "static_text" ? { text: "ข้อความ" } : {}),
+        ...(kind === "combo" ? { text: "{medal}    {competition_name}" } : {}),
       },
     ]);
     setSel({ kind: "block", id });
+  }
+
+  /**
+   * สลับโหมดกรอบ — ตอนปิดกรอบพอดีข้อความ ให้ค้างความกว้างไว้เท่าที่ตัวหนังสือกินอยู่จริง
+   * ไม่งั้นกรอบจะกระโดดกลับไปเป็นค่า w เก่าที่ตั้งไว้ตั้งแต่เมื่อไหร่ก็ไม่รู้
+   */
+  function toggleAutoFit(b: CertBlock, on: boolean) {
+    const measured = textRects[b.id];
+    updateBlock(b.id, {
+      autoFit: on,
+      ...(on || !measured ? {} : { w: round(Math.max(MIN_W, measured.w)), x: round(anchorX(b.align, measured.left, measured.w)) }),
+    });
   }
 
   function removeBlock(id: string) {
@@ -442,8 +515,9 @@ export function CertEditor(props: {
         x: Math.min(85, 20 + 15 * n),
         y: round(maxY * 0.72),
         width: 16,
-        // สืบสีจากคนก่อนหน้า — พื้นหลังโทนเข้มที่ตั้งสีอ่อนไว้แล้ว จะได้ไม่ต้องมาตั้งใหม่ทุกคน
+        // สืบสี/ขนาดจากคนก่อนหน้า — ตั้งไว้ให้เข้ากับพื้นหลังแล้ว จะได้ไม่ต้องมาตั้งใหม่ทุกคน
         color: S[S.length - 1]?.color ?? "#1f2937",
+        fontSize: S[S.length - 1]?.fontSize ?? SIG_FONT_DEFAULT,
       },
     ]);
     setSel({ kind: "sig", i: n });
@@ -616,11 +690,13 @@ export function CertEditor(props: {
   const stageCommon = {
     template: canvasTemplate,
     data: props.sample,
+    qrSvg: props.sampleQrSvg,
     orientation,
     layout,
     signatures,
     sel,
     guides,
+    textRects,
     labelOf,
     onDeselect: () => setSel(null),
     onDown: startDrag,
@@ -747,8 +823,35 @@ export function CertEditor(props: {
                       <input value={selectedBlock.text ?? ""} onChange={(e) => updateBlock(selectedBlock.id, { text: e.target.value })} />
                     </label>
                   )}
+                  {selectedBlock.kind === "combo" && (
+                    <div className="stack" style={{ gap: 4 }}>
+                      <strong>ข้อความ + ช่องข้อมูล</strong>
+                      <ComboField
+                        value={selectedBlock.text ?? ""}
+                        onChange={(v) => updateBlock(selectedBlock.id, { text: v })}
+                        block
+                      />
+                      <div className="subtitle">
+                        รวมหลายช่องไว้บรรทัดเดียว เช่น <code>{"{medal}    {competition_name}"}</code> · เว้นวรรคที่เคาะเองไม่ถูกยุบ
+                        ใช้คั่นระยะได้เลย · ช่องที่ไม่มีข้อมูล (เช่นไม่มีชื่อทีม) หายไปทั้งช่องพร้อมช่องว่างที่ตามหลัง
+                      </div>
+                    </div>
+                  )}
                   {selectedBlock.kind !== "qr" && (
                     <>
+                      <label className="row" style={{ gap: 6, alignItems: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedBlock.autoFit === true}
+                          onChange={(e) => toggleAutoFit(selectedBlock, e.target.checked)}
+                          disabled={locked}
+                        />
+                        <span>กรอบพอดีข้อความ</span>
+                      </label>
+                      <div className="subtitle">
+                        เปิดไว้ = กรอบฟ้าเท่ากับตัวหนังสือจริง จัดชิดซ้าย/ขวาแล้วได้ตำแหน่งที่เห็นเป๊ะ ๆ ·
+                        ปิด = กรอบกว้างคงที่ตามค่า “กว้าง %” แล้วจัดข้อความในกรอบตาม “จัดวาง”
+                      </div>
                       <div className="form-row">
                         <label className="field">
                           <span>ขนาดฟอนต์</span>
@@ -811,7 +914,14 @@ export function CertEditor(props: {
                     </label>
                     <label className="field">
                       <span>กว้าง %</span>
-                      <input type="number" step="0.5" value={selectedBlock.w} onChange={(e) => updateBlock(selectedBlock.id, { w: Number(e.target.value) })} />
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={isFit(selectedBlock) ? round(liveRect(selectedBlock).w) : selectedBlock.w}
+                        onChange={(e) => updateBlock(selectedBlock.id, { w: Number(e.target.value) })}
+                        disabled={isFit(selectedBlock)}
+                        title={isFit(selectedBlock) ? "กรอบพอดีข้อความ — ความกว้างมาจากตัวอักษร" : undefined}
+                      />
                     </label>
                   </div>
                   <button className="btn btn-sm btn-danger" onClick={() => removeBlock(selectedBlock.id)} disabled={locked}>
@@ -867,8 +977,20 @@ export function CertEditor(props: {
                       <span>สี</span>
                       <input type="color" value={s.color} onChange={(e) => updateSig(i, { color: e.target.value })} />
                     </label>
+                    <label className="field">
+                      <span>ขนาดชื่อ %</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min={MIN_FONT}
+                        value={s.fontSize}
+                        onChange={(e) => updateSig(i, { fontSize: clampFont(Number(e.target.value)) })}
+                      />
+                    </label>
                   </div>
-                  <div className="subtitle">สีนี้ใช้กับชื่อ ตำแหน่ง และเส้นสำหรับเซ็นสด (รูปลายเซ็นใช้สีตามไฟล์)</div>
+                  <div className="subtitle">
+                    สีนี้ใช้กับชื่อ ตำแหน่ง และเส้นสำหรับเซ็นสด (รูปลายเซ็นใช้สีตามไฟล์) · บรรทัด “ตำแหน่ง” ย่อตามขนาดชื่อให้เอง
+                  </div>
                   <div className="form-row">
                     <label className="field">
                       <span>X %</span>
@@ -1034,6 +1156,14 @@ export function CertEditor(props: {
                       onChange={(e) => updateBlock(selectedBlock.id, { color: e.target.value })}
                       title="สีตัวอักษร"
                     />
+                    <button
+                      className={`btn btn-sm${selectedBlock.autoFit ? " btn-primary" : ""}`}
+                      onClick={() => toggleAutoFit(selectedBlock, !selectedBlock.autoFit)}
+                      disabled={locked}
+                      title="กรอบฟ้าเท่ากับตัวหนังสือจริง — จัดชิดซ้าย/ขวาได้ตรงตำแหน่ง ไม่มีที่ว่างเหลือในกรอบ"
+                    >
+                      พอดีข้อความ
+                    </button>
                   </>
                 )}
 
@@ -1043,6 +1173,13 @@ export function CertEditor(props: {
                     value={selectedBlock.text ?? ""}
                     onChange={(e) => updateBlock(selectedBlock.id, { text: e.target.value })}
                     placeholder="ข้อความ"
+                  />
+                )}
+
+                {selectedBlock?.kind === "combo" && (
+                  <ComboField
+                    value={selectedBlock.text ?? ""}
+                    onChange={(v) => updateBlock(selectedBlock.id, { text: v })}
                   />
                 )}
 
@@ -1067,6 +1204,29 @@ export function CertEditor(props: {
                       onChange={(e) => updateSig(sel.i, { color: e.target.value })}
                       title="สีชื่อ/ตำแหน่ง/เส้นเซ็นสด"
                     />
+                    <span className="cert-tool-label">ตัวอักษร</span>
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => updateSig(sel.i, { fontSize: clampFont(selectedSig.fontSize - 0.1) })}
+                      title="ย่อชื่อผู้ลงนาม"
+                    >
+                      ก−
+                    </button>
+                    <input
+                      className="cert-tool-num"
+                      type="number"
+                      step="0.1"
+                      value={selectedSig.fontSize}
+                      onChange={(e) => updateSig(sel.i, { fontSize: clampFont(Number(e.target.value)) })}
+                      title="ขนาดชื่อผู้ลงนาม (ตำแหน่งย่อตามให้เอง)"
+                    />
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => updateSig(sel.i, { fontSize: clampFont(selectedSig.fontSize + 0.1) })}
+                      title="ขยายชื่อผู้ลงนาม"
+                    >
+                      ก+
+                    </button>
                   </>
                 )}
 
@@ -1079,11 +1239,21 @@ export function CertEditor(props: {
           </div>
 
           <div className="cert-fs-body" ref={fsBodyRef}>
-            {fitW > 0 && <CertStage {...stageCommon} w={Math.max(240, fitW * zoom)} interactive stageRef={stageRef} />}
+            {fitW > 0 && (
+              <CertStage
+                {...stageCommon}
+                w={Math.max(240, fitW * zoom)}
+                interactive
+                stageRef={stageRef}
+                onMeasure={onMeasure}
+              />
+            )}
           </div>
 
           <div className="cert-fs-foot">
             ลากตรงกลางเพื่อย้าย · ลากจุดซ้าย/ขวาเพื่อปรับความกว้างกรอบ · ลากจุดมุมขวาล่าง <strong>ขึ้น/ลง</strong> เพื่อย่อ-ขยายตัวอักษร · ปุ่มลูกศรขยับทีละน้อย (กด Shift = ทีละมาก) · Delete = ลบ
+            <br />
+            กรอบ<strong>เส้นทึบ</strong> = พอดีข้อความ (กว้างเท่าตัวหนังสือ ไม่มีจุดปรับความกว้าง) · กรอบ<strong>เส้นประ</strong> = กว้างคงที่ โดยมีกรอบชมพูบอกว่าตัวหนังสือกินที่จริงแค่ไหน
           </div>
         </div>,
         document.body
@@ -1102,23 +1272,68 @@ function CertStage(props: {
   stageRef?: React.RefObject<HTMLDivElement | null>;
   template: CanvasTemplate;
   data: CertRenderData;
+  qrSvg: string;
   orientation: Orientation;
   layout: CertLayout;
   signatures: SigEdit[];
   sel: Target | null;
   guides: { v: boolean; h: boolean };
+  textRects: TextRects;
   labelOf: (t: Target) => string;
   onDeselect: () => void;
   onDown: (e: React.PointerEvent, t: Target, mode: DragMode) => void;
+  onMeasure?: (m: TextRects) => void;
 }) {
   const { w, interactive, orientation } = props;
   const ratio = pageRatio(orientation);
   const maxY = pageMaxY(orientation);
   const px = (v: number) => (w * v) / 100;
 
+  // ref ของตัวเอง (ไว้วัดข้อความ) แล้วส่งต่อให้ผู้เรียกด้วย — ผู้เรียกใช้มันคำนวณระยะลาก
+  const elRef = useRef<HTMLDivElement | null>(null);
+  const setRef = (el: HTMLDivElement | null) => {
+    elRef.current = el;
+    if (props.stageRef) props.stageRef.current = el;
+  };
+
+  /**
+   * วัดกรอบจริงของตัวอักษรทุกบล็อก (span ที่ CertificateCanvas ครอบข้อความไว้)
+   * คิดเป็น % ของ "ความกว้าง" กระดาษ เหมือนทุกพิกัดในระบบนี้ ค่าที่ได้จึงใช้ได้ทุกระดับซูม
+   * วัดซ้ำอีกรอบตอนฟอนต์โหลดเสร็จ — ฟอนต์ไทยมาทีหลัง ความกว้างข้อความจะขยับ
+   */
+  const onMeasure = props.onMeasure;
+  useLayoutEffect(() => {
+    const el = elRef.current;
+    if (!el || !onMeasure) return;
+    let alive = true;
+    const measure = () => {
+      if (!alive || !elRef.current) return;
+      const sb = elRef.current.getBoundingClientRect();
+      if (!sb.width) return;
+      const m: TextRects = {};
+      elRef.current.querySelectorAll<HTMLElement>("[data-cert-text]").forEach((n) => {
+        const id = n.dataset.certText;
+        if (!id) return;
+        const r = n.getBoundingClientRect();
+        m[id] = {
+          left: ((r.left - sb.left) / sb.width) * 100,
+          top: ((r.top - sb.top) / sb.width) * 100,
+          w: (r.width / sb.width) * 100,
+          h: (r.height / sb.width) * 100,
+        };
+      });
+      onMeasure(m);
+    };
+    measure();
+    document.fonts?.ready.then(measure).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [onMeasure, props.w, props.orientation, props.layout, props.data]);
+
   return (
     <div
-      ref={props.stageRef}
+      ref={setRef}
       className="cert-stage"
       style={{ width: w, height: w * ratio }}
       // กันเบราว์เซอร์ลากรูปพื้นหลัง/ลากคลุมข้อความแทนเรา — พอซูมจนจอเลื่อนได้
@@ -1130,28 +1345,37 @@ function CertStage(props: {
         if (interactive && !(e.target as HTMLElement).closest(".cert-box")) props.onDeselect();
       }}
     >
-      <CertificateCanvas template={props.template} data={props.data} pageWidth={`${w}px`} />
+      <CertificateCanvas template={props.template} data={props.data} pageWidth={`${w}px`} qrSvg={props.qrSvg} />
       {interactive && (
         <>
           {props.guides.v && <div className="cert-guide" style={{ left: px(50), top: 0, width: 1, height: w * ratio }} />}
           {props.guides.h && <div className="cert-guide" style={{ top: px(maxY / 2), left: 0, height: 1, width: w }} />}
-          {props.layout.map((b) => (
-            <ElementBox
-              key={b.id}
-              t={{ kind: "block", id: b.id }}
-              r={blockRect(b, orientation)}
-              w={w}
-              active={sameTarget(props.sel, { kind: "block", id: b.id })}
-              label={props.labelOf({ kind: "block", id: b.id })}
-              onDown={props.onDown}
-            />
-          ))}
+          {props.layout.map((b) => {
+            const measured = props.textRects[b.id];
+            const fit = isFit(b);
+            return (
+              <ElementBox
+                key={b.id}
+                t={{ kind: "block", id: b.id }}
+                r={fitRect(b, orientation, measured)}
+                // กรอบคงที่: ขีดเส้นบาง ๆ ตรงที่ตัวหนังสือกินจริง จะได้รู้ว่าเหลือที่ว่างอีกเท่าไร
+                // และชื่อยาว ๆ ล้นกรอบหรือยัง (เส้นโผล่พ้นกรอบ = โดนตัดตอนพิมพ์)
+                textR={!fit ? measured : undefined}
+                fixedWidth={!fit}
+                w={w}
+                active={sameTarget(props.sel, { kind: "block", id: b.id })}
+                label={props.labelOf({ kind: "block", id: b.id })}
+                onDown={props.onDown}
+              />
+            );
+          })}
           {props.signatures.map((s, i) => (
             <ElementBox
               key={`sig${i}`}
               t={{ kind: "sig", i }}
               r={sigRect(s, orientation)}
               w={w}
+              fixedWidth
               active={sameTarget(props.sel, { kind: "sig", i })}
               label={props.labelOf({ kind: "sig", i })}
               onDown={props.onDown}
@@ -1167,37 +1391,107 @@ function CertStage(props: {
 function ElementBox({
   t,
   r,
+  textR,
   w,
   active,
   label,
   sig,
+  fixedWidth,
   onDown,
 }: {
   t: Target;
   r: Rect;
+  /** กรอบของตัวอักษรจริง — วาดเป็นเส้นบางซ้อนในกรอบ (เฉพาะบล็อกที่กรอบกว้างคงที่) */
+  textR?: Rect;
   w: number;
   active: boolean;
   label: string;
   sig?: boolean;
+  /** false = กรอบพอดีข้อความ → ไม่มีจุดลากปรับความกว้าง (ความกว้างมาจากตัวอักษรล้วน) */
+  fixedWidth?: boolean;
   onDown: (e: React.PointerEvent, t: Target, mode: DragMode) => void;
 }) {
   const px = (v: number) => (w * v) / 100;
   return (
     <div
-      className={`cert-box${active ? " sel" : ""}${sig ? " sig" : ""}`}
+      className={`cert-box${active ? " sel" : ""}${sig ? " sig" : ""}${fixedWidth ? "" : " fit"}`}
       style={{ left: px(r.left), top: px(r.top), width: Math.max(8, px(r.w)), height: Math.max(8, px(r.h)) }}
       title={label}
       onPointerDown={(e) => onDown(e, t, "move")}
     >
+      {textR && (
+        <span
+          className="cert-text-extent"
+          style={{ left: px(textR.left - r.left), top: px(textR.top - r.top), width: px(textR.w), height: px(textR.h) }}
+        />
+      )}
       {active && (
         <>
           <span className="cert-box-tag">{label}</span>
-          <span className="cert-h l" title="ปรับความกว้าง" onPointerDown={(e) => onDown(e, t, "resize-l")} />
-          <span className="cert-h r" title="ปรับความกว้าง" onPointerDown={(e) => onDown(e, t, "resize-r")} />
+          {fixedWidth && (
+            <>
+              <span className="cert-h l" title="ปรับความกว้าง" onPointerDown={(e) => onDown(e, t, "resize-l")} />
+              <span className="cert-h r" title="ปรับความกว้าง" onPointerDown={(e) => onDown(e, t, "resize-r")} />
+            </>
+          )}
           <span className="cert-h br" title="ลากขึ้น/ลงเพื่อย่อ-ขยายตัวอักษร" onPointerDown={(e) => onDown(e, t, "scale")} />
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * ช่องแก้ "ข้อความผสม" — พิมพ์ข้อความปนกับปุ่มแทรกช่องข้อมูล เช่น "{medal}    {competition_name}"
+ * แทรกตรงตำแหน่งเคอร์เซอร์ (ไม่ใช่ต่อท้ายเสมอ) เพราะคนมักวางเคอร์เซอร์ไว้ตรงที่อยากได้แล้วค่อยกด
+ * เว้นวรรคที่เคาะเองไม่ถูกยุบตอนวาด จึงใช้ Space รัว ๆ คั่นระหว่างช่องได้เลย
+ */
+function ComboField({ value, onChange, block }: { value: string; onChange: (v: string) => void; block?: boolean }) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  function insert(token: string) {
+    const el = ref.current;
+    const at = el?.selectionStart ?? value.length;
+    const to = el?.selectionEnd ?? at;
+    const next = value.slice(0, at) + token + value.slice(to);
+    onChange(next);
+    // คืนเคอร์เซอร์ไปหลังโทเคนที่เพิ่งแทรก — พิมพ์ต่อได้ทันทีโดยไม่ต้องเอาเมาส์ไปคลิกใหม่
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(at + token.length, at + token.length);
+    });
+  }
+
+  return (
+    <>
+      <input
+        ref={ref}
+        className={block ? undefined : "cert-tool-text"}
+        style={block ? { width: "100%" } : { width: 240 }}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="เช่น {medal}  {competition_name}"
+        title="พิมพ์ข้อความได้ตามใจ แล้วแทรกช่องข้อมูลด้วยปุ่มข้าง ๆ"
+      />
+      <select
+        value=""
+        onChange={(e) => {
+          if (e.target.value) insert(e.target.value);
+          e.target.value = "";
+        }}
+        title="แทรกช่องข้อมูลตรงตำแหน่งเคอร์เซอร์"
+      >
+        <option value="" disabled>
+          + แทรกช่อง…
+        </option>
+        {COMBO_TOKENS.map((k) => (
+          <option key={k} value={`{${k}}`}>
+            {BLOCK_LABEL[k]}
+          </option>
+        ))}
+      </select>
+    </>
   );
 }
 
@@ -1224,6 +1518,10 @@ const STATUS_TH: Record<string, string> = { draft: "ฉบับร่าง", p
 
 function round(n: number) {
   return Math.round(n * 10) / 10;
+}
+/** ขนาดตัวอักษรที่ยอมรับ — กันพิมพ์ 0 หรือค่าติดลบจนตัวหนังสือหายไปเฉย ๆ */
+function clampFont(n: number) {
+  return round2(Math.min(MAX_FONT, Math.max(MIN_FONT, Number.isFinite(n) ? n : MIN_FONT)));
 }
 function round2(n: number) {
   return Math.round(n * 100) / 100;

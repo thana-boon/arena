@@ -30,6 +30,7 @@ const CHECKS = [
   { id: "0008", what: "IP ใน audit log", how: () => column("audit_log", "ip"), fix: "node drizzle/apply_0008.mjs" },
   { id: "0009", what: "เลขที่ในห้อง (snapshot)", how: () => column("entry_members", "class_number_snapshot"), fix: "node drizzle/apply_0009.mjs" },
   { id: "0010", what: "สีผู้ลงนามบนเกียรติบัตร", how: () => column("certificate_signatures", "color"), fix: "node drizzle/apply_0010.mjs" },
+  { id: "0011", what: "ขนาดตัวอักษรผู้ลงนาม", how: () => column("certificate_signatures", "font_size"), fix: "node drizzle/apply_0011.mjs" },
 ];
 
 try {

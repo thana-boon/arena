@@ -129,7 +129,7 @@ const certBlock = z.object({
   id: z.string(),
   kind: z.enum([
     "student_name", "class", "team_name", "competition_name", "event_name",
-    "medal", "rank", "date", "serial", "qr", "static_text",
+    "medal", "rank", "date", "serial", "qr", "static_text", "combo",
   ]),
   x: z.number(),
   y: z.number(),
@@ -140,6 +140,8 @@ const certBlock = z.object({
   weight: z.number(),
   color: z.string().max(32),
   text: z.string().max(255).optional(),
+  // กรอบพอดีข้อความ — แม่แบบเก่าไม่ส่งมา = กรอบความกว้างคงที่แบบเดิม
+  autoFit: z.boolean().optional(),
 });
 
 const certSignatureInput = z.object({
@@ -150,8 +152,9 @@ const certSignatureInput = z.object({
   x: z.number(),
   y: z.number(),
   width: z.number(),
-  // แม่แบบเก่าที่บันทึกจากหน้าเดิมยังไม่ส่งสีมา → ใช้สีเดิมที่เคยฝังไว้ในโค้ด
+  // แม่แบบเก่าที่บันทึกจากหน้าเดิมยังไม่ส่งสี/ขนาดตัวอักษรมา → ใช้ค่าเดิมที่เคยฝังไว้ในโค้ด
   color: z.string().max(32).optional().default("#1f2937"),
+  fontSize: z.number().min(0.3).max(20).optional().default(1.2),
 });
 
 // บันทึกแม่แบบทั้งก้อน (พื้นหลัง + layout + ผู้ลงนาม) ในครั้งเดียว

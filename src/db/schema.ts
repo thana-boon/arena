@@ -393,6 +393,8 @@ export const certificateSignatures = pgTable(
     width: numeric("width", { precision: 6, scale: 3 }).notNull().default("18"), // % ของความกว้างหน้า
     // สีของชื่อ/ตำแหน่ง/เส้นเซ็นสด — พื้นหลังเข้มต้องใช้สีอ่อน ไม่งั้นตัวหนังสือจมหาย
     color: varchar("color", { length: 32 }).notNull().default("#1f2937"),
+    // ขนาดชื่อผู้ลงนาม (% ของความกว้างหน้า) — ตำแหน่งย่อตามอัตโนมัติ (SIG_ROLE_RATIO)
+    fontSize: numeric("font_size", { precision: 6, scale: 3 }).notNull().default("1.2"),
   },
   (t) => [index("cert_sig_tpl_idx").on(t.templateId)]
 );

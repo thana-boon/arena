@@ -3,7 +3,8 @@ import { db } from "@/db";
 import { events, competitions } from "@/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { getActiveYear } from "@/lib/queries";
-import { getEventTemplates, defaultLayout, sampleRenderData } from "@/lib/certificates";
+import { getEventTemplates, defaultLayout, sampleRenderData, verifyBaseUrl } from "@/lib/certificates";
+import QRCode from "qrcode";
 import { CertEditor } from "./CertEditor";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,14 @@ export default async function CertEventEditorPage({ params }: { params: Promise<
   // ตัวอย่างชุดเดียวกับที่ใบทดลองพิมพ์ใช้ — ที่เห็นบนจอกับที่ออกจากเครื่องพิมพ์จะได้ตรงกัน
   const sample = await sampleRenderData(eventId, ev.name, year.yearBe);
 
+  // QR ของจริง (ชี้ token "sample" ซึ่งหน้า /verify จะตอบว่าไม่พบ) — สร้างที่ฝั่งเซิร์ฟเวอร์เหมือนตอนพิมพ์
+  // เพื่อให้ตัวอย่างในหน้าออกแบบเห็นลายจุดจริง ไม่ใช่กล่องเปล่า และไม่ต้องแบก qrcode ไปไว้ใน bundle ฝั่งเบราว์เซอร์
+  const sampleQrSvg = await QRCode.toString(`${await verifyBaseUrl()}/${sample.verifyToken}`, {
+    type: "svg",
+    margin: 0,
+    errorCorrectionLevel: "M",
+  });
+
   return (
     <CertEditor
       event={{ id: ev.id, name: ev.name, eventDate: ev.eventDate, status: ev.status }}
@@ -48,10 +57,12 @@ export default async function CertEventEditorPage({ params }: { params: Promise<
           y: s.y,
           width: s.width,
           color: s.color,
+          fontSize: s.fontSize,
         })) ?? []
       }
       competitions={compsInEvent.map((c) => ({ id: c.id, name: c.name, type: c.type, isPublished: c.isPublished }))}
       sample={sample}
+      sampleQrSvg={sampleQrSvg}
     />
   );
 }

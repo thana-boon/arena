@@ -3309,6 +3309,17 @@ p {
   outline-color: #7c3aed;
   background: rgba(124, 58, 237, 0.08);
 }
+/* กรอบพอดีข้อความ — เส้นทึบบาง ๆ ให้ต่างจากกรอบกว้างคงที่ (เส้นประ) แค่มองก็รู้ว่าอันไหนเป็นแบบไหน */
+.cert-box.fit {
+  outline-style: solid;
+}
+/* เงาของตัวหนังสือจริงในกรอบกว้างคงที่ — บอกว่าข้อความกินที่แค่ไหน และล้นกรอบไปแล้วหรือยัง */
+.cert-text-extent {
+  position: absolute;
+  outline: 1px dashed rgba(236, 72, 153, 0.75);
+  background: rgba(236, 72, 153, 0.07);
+  pointer-events: none;
+}
 .cert-box-tag {
   position: absolute;
   bottom: 100%;

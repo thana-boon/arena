@@ -146,11 +146,14 @@ export function CertificateCanvas({
   return (
     <div style={rootStyle} className={className}>
       {template.backgroundSrc && (
+        // cover ไม่ใช่ fill: รูปที่สัดส่วนไม่ตรง A4 (ถ่ายมา/ทำจากสไลด์ 16:9) จะถูกขยายจนเต็มหน้าโดยไม่ยืดบิดเบี้ยว
+        // แล้วครอบตัดส่วนเกินออกข้างละเท่า ๆ กัน (objectPosition ค่าเริ่มต้น = กึ่งกลาง)
+        // รูปที่สัดส่วนตรง A4 อยู่แล้วได้ผลเท่าเดิมทุกประการ — แม่แบบเก่าจึงไม่ขยับ
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={template.backgroundSrc}
           alt=""
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "fill" }}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
       )}
 

@@ -99,6 +99,20 @@ function fitRect(b: CertBlock, orientation: Orientation, measured?: Rect): Rect 
   return measured && isFit(b) ? { left: measured.left, top: r.top, w: measured.w, h: r.h } : r;
 }
 
+/**
+ * รูปพื้นหลังถูกวางแบบ cover — เต็มหน้าเสมอ ไม่ยืดบิดเบี้ยว แต่ส่วนที่เกินสัดส่วนกระดาษจะโดนครอบตัด
+ * คืนว่าตัดด้านไหน ข้างละกี่ % ของรูป เพื่อเตือนครูก่อนที่ลายกรอบสวย ๆ จะหายไปเงียบ ๆ
+ */
+function bgCrop(size: { w: number; h: number } | null, orientation: Orientation): { side: "บน-ล่าง" | "ซ้าย-ขวา"; pct: number } | null {
+  if (!size || size.w <= 0 || size.h <= 0) return null;
+  const page = pageRatio(orientation); // สูง/กว้าง
+  const img = size.h / size.w;
+  // รูป "สูง" กว่ากระดาษ → พอขยายให้เต็มความกว้าง ส่วนเกินอยู่บน-ล่าง
+  const [side, lost] = img > page ? (["บน-ล่าง", 1 - page / img] as const) : (["ซ้าย-ขวา", 1 - img / page] as const);
+  const pct = Math.round((lost / 2) * 100);
+  return pct < 1 ? null : { side, pct };
+}
+
 const sameTarget = (a: Target | null, b: Target) =>
   a != null && (a.kind === "block" && b.kind === "block" ? a.id === b.id : a.kind === "sig" && b.kind === "sig" ? a.i === b.i : false);
 
@@ -127,6 +141,8 @@ export function CertEditor(props: {
   const [signatures, setSignatures] = useState<SigEdit[]>(props.initialSignatures);
   const [sel, setSel] = useState<Target | null>(null);
   const [busy, setBusy] = useState(false);
+  /** ขนาดจริงของรูปพื้นหลัง — ใช้บอกว่าจะโดนครอบตัดกี่ % เท่านั้น ไม่ได้มีผลกับการวาด */
+  const [bgSize, setBgSize] = useState<{ w: number; h: number } | null>(null);
   /** รูปลายเซ็นที่กำลังปรับอยู่ในกล่อง SignatureTuner (null = ไม่ได้เปิด) */
   const [sigTune, setSigTune] = useState<{ i: number; src: File | string; initial: SigTune; name: string } | null>(null);
 
@@ -147,6 +163,25 @@ export function CertEditor(props: {
 
   const maxY = pageMaxY(orientation);
   const ratio = pageRatio(orientation);
+
+  // อ่านขนาดจริงของรูปพื้นหลังที่เก็บไว้ (รูปตัวนี้เบราว์เซอร์โหลดไว้แล้วจากกระดาษ จึงมาจากแคช ไม่ยิงซ้ำ)
+  useEffect(() => {
+    const url = assetUrl(backgroundId);
+    if (!url) {
+      setBgSize(null);
+      return;
+    }
+    let alive = true;
+    const img = new Image();
+    img.onload = () => alive && setBgSize({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => alive && setBgSize(null);
+    img.src = url;
+    return () => {
+      alive = false;
+    };
+  }, [backgroundId]);
+
+  const crop = bgCrop(bgSize, orientation);
 
   const canvasTemplate: CanvasTemplate = {
     orientation,
@@ -812,9 +847,15 @@ export function CertEditor(props: {
                 <input type="file" accept="image/*" hidden onChange={onBgFile} disabled={locked} />
               </label>
               <div className="subtitle">
-                ระบบย่อรูปเป็น WebP กว้างสูงสุด 1754px ให้อัตโนมัติก่อนอัปโหลด
+                ระบบย่อรูปเป็น WebP กว้างสูงสุด 1754px ให้อัตโนมัติก่อนอัปโหลด · รูปสัดส่วนไหนก็เต็มหน้าเสมอ ไม่ยืดบิดเบี้ยว
                 {!backgroundId && " · ยังไม่มีพื้นหลัง — บันทึกงานค้างไว้ก่อนได้ แต่ต้องใส่ก่อนเผยแพร่"}
               </div>
+              {crop && (
+                <div className="subtitle" style={{ color: "var(--color-warning)" }}>
+                  รูปนี้ {bgSize?.w}×{bgSize?.h} สัดส่วนไม่ตรง A4{orientation === "portrait" ? "แนวตั้ง" : "แนวนอน"} — ขยายเต็มหน้าแล้วครอบตัด{crop.side}ออกข้างละ ~{crop.pct}%
+                  {" "}ถ้าลายกรอบขอบรูปสำคัญ ให้ครอปรูปเป็นสัดส่วน A4 ({orientation === "portrait" ? "210×297" : "297×210"}) มาก่อนอัปโหลด
+                </div>
+              )}
             </div>
           </details>
 

@@ -96,7 +96,10 @@ try {
     if (missing.length > 20) console.log(`   ... และอีก ${missing.length - 20} คน`);
   }
 } catch (e) {
-  console.error("❌ ล้มเหลว:", e.message);
+  // AggregateError (เช่น ต่อ DB ไม่ติดทั้ง IPv4/IPv6) มี message ว่าง — ต้องกาง .errors ออกมา
+  // ไม่งั้นเห็นแค่ "❌ ล้มเหลว:" เปล่า ๆ แล้วไล่สาเหตุบนเครื่อง prod ไม่ได้
+  const detail = e?.errors?.length ? e.errors.map((x) => x.message).join(" · ") : e?.message || String(e);
+  console.error("❌ ล้มเหลว:", detail);
   process.exit(1);
 } finally {
   await pool.end();

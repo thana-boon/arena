@@ -58,6 +58,7 @@ export default async function CertEventEditorPage({ params }: { params: Promise<
           width: s.width,
           color: s.color,
           fontSize: s.fontSize,
+          imageScale: s.imageScale,
         })) ?? []
       }
       competitions={compsInEvent.map((c) => ({ id: c.id, name: c.name, type: c.type, isPublished: c.isPublished }))}

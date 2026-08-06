@@ -101,6 +101,7 @@ export type CertTemplateView = {
     width: number;
     color: string;
     fontSize: number;
+    imageScale: number;
   }[];
 };
 
@@ -147,6 +148,7 @@ export async function getEventTemplates(eventId: number): Promise<CertTemplateVi
         width: Number(s.width),
         color: s.color,
         fontSize: Number(s.fontSize),
+        imageScale: Number(s.imageScale),
       })),
   }));
 }
@@ -398,6 +400,7 @@ export type PrintCanvasTemplate = {
     width: number;
     color: string;
     fontSize: number;
+    imageScale: number;
     imageSrc: string | null;
   }[];
 };
@@ -448,6 +451,7 @@ export async function loadTemplatesForPrint(
           width: Number(s.width),
           color: s.color,
           fontSize: Number(s.fontSize),
+          imageScale: Number(s.imageScale),
           imageSrc: s.mode === "image" ? dataUri(assetOf(s.assetId)) : null,
         })),
     });

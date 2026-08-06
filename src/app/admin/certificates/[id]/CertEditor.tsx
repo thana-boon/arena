@@ -7,7 +7,8 @@ import { useAlert, useConfirm } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { Icon } from "@/components/Icon";
 import { CertificateCanvas, type CanvasTemplate } from "@/components/certificate/CertificateCanvas";
-import { compressImage, presetFor } from "@/lib/imageCompress";
+import { compressImage, presetFor, SIG_TUNE_NEW, SIG_TUNE_SAVED, type CompressResult, type SigTune } from "@/lib/imageCompress";
+import { SignatureTuner } from "@/components/certificate/SignatureTuner";
 import { fitCertTexts } from "@/lib/certFit";
 import {
   BLOCK_KINDS,
@@ -18,7 +19,11 @@ import {
   LINE_H,
   pageMaxY,
   pageRatio,
+  clampSigScale,
   SIG_FONT_DEFAULT,
+  SIG_IMAGE_SCALE_DEFAULT,
+  SIG_IMAGE_SCALE_MAX,
+  SIG_IMAGE_SCALE_MIN,
   sigRect,
   type BlockKind,
   type CertBlock,
@@ -51,6 +56,7 @@ type SigEdit = {
   width: number;
   color: string;
   fontSize: number; // ขนาดชื่อ (% ของความกว้างหน้า) — ตำแหน่งย่อตามอัตโนมัติ
+  imageScale: number; // ตัวคูณขนาดเฉพาะรูปลายเซ็น (1 = เท่ากรอบเดิม)
 };
 
 /** กรอบของข้อความจริงบนกระดาษ ที่วัดจาก DOM (คีย์ = id ของบล็อก) */
@@ -121,6 +127,8 @@ export function CertEditor(props: {
   const [signatures, setSignatures] = useState<SigEdit[]>(props.initialSignatures);
   const [sel, setSel] = useState<Target | null>(null);
   const [busy, setBusy] = useState(false);
+  /** รูปลายเซ็นที่กำลังปรับอยู่ในกล่อง SignatureTuner (null = ไม่ได้เปิด) */
+  const [sigTune, setSigTune] = useState<{ i: number; src: File | string; initial: SigTune; name: string } | null>(null);
 
   /**
    * ความกว้างจริงของตัวอักษรแต่ละบล็อก วัดจากกระดาษที่กำลังแสดงอยู่
@@ -154,6 +162,7 @@ export function CertEditor(props: {
       width: s.width,
       color: s.color,
       fontSize: s.fontSize,
+      imageScale: s.imageScale,
       imageSrc: s.mode === "image" ? assetUrl(s.assetId) : null,
     })),
   };
@@ -244,6 +253,8 @@ export function CertEditor(props: {
       y: ((ev.clientY - startY) / w0) * 100,
     });
     const dragged = t.kind === "block" ? layout.find((b) => b.id === t.id) : null;
+    const sig0 = t.kind === "sig" ? signatures[t.i] ?? null : null;
+    const scale0 = sig0?.imageScale ?? SIG_IMAGE_SCALE_DEFAULT;
     const font0 = dragged?.fontSize ?? 0;
     const isQr = dragged?.kind === "qr"; // QR เป็นสี่เหลี่ยมจัตุรัส ไม่มีตัวอักษรให้ขยาย
 
@@ -306,7 +317,17 @@ export function CertEditor(props: {
         return;
       }
 
-      // QR/ลายเซ็น เป็นสี่เหลี่ยมที่ความกว้างคือขนาดจริง มุมขวาล่างจึงลากตามแนวนอน
+      // ลายเซ็นที่เป็นรูป: มุมขวาล่างขยาย "เฉพาะรูป" ตามแนวตั้ง (ลากลง = ใหญ่ขึ้น) เหมือนบล็อกข้อความ
+      // ความกว้างกล่องไม่ขยับ ชื่อ/ตำแหน่งจึงอยู่ที่เดิม แค่ถูกดันลงตามความสูงของรูป
+      // (จุดซ้าย/ขวายังใช้ปรับความกว้างกล่องได้ตามเดิม)
+      if (t.kind === "sig" && sig0?.mode === "image") {
+        const base = Math.max(0.5, rect0.w * ratio * 0.5); // ความสูงรูปตอน scale = 1
+        const sc = clampSigScale(scale0 + dy / base);
+        setSignatures((S) => S.map((s, i) => (i === t.i ? { ...s, imageScale: round2(sc) } : s)));
+        return;
+      }
+
+      // QR/ลายเซ็นแบบเซ็นสด เป็นสี่เหลี่ยมที่ความกว้างคือขนาดจริง มุมขวาล่างจึงลากตามแนวนอน
       const w = Math.max(MIN_W, Math.min(100 - rect0.left, rect0.w + dx));
       applyRect(t, { left: rect0.left, top: rect0.top, w });
     };
@@ -457,22 +478,26 @@ export function CertEditor(props: {
 
   // ===== อัปโหลดรูป =====
 
+  async function uploadResult(c: CompressResult, kind: "background" | "signature", name: string): Promise<number | null> {
+    const res = await api.post<{ id: number }>("/api/admin/certificate-assets", {
+      kind,
+      name,
+      mime: c.mime,
+      data: c.data,
+      width: c.width,
+      height: c.height,
+    });
+    if (!res.ok) {
+      await alert(res.error, { title: "อัปโหลดไม่สำเร็จ", danger: true });
+      return null;
+    }
+    return res.data.id;
+  }
+
   async function uploadAsset(file: File, kind: "background" | "signature"): Promise<number | null> {
     try {
       const c = await compressImage(file, presetFor(kind));
-      const res = await api.post<{ id: number }>("/api/admin/certificate-assets", {
-        kind,
-        name: file.name,
-        mime: c.mime,
-        data: c.data,
-        width: c.width,
-        height: c.height,
-      });
-      if (!res.ok) {
-        await alert(res.error, { title: "อัปโหลดไม่สำเร็จ", danger: true });
-        return null;
-      }
-      return res.data.id;
+      return await uploadResult(c, kind, file.name);
     } catch (e) {
       await alert(e instanceof Error ? e.message : "อัปโหลดไม่สำเร็จ", { title: "อัปโหลดไม่สำเร็จ", danger: true });
       return null;
@@ -489,14 +514,32 @@ export function CertEditor(props: {
     if (id) setBackgroundId(id);
   }
 
-  async function onSigFile(idx: number, e: React.ChangeEvent<HTMLInputElement>) {
+  /**
+   * ลายเซ็นไม่อัปโหลดทันทีที่เลือกไฟล์ — เปิดกล่องปรับก่อน (ลบพื้นกระดาษ/เปลี่ยนสีหมึก)
+   * เพราะรูปที่ครูส่งมาส่วนใหญ่เป็นภาพถ่ายลายเซ็นบนกระดาษ เอาลงเกียรติบัตรตรง ๆ จะได้กล่องขาวทับพื้นหลัง
+   */
+  function onSigFile(idx: number, e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
+    setSigTune({ i: idx, src: f, initial: SIG_TUNE_NEW, name: f.name });
+  }
+
+  /** ปรับรูปที่อัปโหลดไว้แล้ว โดยไม่ต้องหาไฟล์ต้นฉบับมาใหม่ (เช่น เซ็นมาสีดำ แต่อยากได้น้ำเงิน) */
+  function editSigImage(idx: number) {
+    const url = assetUrl(signatures[idx]?.assetId ?? null);
+    if (!url) return;
+    setSigTune({ i: idx, src: url, initial: SIG_TUNE_SAVED, name: `signature-${idx + 1}.webp` });
+  }
+
+  async function applySigResult(c: CompressResult) {
+    const t = sigTune;
+    if (!t) return;
+    setSigTune(null);
     setBusy(true);
-    const id = await uploadAsset(f, "signature");
+    const id = await uploadResult(c, "signature", t.name);
     setBusy(false);
-    if (id) setSignatures((S) => S.map((s, i) => (i === idx ? { ...s, assetId: id, mode: "image" } : s)));
+    if (id) setSignatures((S) => S.map((s, i) => (i === t.i ? { ...s, assetId: id, mode: "image" } : s)));
   }
 
   // ===== ผู้ลงนาม =====
@@ -520,6 +563,7 @@ export function CertEditor(props: {
         // สืบสี/ขนาดจากคนก่อนหน้า — ตั้งไว้ให้เข้ากับพื้นหลังแล้ว จะได้ไม่ต้องมาตั้งใหม่ทุกคน
         color: S[S.length - 1]?.color ?? "#1f2937",
         fontSize: S[S.length - 1]?.fontSize ?? SIG_FONT_DEFAULT,
+        imageScale: SIG_IMAGE_SCALE_DEFAULT,
       },
     ]);
     setSel({ kind: "sig", i: n });
@@ -989,6 +1033,17 @@ export function CertEditor(props: {
                         <input type="file" accept="image/*" hidden onChange={(e) => onSigFile(i, e)} />
                       </label>
                     )}
+                    {s.mode === "image" && s.assetId != null && (
+                      <button
+                        className="btn btn-sm"
+                        style={{ alignSelf: "flex-end" }}
+                        onClick={() => editSigImage(i)}
+                        disabled={locked}
+                        title="ลบพื้นหลัง / เปลี่ยนสีหมึกของรูปลายเซ็น"
+                      >
+                        ลบพื้น/เปลี่ยนสี
+                      </button>
+                    )}
                     <label className="field">
                       <span>สี</span>
                       <input type="color" value={s.color} onChange={(e) => updateSig(i, { color: e.target.value })} />
@@ -1005,7 +1060,8 @@ export function CertEditor(props: {
                     </label>
                   </div>
                   <div className="subtitle">
-                    สีนี้ใช้กับชื่อ ตำแหน่ง และเส้นสำหรับเซ็นสด (รูปลายเซ็นใช้สีตามไฟล์) · บรรทัด “ตำแหน่ง” ย่อตามขนาดชื่อให้เอง
+                    สีนี้ใช้กับชื่อ ตำแหน่ง และเส้นสำหรับเซ็นสด · บรรทัด “ตำแหน่ง” ย่อตามขนาดชื่อให้เอง ·
+                    สีของ<strong>รูปลายเซ็น</strong>ปรับที่ปุ่ม “ลบพื้น/เปลี่ยนสี”
                   </div>
                   <div className="form-row">
                     <label className="field">
@@ -1020,7 +1076,25 @@ export function CertEditor(props: {
                       <span>กว้าง %</span>
                       <input type="number" step="0.5" value={s.width} onChange={(e) => updateSig(i, { width: Number(e.target.value) })} />
                     </label>
+                    {s.mode === "image" && (
+                      <label className="field">
+                        <span>ขนาดลายเซ็น %</span>
+                        <input
+                          type="number"
+                          step="5"
+                          min={SIG_IMAGE_SCALE_MIN * 100}
+                          max={SIG_IMAGE_SCALE_MAX * 100}
+                          value={Math.round(s.imageScale * 100)}
+                          onChange={(e) => updateSig(i, { imageScale: clampSigScale(Number(e.target.value) / 100) })}
+                        />
+                      </label>
+                    )}
                   </div>
+                  {s.mode === "image" && (
+                    <div className="subtitle">
+                      “ขนาดลายเซ็น” ขยายเฉพาะรูป ไม่ดันชื่อ/ตำแหน่งให้เพี้ยน (100% = เท่ากรอบเดิม) · ในโหมดเต็มจอลากจุดมุมขวาล่างของลายเซ็นขึ้น/ลงก็ได้
+                    </div>
+                  )}
                 </div>
               ))}
               {signatures.length < 6 && (
@@ -1251,6 +1325,33 @@ export function CertEditor(props: {
                     >
                       ก+
                     </button>
+                    {selectedSig.mode === "image" && (
+                      <>
+                        <span className="cert-tool-label">ขนาดลายเซ็น</span>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => updateSig(sel.i, { imageScale: clampSigScale(selectedSig.imageScale - 0.1) })}
+                          title="ย่อเฉพาะรูปลายเซ็น"
+                        >
+                          −
+                        </button>
+                        <input
+                          className="cert-tool-num"
+                          type="number"
+                          step="5"
+                          value={Math.round(selectedSig.imageScale * 100)}
+                          onChange={(e) => updateSig(sel.i, { imageScale: clampSigScale(Number(e.target.value) / 100) })}
+                          title="ขนาดรูปลายเซ็น % (100 = เท่ากรอบเดิม)"
+                        />
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => updateSig(sel.i, { imageScale: clampSigScale(selectedSig.imageScale + 0.1) })}
+                          title="ขยายเฉพาะรูปลายเซ็น"
+                        >
+                          +
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
 
@@ -1281,6 +1382,15 @@ export function CertEditor(props: {
           </div>
         </div>,
         document.body
+      )}
+
+      {sigTune && (
+        <SignatureTuner
+          src={sigTune.src}
+          initial={sigTune.initial}
+          onCancel={() => setSigTune(null)}
+          onUse={applySigResult}
+        />
       )}
     </div>
   );

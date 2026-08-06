@@ -170,13 +170,41 @@ export const SIG_FONT_DEFAULT = 1.2;
 /** ตำแหน่ง (บรรทัดล่าง) เล็กกว่าชื่อเท่านี้ — เดิมคือ 1.0 ต่อ 1.2 */
 export const SIG_ROLE_RATIO = 1 / 1.2;
 
+/** ตัวคูณขนาดรูปลายเซ็นเริ่มต้น (1 = สูงเท่ากรอบเดิมที่ผูกกับความกว้างกล่อง) */
+export const SIG_IMAGE_SCALE_DEFAULT = 1;
+export const SIG_IMAGE_SCALE_MIN = 0.2;
+export const SIG_IMAGE_SCALE_MAX = 4;
+export const clampSigScale = (v: number) =>
+  Number.isFinite(v) ? Math.min(SIG_IMAGE_SCALE_MAX, Math.max(SIG_IMAGE_SCALE_MIN, v)) : SIG_IMAGE_SCALE_DEFAULT;
+
+/**
+ * ความสูงของแถบลายเซ็น (รูป หรือเส้นสำหรับเซ็นสด)
+ * เฉพาะโหมดรูปเท่านั้นที่คูณด้วย imageScale — เส้นเซ็นสดยังยึดความกว้างกล่องเหมือนเดิม
+ */
+export function sigImageH(
+  s: { width: number; mode?: "image" | "blank"; imageScale?: number },
+  orientation: Orientation
+): number {
+  const sc = s.mode === "image" ? clampSigScale(s.imageScale ?? SIG_IMAGE_SCALE_DEFAULT) : 1;
+  return s.width * pageRatio(orientation) * 0.5 * sc;
+}
+
 /** กรอบจริงของผู้ลงนาม (เส้น/รูป + ชื่อ + ตำแหน่ง) — ผู้ลงนามวางกึ่งกลางที่ x เสมอ */
 export function sigRect(
-  s: { x: number; y: number; width: number; name?: string; roleLabel?: string; fontSize?: number },
+  s: {
+    x: number;
+    y: number;
+    width: number;
+    name?: string;
+    roleLabel?: string;
+    fontSize?: number;
+    mode?: "image" | "blank";
+    imageScale?: number;
+  },
   orientation: Orientation
 ): Rect {
   const f = s.fontSize ?? SIG_FONT_DEFAULT;
-  const line = s.width * pageRatio(orientation) * 0.5;
+  const line = sigImageH(s, orientation);
   const nameH = s.name ? f * LINE_H + 0.5 : 0;
   const roleH = s.roleLabel ? f * SIG_ROLE_RATIO * LINE_H : 0;
   return { left: s.x - s.width / 2, top: s.y, w: s.width, h: line + nameH + roleH };

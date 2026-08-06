@@ -3466,6 +3466,97 @@ p {
   }
 }
 
+/* ---------- กล่องปรับรูปลายเซ็น ---------- */
+.sig-tune {
+  max-width: 480px;
+  max-height: calc(100vh - 2 * var(--space-4));
+  overflow-y: auto;
+}
+/* ตารางหมากรุก = ที่โปร่งใส ต้องเห็นชัดว่าลบพื้นออกหมดหรือยัง */
+.sig-tune-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 170px;
+  margin-bottom: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--skdw-border);
+  border-radius: var(--radius-md);
+}
+.sig-tune-preview.bd-grid {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #e2e8f0 25%, transparent 25%, transparent 75%, #e2e8f0 75%),
+    linear-gradient(45deg, #e2e8f0 25%, transparent 25%, transparent 75%, #e2e8f0 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
+.sig-tune-preview.bd-light { background: #f6f1e7; }
+.sig-tune-preview.bd-dark { background: #2f3550; }
+.sig-tune-preview img {
+  max-width: 100%;
+  max-height: 150px;
+  object-fit: contain;
+}
+.sig-tune-busy {
+  position: absolute;
+  inset: auto 6px 6px auto;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(26, 26, 46, 0.7);
+  color: #fff;
+  font-size: var(--text-xs);
+}
+.sig-tune-bd {
+  display: flex;
+  width: 100%;
+}
+.sig-tune-bd .seg-btn {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: var(--text-sm);
+}
+/* สไลเดอร์ในกล่องนี้ไม่ต้องมีกรอบเหมือน input ปกติ (.field > input จับไปด้วย) */
+.sig-tune input[type="range"] {
+  min-height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  accent-color: var(--skdw-purple);
+}
+.sig-tune input[type="range"]:disabled {
+  opacity: 0.45;
+}
+.sig-tune-inks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.sig-ink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--skdw-border);
+  border-radius: var(--radius-full);
+  background: var(--skdw-white);
+  color: var(--skdw-dark);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.sig-ink.on {
+  border-color: var(--skdw-purple);
+  box-shadow: inset 0 0 0 1px var(--skdw-purple);
+}
+.sig-ink-dot {
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 50%;
+}
+
 /* QR ต้องมีพื้นขาวรอบตัวเสมอ ไม่งั้นบนเกียรติบัตรพื้นเข้มจะจมจนสแกนไม่ติด
    (กล่อง/ระยะขอบมาจาก CertificateCanvas ที่นี่แค่บังคับให้ svg เต็มกล่อง) */
 .cert-qr-box > svg {

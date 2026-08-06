@@ -395,6 +395,9 @@ export const certificateSignatures = pgTable(
     color: varchar("color", { length: 32 }).notNull().default("#1f2937"),
     // ขนาดชื่อผู้ลงนาม (% ของความกว้างหน้า) — ตำแหน่งย่อตามอัตโนมัติ (SIG_ROLE_RATIO)
     fontSize: numeric("font_size", { precision: 6, scale: 3 }).notNull().default("1.2"),
+    // ตัวคูณขนาด "เฉพาะรูปลายเซ็น" (1 = เท่ากรอบเดิม) — แยกจาก width ที่คุมทั้งกล่อง
+    // ลายเซ็นแต่ละคนกินเนื้อที่ในรูปไม่เท่ากัน บางคนเซ็นตัวเล็กจ้อยกลางกระดาษ ต้องขยายเฉพาะรูปโดยไม่ดันชื่อ/ตำแหน่ง
+    imageScale: numeric("image_scale", { precision: 6, scale: 3 }).notNull().default("1"),
   },
   (t) => [index("cert_sig_tpl_idx").on(t.templateId)]
 );

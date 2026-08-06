@@ -157,6 +157,8 @@ const certSignatureInput = z.object({
   // แม่แบบเก่าที่บันทึกจากหน้าเดิมยังไม่ส่งสี/ขนาดตัวอักษรมา → ใช้ค่าเดิมที่เคยฝังไว้ในโค้ด
   color: z.string().max(32).optional().default("#1f2937"),
   fontSize: z.number().min(0.3).max(20).optional().default(1.2),
+  // ตัวคูณขนาดเฉพาะรูปลายเซ็น — แม่แบบเก่าไม่ส่งมา = 1 (ขนาดเดิมที่ผูกกับความกว้างกล่อง)
+  imageScale: z.number().min(0.2).max(4).optional().default(1),
 });
 
 // บันทึกแม่แบบทั้งก้อน (พื้นหลัง + layout + ผู้ลงนาม) ในครั้งเดียว

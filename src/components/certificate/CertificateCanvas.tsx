@@ -2,9 +2,12 @@ import type { CSSProperties } from "react";
 import {
   autoFitMaxW,
   blockShrinks,
+  clampSigScale,
   COMBO_TOKENS,
   LINE_H,
   SIG_FONT_DEFAULT,
+  SIG_IMAGE_SCALE_DEFAULT,
+  sigImageH,
   SIG_ROLE_RATIO,
   type BlockKind,
   type CertBlock,
@@ -38,6 +41,7 @@ export type SignatureView = {
   width: number;
   color: string; // ใช้กับชื่อ ตำแหน่ง และเส้นสำหรับเซ็นสด
   fontSize?: number; // % ของความกว้างหน้า (ชื่อ) — ไม่ส่งมา = ค่าเดิม 1.2
+  imageScale?: number; // ตัวคูณขนาดเฉพาะรูปลายเซ็น — ไม่ส่งมา = 1 (เท่ากรอบเดิม)
   imageSrc: string | null; // data URI หรือ url
 };
 
@@ -236,6 +240,8 @@ export function CertificateCanvas({
         const w = wpc(sig.width);
         const left = `calc(${wpc(sig.x)} - ${w} / 2)`;
         const sf = sig.fontSize ?? SIG_FONT_DEFAULT;
+        const sigScale = sig.mode === "image" ? clampSigScale(sig.imageScale ?? SIG_IMAGE_SCALE_DEFAULT) : 1;
+        const sigH = sigImageH(sig, template.orientation);
         return (
           <div
             key={sig.id}
@@ -249,10 +255,14 @@ export function CertificateCanvas({
             }}
           >
             {sig.mode === "image" && sig.imageSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={sig.imageSrc} alt="" style={{ height: wpc(sig.width * ratio * 0.5), maxWidth: "100%", objectFit: "contain", margin: "0 auto", display: "block" }} />
+              // กล่องสูงตาม imageScale แล้วให้รูป contain อยู่ข้างใน — ขยายเกิน 100% ได้ (ล้นออกสองข้างเท่า ๆ กัน)
+              // ชื่อ/ตำแหน่งจึงถูกดันลงตามขนาดรูปพอดี ตรงกับกรอบที่ sigRect คำนวณให้หน้าออกแบบ
+              <div style={{ height: wpc(sigH), display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={sig.imageSrc} alt="" style={{ maxHeight: "100%", maxWidth: `${sigScale * 100}%`, objectFit: "contain" }} />
+              </div>
             ) : (
-              <div style={{ height: wpc(sig.width * ratio * 0.5), borderBottom: `1px solid ${sig.color}`, margin: `0 ${wpc(sig.width * 0.1)}` }} />
+              <div style={{ height: wpc(sigH), borderBottom: `1px solid ${sig.color}`, margin: `0 ${wpc(sig.width * 0.1)}` }} />
             )}
             {sig.name && (
               <div style={{ fontSize: wpc(sf), lineHeight: LINE_H, marginTop: wpc(0.5), color: sig.color }}>{sig.name}</div>

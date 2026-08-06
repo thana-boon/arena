@@ -72,6 +72,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           width: String(sig.width),
           color: sig.color,
           fontSize: String(sig.fontSize),
+          imageScale: String(sig.imageScale),
         }))
       );
     }

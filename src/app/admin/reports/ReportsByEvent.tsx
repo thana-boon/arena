@@ -28,12 +28,15 @@ export function ReportsByEvent({
   events,
   bundles,
   defaultEventId = null,
+  scopeHint = null,
 }: {
   yearBe: number;
   events: { id: number; name: string }[];
   bundles: ReportBundle[];
   /** "งานเริ่มต้น" จากหน้าตั้งค่า — ใช้เป็นงานที่เลือกไว้ให้ตอนเปิดหน้านี้ */
   defaultEventId?: number | null;
+  /** ข้อความบอกขอบเขตที่มองเห็น (ฝั่งครูเห็นไม่ครบทุกรายการ ต้องบอกไว้ไม่งั้นนึกว่าข้อมูลหาย) */
+  scopeHint?: string | null;
 }) {
   const [eventId, setEventId] = useState<number | null>(
     (defaultEventId != null && events.some((e) => e.id === defaultEventId) ? defaultEventId : events[0]?.id) ?? null
@@ -114,7 +117,10 @@ export function ReportsByEvent({
       <div className="no-print row between">
         <div className="page-header" style={{ marginBottom: 0 }}>
           <h1>ออกรายงาน</h1>
-          <div className="subtitle">เลือกงาน แล้วพิมพ์เอกสารรวมทุกรายการในงานนั้น · ปีการศึกษา {yearBe}</div>
+          <div className="subtitle">
+            เลือกงาน แล้วพิมพ์เอกสารรวมทุกรายการในงานนั้น · ปีการศึกษา {yearBe}
+            {scopeHint && ` · ${scopeHint}`}
+          </div>
         </div>
         <button
           className="btn btn-primary"

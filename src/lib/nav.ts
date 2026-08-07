@@ -57,6 +57,8 @@ export const TEACHER_NAV_GROUPS: NavGroup[] = [
       { href: "/teacher/scoring", label: "บันทึกผล", icon: "pencil", primary: true },
       // ภาพรวม "ประกาศแล้ว/ยังไม่ประกาศ" ของทั้งหมวด — งานหลังบันทึกคะแนนเสร็จ จึงอยู่ถัดจาก "บันทึกผล"
       { href: "/teacher/results", label: "ประกาศผล", icon: "chart" },
+      // เอกสารของทั้งหมวด (ใบรายชื่อ/ใบกรอกคะแนน/ใบประกาศผล) — หน้าเดียวกับ /admin/reports แต่กรองตามสิทธิ์
+      { href: "/teacher/reports", label: "ออกรายงาน", icon: "printer", short: "รายงาน" },
       { href: "/teacher/certificates", label: "เกียรติบัตร", icon: "file" },
       { href: "/teacher/cert-registry", label: "ทะเบียนเกียรติบัตร", icon: "search", short: "ทะเบียน" },
     ],

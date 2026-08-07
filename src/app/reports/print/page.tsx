@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth/guards";
+import { requireStaff } from "@/lib/auth/guards";
 import { getReportBundles } from "@/lib/reportBundle";
 import { db } from "@/db";
 import { events } from "@/db/schema";
@@ -14,7 +14,7 @@ export default async function ReportPrintPage({
 }: {
   searchParams: Promise<{ event?: string; doc?: string; groups?: string; levels?: string; split?: string }>;
 }) {
-  await requireAdmin();
+  const session = await requireStaff();
   const sp = await searchParams;
   const eventId = Number(sp.event) || 0;
   const docType: DocType = (Object.keys(DOC_LABEL) as DocType[]).includes(sp.doc as DocType)
@@ -34,7 +34,8 @@ export default async function ReportPrintPage({
   const levels = new Set((sp.levels ?? "").split(",").map((v) => v.trim()).filter(Boolean));
 
   const [event] = eventId ? await db.select().from(events).where(eq(events.id, eventId)) : [];
-  const { yearBe, bundles } = await getReportBundles();
+  // ขอบเขตคุมที่นี่ด้วย ไม่ใช่แค่หน้าเลือก — ครูแก้ ?groups= เองไม่ได้ผล
+  const { yearBe, bundles } = await getReportBundles(session);
   const selected = bundles.filter(
     (b) =>
       b.eventId === eventId &&

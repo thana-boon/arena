@@ -12,6 +12,8 @@ import {
 } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
+import { canViewCompetition } from "@/lib/permit";
+import type { SessionPayload } from "@/lib/auth/session";
 import { computeCompetitionResults } from "@/lib/results";
 import { getRoster } from "@/lib/roster";
 import { resolveClassNumbers, withClassNumbers, type ClassNumberMap } from "@/lib/classNumbers";
@@ -124,9 +126,15 @@ export type ReportBundle = {
 
 /**
  * รวบรวมข้อมูลเอกสาร (ใบรายชื่อ/ใบกรอกคะแนน/ใบประกาศผล) ของทุกรายการในปีที่เปิดใช้งาน
- * ให้ admin เลือกติ๊ก/รวมออกเป็นชุดเดียวได้ — คำนวณฝั่งเซิร์ฟเวอร์ (อันดับ/เหรียญ)
+ * ให้เลือกติ๊ก/รวมออกเป็นชุดเดียวได้ — คำนวณฝั่งเซิร์ฟเวอร์ (อันดับ/เหรียญ)
+ *
+ * @param session ส่งมาเพื่อจำกัดขอบเขตตามสิทธิ์ (canViewCompetition ตัวเดียวกับหน้าอื่น:
+ *   ครูเห็นเฉพาะหมวดตัวเอง + รายการที่ตัวเองสร้าง, admin/recorder เห็นทุกรายการ)
+ *   ไม่ส่ง = ไม่กรอง (หน้า admin ที่เห็นทุกรายการอยู่แล้ว)
  */
-export async function getReportBundles(): Promise<{ yearBe: number; bundles: ReportBundle[] }> {
+export async function getReportBundles(
+  session?: SessionPayload
+): Promise<{ yearBe: number; bundles: ReportBundle[] }> {
   const { year, setting } = await getActiveYearWithSettings();
   if (!year) return { yearBe: 0, bundles: [] };
 
@@ -136,9 +144,16 @@ export async function getReportBundles(): Promise<{ yearBe: number; bundles: Rep
     bronze: setting?.medalBronzePct ?? 60,
   };
 
-  const comps = await db.select().from(competitions).where(eq(competitions.yearId, year.id));
+  const allComps = await db.select().from(competitions).where(eq(competitions.yearId, year.id));
   const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
   const groupOf = (id: number | null) => (id == null ? undefined : groups.find((g) => g.id === id));
+
+  // กรองก่อนคำนวณ ไม่ใช่ตอนแสดงผล — ครูจะได้ไม่ต้องรอ roster/คะแนนของหมวดที่ตัวเองไม่ได้เห็น
+  const comps = session
+    ? allComps.filter((c) =>
+        canViewCompetition(session, c.createdBy, groupOf(c.subjectGroupId)?.catalogNo ?? null)
+      )
+    : allComps;
 
   // ข้อมูลเสริมสำหรับรายงานสรุป: สถานที่ + จำนวนรับ (ดึงเป็นชุดเดียว)
   const compIds = comps.map((c) => c.id);

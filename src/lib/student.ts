@@ -11,6 +11,8 @@ export type StudentEntry = {
   type: "individual" | "team";
   teamName: string | null;
   groupName: string;
+  /** งานที่รายการสังกัด — เจ้าของช่วงรับสมัคร (ใช้ตัดสินว่ายังยกเลิกเองได้ไหม) */
+  eventId: number | null;
   eventDate: string | null;
   startTime: string | null;
   endTime: string | null;
@@ -54,6 +56,7 @@ export async function getStudentEntries(studentCode: string, yearId: number): Pr
         type: c.type as "individual" | "team",
         teamName: e.teamName,
         groupName: groupName(c.subjectGroupId),
+        eventId: c.eventId,
         eventDate: c.eventDate,
         startTime: c.startTime,
         endTime: c.endTime,

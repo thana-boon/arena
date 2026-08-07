@@ -35,13 +35,16 @@ export type BrowseComp = {
   myEntryId: number | null;
 };
 
+/** สถานะรับสมัครของแต่ละงาน — ปุ่มลงทะเบียน/ยกเลิกคุมตามงานที่รายการนั้นสังกัด ไม่ใช่สถานะรวมของทั้งปี */
+export type EventState = { id: number; name: string; open: boolean; reason: string | null };
+
 export function BrowseRegister({
   comps,
-  registrationOpen,
+  eventStates,
   self,
 }: {
   comps: BrowseComp[];
-  registrationOpen: boolean;
+  eventStates: EventState[];
   self: PickedStudent;
 }) {
   const router = useRouter();
@@ -55,6 +58,10 @@ export function BrowseRegister({
   const [eventId, setEventId] = useState<number | null>(null);
   // กรองเฉพาะกลุ่มสาระที่เลือก (null = ทุกกลุ่มสาระ)
   const [filterGroupId, setFilterGroupId] = useState<number | null>(null);
+
+  // สถานะรับสมัครรายงาน — งานที่ไม่รู้จัก (ไม่ควรเกิด) ถือว่าปิดไว้ก่อน
+  const stateById = useMemo(() => new Map(eventStates.map((s) => [s.id, s])), [eventStates]);
+  const stateOf = (id: number | null): EventState | null => (id == null ? null : stateById.get(id) ?? null);
 
   // สรุปงาน: จำนวนรายการ + จำนวนที่ลงทะเบียนแล้ว ในแต่ละงาน (นักเรียนเลือกงานก่อน แล้วดูรายการในงาน)
   const eventList = useMemo(() => {
@@ -157,22 +164,29 @@ export function BrowseRegister({
       <div className="stack">
         <div className="text-sm muted">เลือกงานที่ต้องการก่อน แล้วจึงเลือกรายการแข่งขันตามกลุ่มสาระ</div>
         <div className="grid-3 stagger">
-          {eventList.map((e) => (
-            <button
-              key={e.id}
-              type="button"
-              className="card"
-              style={{ textAlign: "left", cursor: "pointer", border: "0.5px solid var(--skdw-border)" }}
-              onClick={() => { setEventId(e.id); setFilterGroupId(null); setMsg(null); }}
-            >
-              <div className="row between mb-2">
-                <span className="badge badge-purple"><Icon name="calendar" size={13} /> งาน</span>
-                {e.registered > 0 && <span className="badge badge-success">ลงแล้ว {e.registered}</span>}
-              </div>
-              <h3 style={{ margin: "4px 0" }}>{e.name}</h3>
-              <div className="text-sm muted">{e.count} รายการ</div>
-            </button>
-          ))}
+          {eventList.map((e) => {
+            const st = stateOf(e.id);
+            return (
+              <button
+                key={e.id}
+                type="button"
+                className="card"
+                style={{ textAlign: "left", cursor: "pointer", border: "0.5px solid var(--skdw-border)" }}
+                onClick={() => { setEventId(e.id); setFilterGroupId(null); setMsg(null); }}
+              >
+                <div className="row between mb-2">
+                  <span className="badge badge-purple"><Icon name="calendar" size={13} /> งาน</span>
+                  {e.registered > 0 && <span className="badge badge-success">ลงแล้ว {e.registered}</span>}
+                </div>
+                <h3 style={{ margin: "4px 0" }}>{e.name}</h3>
+                <div className="text-sm muted">{e.count} รายการ</div>
+                {/* บอกตั้งแต่การ์ดเลือกงาน — เดิมต้องกดเข้าไปแล้วปุ่มเทาเฉย ๆ โดยไม่มีเหตุผล */}
+                {st && !st.open && (
+                  <div className="mt-2"><span className="badge badge-warning">{st.reason}</span></div>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
     );
@@ -180,11 +194,13 @@ export function BrowseRegister({
 
   // ขั้นที่ 2: เลือกงานแล้ว → แสดงรายการของงานนั้น แยกเป็นหัวข้อตามกลุ่มสาระ
   const currentEventName = eventList.find((e) => e.id === eventId)?.name ?? "";
+  const currentState = stateOf(eventId);
+  const currentOpen = currentState?.open ?? false;
   const shownSections = filterGroupId == null ? sections : sections.filter((s) => s.id === filterGroupId);
 
   const renderCard = (c: BrowseComp) => {
     const full = seatsFull(c.registered, c.capacity);
-    const canRegister = registrationOpen && !c.alreadyRegistered && !full;
+    const canRegister = currentOpen && !c.alreadyRegistered && !full;
     return (
       <div key={c.id} className="card">
         <div className="row between">
@@ -211,7 +227,7 @@ export function BrowseRegister({
             {c.alreadyRegistered ? (
               <div className="stack" style={{ gap: 6, alignItems: "flex-end" }}>
                 <span className="badge badge-success">ลงทะเบียนแล้ว</span>
-                {registrationOpen && c.myEntryId != null && (
+                {currentOpen && c.myEntryId != null && (
                   <button
                     className="btn btn-ghost btn-sm"
                     disabled={busy === c.id}
@@ -293,6 +309,17 @@ export function BrowseRegister({
         </button>
         <span className="badge badge-purple"><Icon name="calendar" size={13} /> {currentEventName}</span>
       </div>
+
+      {/* งานที่เลือกปิดรับแล้ว — บอกเหตุผลตรงนี้ ไม่ปล่อยให้เจอแค่ปุ่มเทา */}
+      {!currentOpen && (
+        <div className="alert alert-warning row" style={{ gap: 10, alignItems: "flex-start", margin: 0 }}>
+          <Icon name="warning" size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+          <div>
+            <strong>{currentState?.reason ?? "ปิดรับสมัคร"}</strong>
+            <div className="text-sm">{currentEventName} — ดูรายการได้ แต่ลงทะเบียนหรือยกเลิกเองไม่ได้แล้ว หากมีเหตุจำเป็นให้ติดต่อผู้ดูแลระบบ</div>
+          </div>
+        </div>
+      )}
 
       {/* ปุ่มลัดไปกลุ่มสาระ — รายการเยอะ ๆ จะได้ไม่ต้องเลื่อนหา */}
       {sections.length > 1 && (

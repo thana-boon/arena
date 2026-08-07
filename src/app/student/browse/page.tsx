@@ -4,8 +4,9 @@ import { competitions, competitionCapacity, subjectGroups, entryMembers, entries
 import { eq, and, inArray } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { getVenueLabelsByCompetition } from "@/lib/venues";
-import { parseJsonArray } from "@/lib/domain";
-import { BrowseRegister, type BrowseComp } from "./BrowseRegister";
+import { parseJsonArray, registrationNotice, registrationWindow } from "@/lib/domain";
+import { RegWindowNotice } from "@/components/RegWindowNotice";
+import { BrowseRegister, type BrowseComp, type EventState } from "./BrowseRegister";
 
 export const dynamic = "force-dynamic";
 
@@ -23,14 +24,13 @@ export default async function BrowsePage() {
     .where(and(eq(events.yearId, year.id), eq(events.visibleToStudents, true)));
   const eventById = new Map(eventRows.map((e) => [e.id, e]));
   const now = new Date();
-  const eventOpen = (id: number | null) => {
-    const e = id == null ? null : eventById.get(id);
-    if (!e || !e.registrationOpen) return false;
-    if (e.regStart && now < new Date(e.regStart)) return false;
-    if (e.regEnd && now > new Date(e.regEnd)) return false;
-    return true;
-  };
-  const registrationOpen = eventRows.some((e) => eventOpen(e.id));
+  // สถานะรับสมัครแยกรายงาน — งานหนึ่งหมดเวลาแล้วอีกงานยังเปิดอยู่ได้ ปุ่มจึงต้องคุมตามงานที่นักเรียนเลือก
+  const eventStates: EventState[] = eventRows.map((e) => ({
+    id: e.id,
+    name: e.name,
+    ...registrationWindow(e, now),
+  }));
+  const notice = registrationNotice(eventRows, now);
 
   const visibleEventIds = eventRows.map((e) => e.id);
   const comps = visibleEventIds.length
@@ -113,13 +113,16 @@ export default async function BrowsePage() {
       <div className="page-header">
         <h1>เลือกลงทะเบียน</h1>
         <div className="subtitle">
-          ระดับชั้น {myLevel} · {registrationOpen ? "เปิดรับสมัคร" : "ปิดรับสมัคร"}
+          ระดับชั้น {myLevel} · {notice.title}
         </div>
       </div>
-      {!registrationOpen && <div className="alert alert-warning">ขณะนี้ยังไม่มีงานที่เปิดรับสมัคร — ดูรายการได้แต่ยังลงทะเบียนไม่ได้</div>}
+      <RegWindowNotice
+        events={eventRows}
+        note={notice.open ? undefined : "ดูรายการได้ แต่ยังลงทะเบียนไม่ได้"}
+      />
       <BrowseRegister
         comps={data}
-        registrationOpen={registrationOpen}
+        eventStates={eventStates}
         self={{ studentCode: session.code, name: session.name, classLevel: myLevel, classRoom: session.classRoom ?? "" }}
       />
     </div>

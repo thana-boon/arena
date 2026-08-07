@@ -161,6 +161,19 @@ export function formatThaiDate(input: string | Date | null | undefined): string 
   return `${d} ${month} ${y + 543}`;
 }
 
+/**
+ * วัน-เวลาแบบไทย เช่น "15 ส.ค. 2569 16:30 น." — ใช้บอกกำหนดเปิด/ปิดรับสมัคร (เวลามีความหมาย)
+ * แปลงเป็น Date ก่อนเสมอ เวลาที่เห็นจึงเป็นเวลาเครื่อง (คอนเทนเนอร์ตั้ง TZ=Asia/Bangkok)
+ */
+export function formatThaiDateTime(input: string | Date | null | undefined): string {
+  if (!input) return "";
+  const d = input instanceof Date ? input : new Date(input);
+  if (isNaN(d.getTime())) return typeof input === "string" ? input : "";
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${formatThaiDate(d)} ${hh}:${mm} น.`;
+}
+
 // ===== ความจุ / ที่นั่ง =====
 /** ค่า capacity ที่ถือว่า "ไม่จำกัดจำนวน" (เป็นค่า default ตอนสร้างรายการ) */
 export const UNLIMITED_CAPACITY = -1;
@@ -233,6 +246,61 @@ export function registrationWindow(
   if (event.regEnd && now > new Date(event.regEnd))
     return { open: false, reason: "หมดเวลารับสมัครแล้ว" };
   return { open: true, reason: null };
+}
+
+/** งาน + ชื่อ — ใช้ทำข้อความบอกสถานะรับสมัครที่อ้างถึงงานได้ */
+export type NamedRegWindowEvent = RegWindowEvent & { name: string };
+
+export type RegNotice = {
+  open: boolean;
+  /** พาดหัวสั้น เช่น "หมดเวลารับสมัครแล้ว" */
+  title: string;
+  /** บรรทัดขยายความ (ชื่องาน + วันเวลา) — "" ถ้าไม่มีกำหนดเวลาให้บอก */
+  detail: string;
+};
+
+/**
+ * สรุปสถานะรับสมัครของกลุ่มงาน ให้เป็นข้อความเดียวที่ขึ้นหัวหน้าจอได้
+ * ครูสะท้อนว่าเดิมต้องกดเข้าไปเลือกรายการก่อนถึงจะรู้ว่าหมดเวลาแล้ว — ต้องรู้ตั้งแต่เปิดหน้า
+ *
+ * ลำดับความสำคัญตอนไม่มีงานเปิดอยู่: งานที่กำลังจะเปิด > งานที่เพิ่งหมดเวลา > ปิดสวิตช์เฉย ๆ
+ * (วันเปิดรอบหน้าเป็นข้อมูลที่เอาไปใช้ต่อได้มากกว่าวันที่ปิดไปแล้ว)
+ */
+export function registrationNotice(events: NamedRegWindowEvent[], now: Date = new Date()): RegNotice {
+  const ms = (v: string | Date) => new Date(v).getTime();
+  const open = events.filter((e) => registrationWindow(e, now).open);
+  if (open.length) {
+    const deadlines = open
+      .filter((e) => e.regEnd)
+      .sort((a, b) => ms(a.regEnd!) - ms(b.regEnd!))
+      .map((e) => `${e.name} — ปิดรับ ${formatThaiDateTime(e.regEnd)}`);
+    return { open: true, title: "เปิดรับสมัคร", detail: deadlines.join(" · ") };
+  }
+  if (!events.length) return { open: false, title: "ยังไม่มีงานที่เปิดรับสมัคร", detail: "" };
+
+  // จะเปิดรอบหน้า — เอางานที่ใกล้ที่สุด (สวิตช์รับสมัครต้องเปิดไว้แล้ว ไม่งั้นวันเปิดยังไม่มีความหมาย)
+  const upcoming = events
+    .filter((e) => e.registrationOpen && e.regStart && now < new Date(e.regStart))
+    .sort((a, b) => ms(a.regStart!) - ms(b.regStart!));
+  if (upcoming.length)
+    return {
+      open: false,
+      title: "ยังไม่ถึงเวลาเปิดรับสมัคร",
+      detail: `${upcoming[0].name} — เปิดรับ ${formatThaiDateTime(upcoming[0].regStart)}`,
+    };
+
+  // หมดเวลาไปแล้ว — เอางานที่ปิดล่าสุด (ใกล้ปัจจุบันที่สุด) เป็นตัวแทน
+  const ended = events
+    .filter((e) => e.regEnd && now > new Date(e.regEnd))
+    .sort((a, b) => ms(b.regEnd!) - ms(a.regEnd!));
+  if (ended.length)
+    return {
+      open: false,
+      title: "หมดเวลารับสมัครแล้ว",
+      detail: `${ended[0].name} — ปิดรับเมื่อ ${formatThaiDateTime(ended[0].regEnd)}`,
+    };
+
+  return { open: false, title: "ขณะนี้ปิดรับสมัคร", detail: "" };
 }
 
 export type CompType = "individual" | "team";

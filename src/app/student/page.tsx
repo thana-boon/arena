@@ -2,9 +2,13 @@ import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { CompTypeBadge } from "@/components/CompTypeBadge";
 import { requireRole } from "@/lib/auth/guards";
+import { db } from "@/db";
+import { events } from "@/db/schema";
+import { asc, eq } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { getStudentEntries } from "@/lib/student";
-import { formatThaiDate } from "@/lib/domain";
+import { formatThaiDate, registrationNotice, registrationWindow } from "@/lib/domain";
+import { RegWindowNotice } from "@/components/RegWindowNotice";
 import { WithdrawButton } from "./WithdrawButton";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +23,28 @@ export default async function StudentDashboard() {
   const max = setting.maxEntriesPerStudent;
   const remaining = Math.max(0, max - entries.length);
 
+  // ช่วงรับสมัครเป็นของ "งาน" ไม่ใช่ของปีการศึกษา
+  // แถบสถานะด้านบนพูดถึงเฉพาะงานที่เปิดให้นักเรียน แต่ปุ่มยกเลิกต้องเทียบกับงานจริงของรายการนั้น
+  // (ครูลงชื่อให้ในงานที่ยังไม่เปิดให้นักเรียนได้ — ถ้าใช้แค่งานที่มองเห็น จะขึ้นเหตุผลผิด)
+  const eventRows = await db
+    .select({
+      id: events.id,
+      name: events.name,
+      visibleToStudents: events.visibleToStudents,
+      registrationOpen: events.registrationOpen,
+      regStart: events.regStart,
+      regEnd: events.regEnd,
+    })
+    .from(events)
+    .where(eq(events.yearId, year.id))
+    .orderBy(asc(events.name));
+  const eventById = new Map(eventRows.map((e) => [e.id, e]));
+  const visibleEvents = eventRows.filter((e) => e.visibleToStudents);
+  const notice = registrationNotice(visibleEvents);
+  // ยกเลิกเองได้เฉพาะตอนงานของรายการนั้นยังเปิดรับสมัคร (เกณฑ์เดียวกับฝั่งครูประจำชั้น)
+  const entryWindow = (eventId: number | null) =>
+    registrationWindow(eventId == null ? null : eventById.get(eventId));
+
   return (
     <div className="stack">
       <div className="page-header">
@@ -27,6 +53,9 @@ export default async function StudentDashboard() {
           {session.classLevel}/{session.classRoom} · ปีการศึกษา {year.yearBe}
         </div>
       </div>
+
+      {/* บอกสถานะรับสมัครตั้งแต่หน้าแรก ไม่ต้องกดเข้าไปหน้าเลือกรายการก่อนถึงจะรู้ว่าหมดเวลา */}
+      <RegWindowNotice events={visibleEvents} />
 
       <div className="grid-3 stagger">
         <div className="stat-card">
@@ -41,7 +70,7 @@ export default async function StudentDashboard() {
         <Link href="/student/browse" className="stat-card" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
           <Icon name="clipboard" size={28} style={{ color: "var(--skdw-purple)" }} />
           <div style={{ fontWeight: 600, color: "var(--skdw-purple)", marginTop: 4 }}>
-            {setting.registrationOpen ? "เลือกลงทะเบียน" : "ดูรายการแข่งขัน"}
+            {notice.open ? "เลือกลงทะเบียน" : "ดูรายการแข่งขัน"}
           </div>
         </Link>
       </div>
@@ -51,11 +80,13 @@ export default async function StudentDashboard() {
         <div className="empty-state card">
           <Icon name="clipboard" size={44} className="empty-ico" />
           <p>ยังไม่มีรายการที่ลงทะเบียน</p>
-          {setting.registrationOpen && <Link href="/student/browse" className="btn btn-primary mt-4">เลือกลงทะเบียน</Link>}
+          {notice.open && <Link href="/student/browse" className="btn btn-primary mt-4">เลือกลงทะเบียน</Link>}
         </div>
       ) : (
         <div className="stack">
-          {entries.map((e) => (
+          {entries.map((e) => {
+            const w = entryWindow(e.eventId);
+            return (
             <div key={e.entryId} className="card">
               <div className="row between">
                 <div>
@@ -88,10 +119,15 @@ export default async function StudentDashboard() {
                     </div>
                   )}
                 </div>
-                <WithdrawButton entryId={e.entryId} disabled={!setting.registrationOpen} />
+                <WithdrawButton
+                  entryId={e.entryId}
+                  disabled={!w.open}
+                  disabledReason={w.reason ?? undefined}
+                />
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

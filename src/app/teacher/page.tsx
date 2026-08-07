@@ -2,15 +2,17 @@ import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { requireStaff } from "@/lib/auth/guards";
 import { db } from "@/db";
-import { competitions } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { competitions, events } from "@/db/schema";
+import { eq, asc } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
+import { registrationNotice } from "@/lib/domain";
+import { RegWindowNotice } from "@/components/RegWindowNotice";
 
 export const dynamic = "force-dynamic";
 
 export default async function TeacherHome() {
   const session = await requireStaff();
-  const { year, setting } = await getActiveYearWithSettings();
+  const { year } = await getActiveYearWithSettings();
 
   let mine = 0;
   let total = 0;
@@ -20,16 +22,33 @@ export default async function TeacherHome() {
     mine = all.filter((c) => c.createdBy === session.code).length;
   }
 
+  // สถานะรับสมัครเป็นของ "งาน" ไม่ใช่ของปีการศึกษา — เดิมหัวข้อหน้านี้อ่านสวิตช์ระดับปีที่เลิกใช้แล้ว
+  const eventRows = year
+    ? await db
+        .select({
+          name: events.name,
+          registrationOpen: events.registrationOpen,
+          regStart: events.regStart,
+          regEnd: events.regEnd,
+        })
+        .from(events)
+        .where(eq(events.yearId, year.id))
+        .orderBy(asc(events.name))
+    : [];
+  const notice = registrationNotice(eventRows);
+
   return (
     <div className="stack">
       <div className="page-header">
         <h1>สวัสดี {session.name}</h1>
         <div className="subtitle">
           {year ? `ปีการศึกษา ${year.yearBe}` : "ยังไม่เปิดปีการศึกษา"}
-          {setting && ` · ${setting.registrationOpen ? "เปิดรับสมัคร" : "ปิดรับสมัคร"}`}
+          {year && ` · ${notice.title}`}
           {(session.role === "recorder" || session.role === "admin") && " · มีสิทธิ์บันทึกผล"}
         </div>
       </div>
+
+      {year && <RegWindowNotice events={eventRows} />}
 
       <div className="grid-3 stagger">
         <div className="stat-card">

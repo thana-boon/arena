@@ -16,6 +16,8 @@ export function RosterManager({
   canOverride,
   allowedLevels,
   allowCrossClass,
+  regClosedReason,
+  hasEvent,
 }: {
   competitionId: number;
   type: "individual" | "team";
@@ -26,6 +28,10 @@ export function RosterManager({
   allowedLevels: string[];
   /** ทีมข้ามห้องได้หรือไม่ — false = สมาชิกคนถัดไปถูกล็อกให้อยู่ห้องเดียวกับคนแรก */
   allowCrossClass: boolean;
+  /** เหตุผลที่ตอนนี้ยังลงทะเบียนไม่ได้ (ปิดรับ/ยังไม่เปิด/หมดเวลา) — null = อยู่ในช่วงรับสมัคร */
+  regClosedReason: string | null;
+  /** รายการนี้ถูกจัดเข้างานแล้วหรือยัง — ยังไม่เข้างาน = ลงไม่ได้เลย ต้องแก้ที่ตัวรายการก่อน */
+  hasEvent: boolean;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -121,14 +127,30 @@ export function RosterManager({
       ? { classLevel: members[0].classLevel, classRoom: members[0].classRoom }
       : null;
 
+  // นอกช่วงรับสมัคร: admin ยังเพิ่มได้ตลอด (server ยกเว้นให้เฉพาะ role นี้) — ครูคนอื่นเพิ่มไม่ได้
+  // ยกเว้นรายการที่ยังไม่เข้างาน ซึ่งลงไม่ได้ทุกคน จนกว่าจะแก้รายการให้สังกัดงานก่อน
+  const canAdd = !regClosedReason || (canOverride && hasEvent);
+
   return (
     <div className="card">
       <div className="row between mb-4">
         <div className="card-header" style={{ padding: 0, border: "none" }}>
           รายชื่อผู้ลงทะเบียน ({roster.length})
         </div>
-        {!adding && <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)}>+ เพิ่มผู้เข้าแข่งขัน</button>}
+        {!adding && canAdd && (
+          <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)}>+ เพิ่มผู้เข้าแข่งขัน</button>
+        )}
       </div>
+
+      {regClosedReason && (
+        <div className={`alert alert-${canAdd ? "info" : "warning"}`}>
+          {!hasEvent
+            ? "รายการนี้ยังไม่ถูกจัดเข้างาน — แก้ไขรายการให้สังกัดงานก่อน จึงจะลงทะเบียนผู้เข้าแข่งขันได้"
+            : canAdd
+              ? `${regClosedReason} — คุณเป็นผู้ดูแลระบบ จึงเพิ่มผู้เข้าแข่งขันได้ตลอด (ระบบบันทึกไว้ใน log ว่าลงหลังปิดรับ)`
+              : `${regClosedReason} — เพิ่มผู้เข้าแข่งขันได้เฉพาะผู้ดูแลระบบ`}
+        </div>
+      )}
 
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
 
@@ -181,7 +203,10 @@ export function RosterManager({
           {canOverride && (
             <label className="form-check mt-4">
               <input type="checkbox" checked={override} onChange={(e) => setOverride(e.target.checked)} />
-              <span>ลงทะเบียนแบบ override (ข้ามกติกาปิดรับ/จำนวน/เวลาชน — จะถูกบันทึก log)</span>
+              <span>
+                ลงทะเบียนแบบ override (ข้ามกติกาจำนวนรายการต่อคน/เวลาแข่งชน — จะถูกบันทึก log)
+                {regClosedReason && " · ช่วงรับสมัครไม่ต้องติ๊กแล้ว ผู้ดูแลระบบข้ามให้อัตโนมัติ"}
+              </span>
             </label>
           )}
           <div className="row mt-4">

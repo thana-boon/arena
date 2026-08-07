@@ -62,7 +62,7 @@ export async function POST(req: Request) {
 
     try {
       const members = await resolveMembers(memberCodes, selfSnapshot);
-      const { entryId, competitionName } = await registerEntry({
+      const { entryId, competitionName, afterClose } = await registerEntry({
         competitionId: body.competitionId,
         members,
         teamName: body.teamName ?? null,
@@ -84,6 +84,8 @@ export async function POST(req: Request) {
         // เก็บชื่อคู่รหัส — ค้นใน log ด้วยชื่อนักเรียนหรือรหัสก็เจอเหมือนกัน
         members: members.map((m) => `${m.name} (${m.studentCode})`),
         ...(body.teamName?.trim() ? { teamName: body.teamName.trim() } : {}),
+        // admin ลงเพิ่มหลังปิดรับสมัคร — ติดธงไว้ให้ไล่ดูย้อนหลังได้ว่าใครถูกเพิ่มนอกช่วงเวลา
+        ...(afterClose ? { afterClose: true } : {}),
       });
       return ok({ entryId });
     } catch (e) {

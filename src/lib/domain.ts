@@ -209,6 +209,32 @@ export function formatSlot(label: string, startTime: string, endTime: string): s
   return `${label} (${hhmm(startTime)}–${hhmm(endTime)})`;
 }
 
+// ===== ช่วงรับสมัคร (ระดับงาน) =====
+/** เท่าที่ต้องรู้เพื่อตัดสินว่างานยังรับสมัครอยู่ไหม (รับได้ทั้งแถว events และข้อมูลที่ส่งให้ client) */
+export type RegWindowEvent = {
+  registrationOpen: boolean;
+  regStart: string | Date | null;
+  regEnd: string | Date | null;
+};
+
+/**
+ * งานนี้ยังรับสมัครอยู่ไหม + ถ้าไม่ เพราะอะไร
+ * ใช้ที่เดียวกันทั้งฝั่งบันทึก (registerEntry), ฝั่งลิสต์ (การสมัครรายห้อง) และฝั่งแสดงผล
+ * — เดิมเงื่อนไขเดียวกันนี้ถูกเขียนซ้ำสามที่ ข้อความบอกเหตุผลจึงหลุดไม่ตรงกันได้ง่าย
+ */
+export function registrationWindow(
+  event: RegWindowEvent | null | undefined,
+  now: Date = new Date()
+): { open: boolean; reason: string | null } {
+  if (!event) return { open: false, reason: "รายการนี้ยังไม่ถูกจัดเข้างาน" };
+  if (!event.registrationOpen) return { open: false, reason: "ขณะนี้ปิดรับสมัคร" };
+  if (event.regStart && now < new Date(event.regStart))
+    return { open: false, reason: "ยังไม่ถึงเวลาเปิดรับสมัคร" };
+  if (event.regEnd && now > new Date(event.regEnd))
+    return { open: false, reason: "หมดเวลารับสมัครแล้ว" };
+  return { open: true, reason: null };
+}
+
 export type CompType = "individual" | "team";
 
 /** นักเรียน 1 คน + รายการที่สมัครไว้ (หน้า "การสมัครรายห้อง") */

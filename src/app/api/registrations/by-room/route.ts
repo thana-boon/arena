@@ -7,7 +7,7 @@ import { canRegisterHiddenCompetition } from "@/lib/permit";
 import { getActiveYear } from "@/lib/queries";
 import { listStudentsInRoom, studentFullName } from "@/lib/external/student-api";
 import { fetchTeacherHomerooms } from "@/lib/external/teacher-api";
-import { parseJsonArray, type RoomComp, type RoomStudent } from "@/lib/domain";
+import { parseJsonArray, registrationWindow, type RoomComp, type RoomStudent } from "@/lib/domain";
 
 /**
  * GET: นักเรียนทั้งห้อง + รายการแข่งขันที่แต่ละคนสมัครไว้ (ปีการศึกษาปัจจุบัน)
@@ -115,13 +115,8 @@ export async function GET(req: Request) {
     const eventRows = await db.select().from(events).where(eq(events.yearId, year.id));
     const eventById = new Map(eventRows.map((e) => [e.id, e]));
     const now = new Date();
-    const eventOpen = (id: number | null) => {
-      const e = id == null ? null : eventById.get(id);
-      if (!e || !e.registrationOpen) return false;
-      if (e.regStart && now < new Date(e.regStart)) return false;
-      if (e.regEnd && now > new Date(e.regEnd)) return false;
-      return true;
-    };
+    const eventOpen = (id: number | null) =>
+      registrationWindow(id == null ? null : eventById.get(id), now).open;
 
     const compIds = eligible.map((c) => c.id);
     const caps = compIds.length

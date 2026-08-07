@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { competitions, competitionCapacity, entries, entryMembers, events, subjectGroups } from "@/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
-import { parseJsonArray } from "@/lib/domain";
+import { parseJsonArray, registrationWindow } from "@/lib/domain";
 import { canRegisterHiddenCompetition } from "@/lib/permit";
 import type { Role } from "@/lib/auth/session";
 
@@ -42,6 +42,8 @@ export type RegisterResult = {
   entryId: number;
   /** ชื่อรายการ — ผู้เรียกใช้เขียนลง audit log ได้โดยไม่ต้อง query ซ้ำ */
   competitionName: string;
+  /** admin ลงนอกช่วงรับสมัคร (ปิดรับ/หมดเวลา/ยังไม่เปิด) — ผู้เรียกใช้ติดธงไว้ใน audit log */
+  afterClose: boolean;
 };
 
 /**
@@ -63,14 +65,21 @@ export async function registerEntry(args: RegisterArgs): Promise<RegisterResult>
     : null;
 
   // กติกา 1: เปิดรับสมัคร + อยู่ในช่วงเวลา (ระดับงาน)
+  //
+  // admin ไม่ติดช่วงเวลา — ลงทะเบียนเพิ่มได้ตลอดแม้ปิดรับ/หมดเวลาไปแล้ว โดยไม่ต้องติ๊ก override
+  // เพราะคนที่ต้องตามเก็บเคสตกหล่นหลังปิดรับก็คือ admin อยู่แล้ว และ override เป็นค้อนที่ใหญ่เกินไป
+  // (ข้ามจำนวนรายการต่อคน/เวลาแข่งชนไปด้วย) กติกาที่เหลือจึงยังบังคับกับ admin ตามปกติ
+  // บันทึกไว้ใน audit ว่าลงหลังปิดรับ (afterClose) — ตามรอยได้ว่ารายชื่อไหนเพิ่มทีหลัง
+  let afterClose = false;
   if (!override) {
     if (!event) throw new RegistrationError("รายการนี้ยังไม่ถูกจัดเข้างาน");
     if (args.byRole === "student" && !event.visibleToStudents)
       throw new RegistrationError("งานนี้ยังไม่เปิดให้นักเรียน", 403);
-    if (!event.registrationOpen) throw new RegistrationError("ขณะนี้ปิดรับสมัคร");
-    const now = new Date();
-    if (event.regStart && now < new Date(event.regStart)) throw new RegistrationError("ยังไม่ถึงเวลาเปิดรับสมัคร");
-    if (event.regEnd && now > new Date(event.regEnd)) throw new RegistrationError("หมดเวลารับสมัครแล้ว");
+    const window = registrationWindow(event);
+    if (!window.open) {
+      if (args.byRole !== "admin") throw new RegistrationError(window.reason!);
+      afterClose = true;
+    }
   }
 
   // รายการที่ซ่อนจากนักเรียน — คุมซ้อนระดับรายการ (นอกเหนือจากช่วงรับสมัครระดับงาน)
@@ -237,7 +246,7 @@ export async function registerEntry(args: RegisterArgs): Promise<RegisterResult>
     return newEntryId;
   });
 
-  return { entryId, competitionName: comp.name };
+  return { entryId, competitionName: comp.name, afterClose };
 }
 
 /** ยกเลิกการลงทะเบียน (คืน counter ใน transaction เดียว) */

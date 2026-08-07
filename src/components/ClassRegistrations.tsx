@@ -655,7 +655,7 @@ function RegisterModal({
 
   const full = comp ? seatsFull(comp.registered, comp.capacity) : false;
   const closed = comp ? !comp.open : false;
-  // ปิดรับ: ครูทั่วไปสมัครไม่ได้เลย — admin กดได้ (server จะแจ้ง แล้วค่อย override)
+  // ปิดรับ: ครูทั่วไปสมัครไม่ได้เลย — admin กดได้ตามปกติ (server ยกเว้นช่วงเวลาให้ admin อยู่แล้ว)
   const blocked = full || (closed && !isAdmin);
   const teamReady =
     !comp || comp.type !== "team" || members.length >= (comp.teamSizeMin ?? 1);
@@ -665,7 +665,7 @@ function RegisterModal({
     const ok = await confirm({
       title: override ? "ยืนยันการสมัครแบบ override" : "ยืนยันการสมัคร",
       message: override
-        ? `สมัคร "${comp.name}" ให้ ${student.name} โดยข้ามกติกา (เวลาชน/จำนวนรายการ/ช่วงรับสมัคร)?`
+        ? `สมัคร "${comp.name}" ให้ ${student.name} โดยข้ามกติกา (เวลาชน/จำนวนรายการ)?`
         : comp.type === "team"
           ? `สมัครทีมรายการ "${comp.name}" (${members.length} คน)?`
           : `สมัครรายการ "${comp.name}" ให้ ${student.name}?`,
@@ -753,6 +753,11 @@ function RegisterModal({
                 </div>
                 ที่นั่ง {formatSeats(comp.registered, comp.capacity)}
                 {comp.eventDate && ` · ${formatThaiDate(comp.eventDate)} ${hhmm(comp.startTime)}–${hhmm(comp.endTime)}`}
+                {closed && isAdmin && (
+                  <div className="form-hint" style={{ marginTop: 6 }}>
+                    งานนี้ปิดรับสมัครแล้ว — ผู้ดูแลระบบยังสมัครให้ได้ตามปกติ (ระบบบันทึกไว้ใน log)
+                  </div>
+                )}
               </div>
             )}
 

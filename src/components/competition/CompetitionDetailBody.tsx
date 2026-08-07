@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { db } from "@/db";
-import { competitions, criteria, subjectGroups } from "@/db/schema";
+import { competitions, criteria, events, subjectGroups } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { parseJsonArray, formatThaiDate, formatSeats } from "@/lib/domain";
+import { parseJsonArray, formatThaiDate, formatSeats, registrationWindow } from "@/lib/domain";
 import { canScore, canViewCompetition } from "@/lib/permit";
 import { getRoster, getCapacityRows } from "@/lib/roster";
 import type { SessionPayload } from "@/lib/auth/session";
@@ -36,6 +36,13 @@ export async function CompetitionDetailBody({
   const caps = await getCapacityRows(id);
   const levels = parseJsonArray(comp.allowedClassLevels);
   const eventDateTh = formatThaiDate(comp.eventDate);
+
+  // ช่วงรับสมัครของ "งาน" ที่รายการนี้สังกัด — บอกไว้ในกล่องรายชื่อว่าตอนนี้เพิ่มคนได้ไหม
+  // (admin เพิ่มได้ตลอดแม้ปิดรับแล้ว จึงต้องบอกให้ชัดว่ากำลังลงนอกช่วงเวลา ไม่ใช่ปล่อยให้เดา)
+  const event = comp.eventId
+    ? (await db.select().from(events).where(eq(events.id, comp.eventId)).limit(1))[0]
+    : null;
+  const regClosedReason = registrationWindow(event).reason;
 
   return (
     <div className="stack">
@@ -115,6 +122,8 @@ export async function CompetitionDetailBody({
         canOverride={session.role === "admin"}
         allowedLevels={levels}
         allowCrossClass={comp.allowCrossClass}
+        regClosedReason={regClosedReason}
+        hasEvent={!!event}
       />
     </div>
   );

@@ -170,6 +170,7 @@ const DETAIL_LABEL: Record<string, string> = {
   competition: "รายการ",
   members: "ผู้เข้าแข่งขัน",
   teamName: "ชื่อทีม",
+  afterClose: "ลงหลังปิดรับสมัคร",
   entryId: "การลงทะเบียนที่",
   eventId: "งานที่",
   yearId: "ปีที่",

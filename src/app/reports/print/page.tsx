@@ -1,5 +1,5 @@
 import { requireStaff } from "@/lib/auth/guards";
-import { getReportBundles } from "@/lib/reportBundle";
+import { applyReportFilter, getReportBundles, parseReportFilter } from "@/lib/reportBundle";
 import { db } from "@/db";
 import { events } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -16,32 +16,18 @@ export default async function ReportPrintPage({
 }) {
   const session = await requireStaff();
   const sp = await searchParams;
-  const eventId = Number(sp.event) || 0;
   const docType: DocType = (Object.keys(DOC_LABEL) as DocType[]).includes(sp.doc as DocType)
     ? (sp.doc as DocType)
     : "roster";
 
   // ตัวกรองจากหน้าออกรายงาน (ไม่ส่งมา = เอาทุกหมวด/ทุกชั้น) — ต้องกรองแบบเดียวกับที่หน้านั้นแสดง
-  // -1 = "ไม่ระบุหมวด" จึงรับค่าติดลบด้วย ไม่ใช่แค่ id บวก
-  const groupIds = new Set(
-    (sp.groups ?? "")
-      .split(",")
-      .map((v) => v.trim())
-      .filter(Boolean)
-      .map(Number)
-      .filter(Number.isInteger)
-  );
-  const levels = new Set((sp.levels ?? "").split(",").map((v) => v.trim()).filter(Boolean));
+  const filter = parseReportFilter(sp);
+  const { eventId, levels } = filter;
 
   const [event] = eventId ? await db.select().from(events).where(eq(events.id, eventId)) : [];
   // ขอบเขตคุมที่นี่ด้วย ไม่ใช่แค่หน้าเลือก — ครูแก้ ?groups= เองไม่ได้ผล
   const { yearBe, bundles } = await getReportBundles(session);
-  const selected = bundles.filter(
-    (b) =>
-      b.eventId === eventId &&
-      (groupIds.size === 0 || groupIds.has(b.subjectGroupId ?? -1)) &&
-      (levels.size === 0 || b.levels.some((lv) => levels.has(lv)))
-  );
+  const selected = applyReportFilter(bundles, filter);
 
   if (!event || !selected.length) {
     return <div style={{ padding: 40 }}>ไม่พบรายการที่ต้องการพิมพ์</div>;

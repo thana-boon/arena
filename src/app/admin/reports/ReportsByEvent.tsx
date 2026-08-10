@@ -8,6 +8,7 @@ import {
   DOC_HINT,
   DOC_LABEL,
   DOC_SECTIONS,
+  ReportSheet,
   SUMMARY_DOCS,
   type DocType,
   SummarySheet,
@@ -16,6 +17,9 @@ import {
 
 // basePath (/arena) ไม่ถูกเติมให้ window.open อัตโนมัติ ต้อง prefix เอง
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
+/** เอกสารรายรายการมีได้เป็นร้อยแผ่น — บนจอโชว์แค่ไม่กี่รายการแรกพอให้เห็นหน้าตา ที่เหลือดูจากแท็บพิมพ์ */
+const PREVIEW_LIMIT = 5;
 
 export function ReportsByEvent({
   yearBe,
@@ -74,6 +78,9 @@ export function ReportsByEvent({
   );
   const isSummaryDoc = SUMMARY_DOCS.includes(docType);
   const isFiltered = groupIds.size > 0 || levels.size > 0;
+  // เอกสารสรุปเป็นตารางเดียว โชว์ครบได้; เอกสารรายรายการตัดให้เหลือไม่กี่ใบ ไม่งั้นหน้าอืด
+  const previewBundles = isSummaryDoc ? selectedBundles : selectedBundles.slice(0, PREVIEW_LIMIT);
+  const hiddenPreviewCount = selectedBundles.length - previewBundles.length;
   // หลายหมวด = เอกสารสรุปแยกหน้าให้อัตโนมัติ — บอกไว้ก่อนกดพิมพ์ว่าจะได้กี่หน้าเป็นอย่างน้อย
   const selectedGroupCount = useMemo(
     () => new Set(selectedBundles.map((b) => b.subjectGroupId ?? -1)).size,
@@ -112,15 +119,32 @@ export function ReportsByEvent({
     setLevels(new Set());
   }
 
+  /** พารามิเตอร์ของเอกสารชุดที่เลือกอยู่ — แท็บพิมพ์กับไฟล์ Excel ต้องใช้ตัวกรองเดียวกัน */
+  const docParams = () => {
+    const sp = new URLSearchParams({ event: String(eventId) });
+    // ส่งตัวกรองไปด้วย ไม่งั้นปลายทางจะเอาทุกรายการในงาน
+    if (groupIds.size) sp.set("groups", [...groupIds].join(","));
+    if (levels.size) sp.set("levels", [...levels].join(","));
+    return sp;
+  };
+
   /** เปิดเอกสารในแท็บใหม่ แล้วแท็บนั้นเด้งหน้าต่างพิมพ์เอง — กันเผลอปิดแท็บงานหลัก */
   const openPrint = () => {
     if (!eventId) return;
-    const sp = new URLSearchParams({ event: String(eventId), doc: docType });
-    // ส่งตัวกรองไปหน้าพิมพ์ด้วย ไม่งั้นแท็บใหม่จะพิมพ์ทุกรายการในงาน
-    if (groupIds.size) sp.set("groups", [...groupIds].join(","));
-    if (levels.size) sp.set("levels", [...levels].join(","));
+    const sp = docParams();
+    sp.set("doc", docType);
     if (docType === "catalog" && splitByGroup) sp.set("split", "group");
     window.open(`${BASE}/reports/print?${sp.toString()}`, "_blank", "noopener");
+  };
+
+  /**
+   * โหลดใบรายชื่อเป็นไฟล์ Excel — เบราว์เซอร์เห็น Content-Disposition แล้วเซฟไฟล์ให้เอง
+   * เปิดผ่านแท็บใหม่ ไม่ใช่ location.href เพราะถ้า session หมดอายุพอดี ปลายทางจะตอบเป็น JSON
+   * ซึ่งจะเข้ามาทับหน้านี้ทั้งหน้า (ตัวกรองที่ตั้งไว้หายหมด) — แบบนี้อย่างมากก็เด้งแท็บใหม่ให้เห็นข้อความ
+   */
+  const downloadExcel = () => {
+    if (!eventId) return;
+    window.open(`${BASE}/api/reports/roster-excel?${docParams().toString()}`, "_blank", "noopener");
   };
 
   return (
@@ -133,13 +157,26 @@ export function ReportsByEvent({
             {scopeHint && ` · ${scopeHint}`}
           </div>
         </div>
-        <button
-          className="btn btn-primary"
-          disabled={!selectedBundles.length}
-          onClick={openPrint}
-        >
-          <Icon name="printer" size={18} /> {isSummaryDoc ? "พิมพ์" : `พิมพ์ (${selectedBundles.length})`}
-        </button>
+        <div className="row">
+          {/* Excel มีเฉพาะใบรายชื่อ — เอกสารอื่นเป็นแบบฟอร์มสำหรับกรอก/ติดประกาศ เอาลงตารางแล้วไม่ได้ใช้อะไร */}
+          {docType === "roster" && (
+            <button
+              className="btn btn-ghost"
+              disabled={!selectedBundles.length}
+              onClick={downloadExcel}
+              title="ดาวน์โหลดรายชื่อผู้สมัครเป็นไฟล์ Excel เอาไปก็อป/กรองต่อได้"
+            >
+              <Icon name="download" size={18} /> Excel
+            </button>
+          )}
+          <button
+            className="btn btn-primary"
+            disabled={!selectedBundles.length}
+            onClick={openPrint}
+          >
+            <Icon name="printer" size={18} /> {isSummaryDoc ? "พิมพ์" : `พิมพ์ (${selectedBundles.length})`}
+          </button>
+        </div>
       </div>
 
       <div className="no-print card stack">
@@ -253,13 +290,23 @@ export function ReportsByEvent({
             ? "ไม่มีรายการตามตัวกรองที่เลือก — ลองเอาตัวกรองบางตัวออก"
             : isSummaryDoc
               ? `เลือกไว้ ${selectedBundles.length} รายการ${isFiltered ? ` (จากทั้งหมด ${inEvent.length})` : ""} — ${summaryShapeHint()} (กด "พิมพ์" เพื่อเปิดเอกสารในแท็บใหม่)`
-              : `เลือกไว้ ${selectedBundles.length} รายการ${isFiltered ? ` (จากทั้งหมด ${inEvent.length})` : ""} — กด "พิมพ์" เพื่อเปิดเอกสารในแท็บใหม่ (แต่ละรายการขึ้นหน้าใหม่)`}
+              : `เลือกไว้ ${selectedBundles.length} รายการ${isFiltered ? ` (จากทั้งหมด ${inEvent.length})` : ""} — กด "พิมพ์" เพื่อเปิดเอกสารในแท็บใหม่ (แต่ละรายการขึ้นหน้าใหม่)${
+                  docType === "roster" ? ' · กด "Excel" ถ้าอยากได้รายชื่อเป็นตารางไว้ก็อปไปใช้ต่อ' : ""
+                }`}
         </div>
       </div>
 
-      {/* เอกสารสรุป: แสดงตัวอย่างบนจอ (ตัวจริงพิมพ์จากแท็บใหม่ /reports/print) */}
-      {isSummaryDoc && selectedBundles.length > 0 && (
+      {/* ตัวอย่างบนจอ (ตัวจริงพิมพ์จากแท็บใหม่ /reports/print) — เอกสารรายรายการโชว์แค่ไม่กี่ใบแรก */}
+      {selectedBundles.length > 0 && (
         <div className="card">
+          <div className="no-print row between" style={{ marginBottom: "var(--space-4)" }}>
+            <strong>ตัวอย่างเอกสาร — {DOC_LABEL[docType]}</strong>
+            {!isSummaryDoc && (
+              <span className="muted text-sm">
+                {previewBundles.length} จาก {selectedBundles.length} รายการ
+              </span>
+            )}
+          </div>
           {docType === "venues" ? (
             <VenueUsageSheet bundles={selectedBundles} eventName={eventName} yearBe={yearBe} />
           ) : docType === "catalog" ? (
@@ -270,8 +317,17 @@ export function ReportsByEvent({
               splitByGroup={splitByGroup}
               levelFilter={[...levels]}
             />
-          ) : (
+          ) : isSummaryDoc ? (
             <SummarySheet bundles={selectedBundles} docType={docType as "summary" | "regcount"} eventName={eventName} yearBe={yearBe} />
+          ) : (
+            previewBundles.map((b) => (
+              <ReportSheet key={b.id} bundle={b} docType={docType} eventName={eventName} />
+            ))
+          )}
+          {hiddenPreviewCount > 0 && (
+            <p className="no-print muted text-sm" style={{ marginTop: "var(--space-4)" }}>
+              ยังมีอีก {hiddenPreviewCount} รายการที่ไม่ได้แสดงตัวอย่าง — กด “พิมพ์” เพื่อดูครบทุกรายการ
+            </p>
           )}
         </div>
       )}

@@ -212,3 +212,34 @@ export async function getReportBundles(
   );
   return { yearBe: year.yearBe, bundles };
 }
+
+/** ตัวกรองของหน้าออกรายงาน — เซ็ตว่าง = ไม่กรอง (เอาทั้งหมด) */
+export type ReportFilter = { eventId: number; groupIds: Set<number>; levels: Set<string> };
+
+/**
+ * อ่านตัวกรองจาก query string ที่หน้าออกรายงานส่งมา (?event=&groups=&levels=)
+ * ใช้ร่วมกันทั้งแท็บพิมพ์และไฟล์ Excel — สองทางนี้ต้องได้รายการชุดเดียวกันเสมอ
+ */
+export function parseReportFilter(sp: { event?: string; groups?: string; levels?: string }): ReportFilter {
+  const list = (v: string | undefined) =>
+    (v ?? "")
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+  return {
+    eventId: Number(sp.event) || 0,
+    // -1 = "ไม่ระบุหมวด" จึงรับค่าติดลบด้วย ไม่ใช่แค่ id บวก
+    groupIds: new Set(list(sp.groups).map(Number).filter(Number.isInteger)),
+    levels: new Set(list(sp.levels)),
+  };
+}
+
+/** รายการที่ผ่านตัวกรอง — ระดับชั้นนับว่าเข้าเงื่อนไขถ้ารายการรับชั้นที่เลือกไว้ชั้นใดชั้นหนึ่ง */
+export function applyReportFilter(bundles: ReportBundle[], f: ReportFilter): ReportBundle[] {
+  return bundles.filter(
+    (b) =>
+      b.eventId === f.eventId &&
+      (f.groupIds.size === 0 || f.groupIds.has(b.subjectGroupId ?? -1)) &&
+      (f.levels.size === 0 || b.levels.some((lv) => f.levels.has(lv)))
+  );
+}

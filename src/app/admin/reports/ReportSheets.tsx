@@ -1,5 +1,6 @@
-import { formatThaiDate, formatLevels, hhmm, isUnlimited, CLASS_BANDS, classBand, type ClassBand } from "@/lib/domain";
+import { formatThaiDate, formatLevels, classBand } from "@/lib/domain";
 import type { ReportBundle } from "@/lib/reportBundle";
+import { capacityLabel, groupLabel, scheduleLabel, typeLabel } from "@/lib/reportLabels";
 import {
   PersonHeadCells,
   SheetEntryRows,
@@ -36,30 +37,6 @@ export const DOC_SECTIONS: { title: string; docs: DocType[] }[] = [
 /** เอกสารสรุป = ตารางรวมฉบับเดียวทั้งงาน (ไม่แยกหน้าใหม่ต่อรายการ) — แสดงตัวอย่างบนจอได้เลย */
 export const SUMMARY_DOCS: DocType[] = ["summary", "regcount", "venues", "catalog"];
 
-/** ป้ายประเภท เช่น "เดี่ยว" / "ทีม 2–5 คน" — รายการที่ไม่มีการแข่งขันบอกไว้ให้ชัด */
-function typeLabel(b: ReportBundle): string {
-  if (b.noContest) return b.meta.type === "team" ? "ทีม (ไม่มีการแข่งขัน)" : "ไม่มีการแข่งขัน";
-  if (b.meta.type !== "team") return "เดี่ยว";
-  const { teamSizeMin: mn, teamSizeMax: mx } = b;
-  if (mn && mx) return mn === mx ? `ทีม ${mn} คน` : `ทีม ${mn}–${mx} คน`;
-  if (mn) return `ทีม ≥${mn} คน`;
-  if (mx) return `ทีม ≤${mx} คน`;
-  return "ทีม";
-}
-
-/** ข้อความจำนวนรับ — ไม่จำกัด → "ไม่จำกัดจำนวน" */
-function capacityLabel(b: ReportBundle): string {
-  if (isUnlimited(b.capacity)) return "ไม่จำกัดจำนวน";
-  return `${b.capacity} ${b.meta.type === "team" ? "ทีม" : "คน"}`;
-}
-
-/** วัน–เวลาแข่งขันแบบบรรทัดเดียว เช่น "12 ส.ค. 2569 09:00–12:00 น." — ไม่มีข้อมูลเลยคืน "" */
-function scheduleLabel(b: ReportBundle): string {
-  const date = formatThaiDate(b.meta.eventDate);
-  const time = b.meta.startTime ? `${hhmm(b.meta.startTime)}–${hhmm(b.meta.endTime)} น.` : "";
-  return [date, time].filter(Boolean).join(" ");
-}
-
 /** บรรทัดเล็กใต้ชื่อรายการ: วัน–เวลา · ห้อง (ข้ามส่วนที่ยังไม่ได้กรอก) */
 function CompetitionSubLine({ b, withVenue = false }: { b: ReportBundle; withVenue?: boolean }) {
   const parts = [scheduleLabel(b), withVenue ? b.venueName : ""].filter(Boolean);
@@ -78,11 +55,36 @@ function groupBySubject(bundles: ReportBundle[]): { groupName: string; items: Re
   return out;
 }
 
-/** นับผู้สมัครแยกช่วงชั้น (เตรียม/อ./ป./ม.) — นับหัวคนตามที่ปรากฏในแต่ละรายการ เหมือน studentCount */
-function bandCounts(bundles: ReportBundle[]): Record<ClassBand, number> {
-  const out: Record<ClassBand, number> = { pre: 0, kg: 0, primary: 0, secondary: 0, other: 0 };
-  for (const b of bundles) for (const e of b.roster) for (const m of e.members) out[classBand(m.classLevel)]++;
+/**
+ * ช่วงชั้นในเอกสารสรุปยอด — โรงเรียนดู "เตรียมอนุบาล+อนุบาล" เป็นก้อนเดียว จึงยุบสองชั้นนี้รวมกัน
+ * (ต่างจาก CLASS_BANDS ใน domain ที่แยก pre/kg ไว้สำหรับงานอื่น)
+ */
+const REPORT_BANDS = [
+  { key: "kg", label: "เตรียมอนุบาล–อนุบาล" },
+  { key: "primary", label: "ประถมศึกษา" },
+  { key: "secondary", label: "มัธยมศึกษา" },
+  { key: "other", label: "ไม่ระบุชั้น" },
+] as const;
+type ReportBand = (typeof REPORT_BANDS)[number]["key"];
+
+/** "อ.2"/"เตรียมอนุบาล" → "kg" — เตรียมอนุบาลถูกนับรวมกับอนุบาล */
+function reportBand(level: string | null | undefined): ReportBand {
+  const b = classBand(level);
+  return b === "pre" ? "kg" : b;
+}
+
+/** นับผู้สมัครแยกช่วงชั้น (เตรียม-อนุบาล/ประถม/มัธยม) — นับหัวคนตามที่ปรากฏในแต่ละรายการ เหมือน studentCount */
+function bandCounts(bundles: ReportBundle[]): Record<ReportBand, number> {
+  const out: Record<ReportBand, number> = { kg: 0, primary: 0, secondary: 0, other: 0 };
+  for (const b of bundles) for (const e of b.roster) for (const m of e.members) out[reportBand(m.classLevel)]++;
   return out;
+}
+
+/** บรรทัดสรุปสั้น ๆ เช่น "เตรียมอนุบาล–อนุบาล 42 คน · ประถมศึกษา 118 คน" — เฉพาะช่วงชั้นที่มีคนจริง */
+function bandSummaryText(counts: Record<ReportBand, number>): string {
+  return REPORT_BANDS.filter((b) => counts[b.key] > 0)
+    .map((b) => `${b.label} ${counts[b.key]} คน`)
+    .join(" · ");
 }
 
 /**
@@ -148,11 +150,13 @@ function SummaryPage({
 }) {
   const bundles = groups.flatMap((g) => g.items);
   const totalStudents = bundles.reduce((s, b) => s + b.studentCount, 0);
+  // ยอดแยกช่วงชั้นของ "หน้านี้" — พิมพ์แยกหมวดแล้วแต่ละแผ่นยังบอกได้เองว่าหมวดนี้มีอนุบาล/ประถม/มัธยมกี่คน
+  const bandLine = docType === "regcount" ? bandSummaryText(bandCounts(bundles)) : "";
 
   return (
     <section className="report-section report-web" style={pageBreak ? undefined : { breakBefore: "auto" }}>
       <SheetHeader
-        docLabel={DOC_LABEL[docType] + (soleGroup ? ` · ${soleGroup === "-" ? "ไม่ระบุหมวด" : soleGroup}` : "")}
+        docLabel={DOC_LABEL[docType] + (soleGroup ? ` · ${groupLabel(soleGroup)}` : "")}
         eventName={eventName}
         note={
           <>
@@ -199,6 +203,12 @@ function SummaryPage({
           </tbody>
         </table>
       </div>
+
+      {bandLine && (
+        <p className="text-sm" style={{ marginTop: 8 }}>
+          <strong>แยกตามระดับชั้น:</strong> {bandLine} (รวม {totalStudents} คน)
+        </p>
+      )}
     </section>
   );
 }
@@ -212,7 +222,7 @@ function SummaryGroupRows({
   docType: "summary" | "regcount";
   showGroupRow: boolean;
 }) {
-  const label = group.groupName === "-" ? "ไม่ระบุหมวด" : group.groupName;
+  const label = groupLabel(group.groupName);
   return (
     <>
       {showGroupRow && (
@@ -278,13 +288,13 @@ function RegCountByBandPage({
 }) {
   const all = groups.flatMap((g) => g.items);
   const totals = bandCounts(all);
-  const bands = CLASS_BANDS.filter((b) => totals[b.key] > 0);
+  const bands = REPORT_BANDS.filter((b) => totals[b.key] > 0);
   const grandTotal = all.reduce((s, b) => s + b.studentCount, 0);
   // ไม่มีใครสมัครเลย → ไม่ต้องมีหน้าตารางว่าง ๆ
   if (!bands.length) return null;
 
   const rows = groups.map((g) => ({
-    label: g.groupName === "-" ? "ไม่ระบุหมวด" : g.groupName,
+    label: groupLabel(g.groupName),
     items: g.items,
     counts: bandCounts(g.items),
   }));
@@ -413,7 +423,7 @@ function VenueGroupRows({ group }: { group: { venueName: string; items: ReportBu
         <tr key={b.id}>
           <td className="col-fit">{i + 1}</td>
           <td>{b.meta.competitionName}</td>
-          <td className="col-fit">{b.groupName === "-" ? "ไม่ระบุหมวด" : b.groupName}</td>
+          <td className="col-fit">{groupLabel(b.groupName)}</td>
           <td className="col-fit">{formatLevels(b.levels) || "-"}</td>
           <td className="col-fit">{scheduleLabel(b) || "-"}</td>
         </tr>
@@ -495,7 +505,7 @@ function CatalogPage({
       <SheetHeader
         compact
         docLabel={
-          DOC_LABEL.catalog + (soleGroup ? ` · ${soleGroup === "-" ? "ไม่ระบุหมวด" : soleGroup}` : "")
+          DOC_LABEL.catalog + (soleGroup ? ` · ${groupLabel(soleGroup)}` : "")
         }
         eventName={eventName}
         note={`ปีการศึกษา ${yearBe} · ${count} รายการ${levelNote ? ` · ${levelNote}` : ""}`}
@@ -529,7 +539,7 @@ function CatalogGroupRows({
   group: { groupName: string; items: ReportBundle[] };
   showGroupRow: boolean;
 }) {
-  const label = group.groupName === "-" ? "ไม่ระบุหมวด" : group.groupName;
+  const label = groupLabel(group.groupName);
   return (
     <>
       {showGroupRow && (

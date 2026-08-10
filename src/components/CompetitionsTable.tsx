@@ -217,6 +217,13 @@ export function CompetitionsTable({
                 <td className="td-title">
                   <Link href={`${basePath}/${c.id}`} style={{ fontWeight: 500 }}>{c.name}</Link>
                   <div className="text-xs muted">{c.levels.join(", ")}{c.eventDate ? ` · ${formatThaiDate(c.eventDate)}` : ""}</div>
+                  {/* ห้องแข่งขัน — บรรทัดเล็กแยก เพราะบางรายการใช้ 2 ห้อง ต่อท้ายบรรทัดบนแล้วยาวเกิน */}
+                  {c.venues.length > 0 && (
+                    <div className="text-xs muted row" style={{ gap: 3, flexWrap: "wrap" }}>
+                      <Icon name="pin" size={12} />
+                      <span>{c.venues.join(", ")}</span>
+                    </div>
+                  )}
                 </td>
                 <td className="text-sm" data-label="หมวด">{c.groupName}</td>
                 <td data-label="ประเภท">

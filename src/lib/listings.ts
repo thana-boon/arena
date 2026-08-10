@@ -11,6 +11,7 @@ import {
   minClassLevelIndex,
 } from "@/lib/domain";
 import { listStudents } from "@/lib/external/student-api";
+import { getVenueLabelsByCompetition } from "@/lib/venues";
 
 export type CompListItem = {
   id: number;
@@ -25,6 +26,8 @@ export type CompListItem = {
   /** เหตุผลที่ครูแก้/ลบรายการนี้ไม่ได้ตอนนี้ (null = ยังอยู่ในช่วงที่แก้ได้) — admin ไม่ติดข้อนี้ */
   compEditReason: string | null;
   levels: string[];
+  /** ห้องที่เลือกไว้ ("อาคาร · ห้อง") — ว่างถ้ายังไม่ระบุ, มีได้หลายห้องต่อรายการ */
+  venues: string[];
   eventDate: string | null;
   startTime: string | null;
   endTime: string | null;
@@ -53,6 +56,7 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
     .select()
     .from(entries)
     .where(and(inArray(entries.competitionId, compIds), eq(entries.status, "active")));
+  const venueLabels = await getVenueLabelsByCompetition(compIds);
 
   const rows = comps.map((c) => {
     const cRows = caps.filter((x) => x.competitionId === c.id);
@@ -68,6 +72,7 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
       eventName: eventName(c.eventId),
       compEditReason: editReason(c.eventId),
       levels: parseJsonArray(c.allowedClassLevels),
+      venues: venueLabels.get(c.id) ?? [],
       eventDate: c.eventDate,
       startTime: c.startTime,
       endTime: c.endTime,

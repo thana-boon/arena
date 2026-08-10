@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
 import { canViewCompetition } from "@/lib/permit";
-import { certIssueInput } from "@/lib/validation";
+import { certIssueInput, certUndoInput } from "@/lib/validation";
 import { getYearWithSettings } from "@/lib/queries";
 import { computeCompetitionResults } from "@/lib/results";
 import { getRoster } from "@/lib/roster";
@@ -13,9 +13,27 @@ import {
   getEventTemplates,
   issueCertificates,
   lockEventIfNeeded,
+  undoIssuesForCompetition,
   type IssueTarget,
 } from "@/lib/certificates";
 import { logAudit } from "@/lib/audit";
+import type { SessionPayload } from "@/lib/auth/session";
+
+/**
+ * รายการแข่งขัน + สิทธิ์ของผู้เรียก — ขาออกใบและขายกเลิกต้องใช้เกณฑ์เดียวกันเป๊ะ ๆ
+ * (ใครออกใบของรายการไหนได้ ก็ต้องถอนคืนได้ ไม่งั้นครูออกไปแล้วถอนเองไม่ได้ ต้องวิ่งหา admin)
+ */
+async function findAllowedCompetition(s: SessionPayload, competitionId: number) {
+  const comp = (
+    await db.select().from(competitions).where(eq(competitions.id, competitionId)).limit(1)
+  )[0];
+  if (!comp) return { comp: null, allowed: false };
+
+  const group = comp.subjectGroupId == null ? undefined : (
+    await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1)
+  )[0];
+  return { comp, allowed: canViewCompetition(s, comp.createdBy, group?.catalogNo) };
+}
 
 /**
  * ครูสั่งออกเกียรติบัตรของรายการแข่งขันหนึ่ง — ออกให้สมาชิกทุกคนใน entry ที่เลือก (หรือทุก entry ถ้าไม่ระบุ)
@@ -27,16 +45,9 @@ export async function POST(req: Request) {
     const s = await apiRequireRole("teacher", "recorder", "admin");
     const { competitionId, entryIds } = certIssueInput.parse(await req.json());
 
-    const comp = (
-      await db.select().from(competitions).where(eq(competitions.id, competitionId)).limit(1)
-    )[0];
+    const { comp, allowed } = await findAllowedCompetition(s, competitionId);
     if (!comp) return fail("ไม่พบรายการแข่งขัน", 404);
-
-    const group = comp.subjectGroupId == null ? undefined : (
-      await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1)
-    )[0];
-    if (!canViewCompetition(s, comp.createdBy, group?.catalogNo))
-      return fail("ออกเกียรติบัตรได้เฉพาะรายการในหมวดของท่าน", 403);
+    if (!allowed) return fail("ออกเกียรติบัตรได้เฉพาะรายการในหมวดของท่าน", 403);
 
     const event = await findEventForCompetition(competitionId);
     if (!event) return fail("รายการนี้ยังไม่ถูกจัดเข้างาน กรุณาแจ้งผู้ดูแลระบบ");
@@ -142,5 +153,37 @@ export async function POST(req: Request) {
       count: issued.length,
       newCount: issued.filter((i) => !i.reused).length,
     });
+  });
+}
+
+/**
+ * ยกเลิกการออกเกียรติบัตรของรายการหนึ่ง — ถอนใบทั้งล็อตให้เหมือนไม่เคยกดออก
+ * (คืนเลขทะเบียนที่จองไว้ + ปลดล็อกงานถ้าไม่เหลือใบเลย — รายละเอียดที่ undoIssuesForCompetition)
+ *
+ * สิทธิ์เท่ากับขาออกใบ ถอนได้ทีละรายการเท่านั้น เพราะเลขทะเบียนถอยคืนได้เฉพาะตอนถอนยกล็อต
+ */
+export async function DELETE(req: Request) {
+  return handle(async () => {
+    const s = await apiRequireRole("teacher", "recorder", "admin");
+    const { competitionId } = certUndoInput.parse(await req.json());
+
+    const { comp, allowed } = await findAllowedCompetition(s, competitionId);
+    if (!comp) return fail("ไม่พบรายการแข่งขัน", 404);
+    if (!allowed) return fail("ยกเลิกได้เฉพาะรายการในหมวดของท่าน", 403);
+
+    const res = await undoIssuesForCompetition(competitionId);
+    if (!res.deleted) return fail("รายการนี้ยังไม่ได้ออกเกียรติบัตร");
+
+    // เก็บเลขทะเบียนที่ถอนไว้ในบันทึกด้วย — ทะเบียนคุมมีรูโหว่เมื่อไหร่ต้องตามได้ว่าใครถอนและถอนเลขไหน
+    await logAudit(s.code, "undo_certificates", {
+      competitionId,
+      competitionName: comp.name,
+      eventId: res.eventId,
+      count: res.deleted,
+      serials: res.serials,
+      eventUnlocked: res.eventUnlocked,
+    });
+
+    return ok({ count: res.deleted, eventUnlocked: res.eventUnlocked });
   });
 }

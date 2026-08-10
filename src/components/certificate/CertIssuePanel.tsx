@@ -1,8 +1,10 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/client";
 import { Icon } from "@/components/Icon";
+import { useConfirm } from "@/components/ConfirmDialog";
 import type { CertIssueCompRow } from "@/lib/certIssuing";
 
 // window.open ไม่ถูกเติม basePath (/arena) ให้อัตโนมัติเหมือน <Link> — ต้อง prefix เอง
@@ -20,6 +22,8 @@ export function CertIssuePanel({
 }) {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [msg, setMsg] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const confirm = useConfirm();
+  const router = useRouter();
 
   async function issue(r: CertIssueCompRow) {
     setBusyId(r.id);
@@ -39,8 +43,38 @@ export function CertIssuePanel({
     window.open(`${BASE}/certificates/print?ids=${res.data.issueIds.join(",")}`, "_blank");
     setMsg({
       type: "success",
-      text: `ออกเกียรติบัตร ${res.data.count} ใบ (ใหม่ ${res.data.newCount} ใบ) — เปิดแท็บสำหรับพิมพ์แล้ว`,
+      text: `ออกเกียรติบัตร ${res.data.count} ใบ (ใหม่ ${res.data.newCount} ใบ) — เปิดแท็บสำหรับพิมพ์แล้ว · ถ้าแค่ลองดู กด “ยกเลิกการออก” เพื่อถอนคืนได้`,
     });
+    router.refresh(); // ช่อง "ออกแล้ว" กับปุ่มยกเลิกมาจากฝั่งเซิร์ฟเวอร์ ต้องดึงใหม่
+  }
+
+  /** ถอนใบทั้งล็อตของรายการนี้ — สำหรับคนที่กดออกเพื่อดูหน้าตาใบเฉย ๆ */
+  async function undo(r: CertIssueCompRow) {
+    const okDo = await confirm({
+      title: "ยกเลิกการออกเกียรติบัตร",
+      message: `ลบเกียรติบัตรของ “${r.name}” ทั้งหมด ${r.issuedCount} ใบ แล้วคืนเลขทะเบียนที่จองไว้ · ถ้ามีใบที่พิมพ์แจกไปแล้ว ใบเหล่านั้นจะสแกน QR ตรวจสอบไม่ผ่านอีกต่อไป`,
+      confirmText: "ยกเลิกการออก",
+      danger: true,
+    });
+    if (!okDo) return;
+
+    setBusyId(r.id);
+    setMsg(null);
+    const res = await api.del<{ count: number; eventUnlocked: boolean }>(
+      "/api/certificates/issue",
+      { competitionId: r.id },
+      { timeoutMs: 60_000 }
+    );
+    setBusyId(null);
+    if (!res.ok) return setMsg({ type: "error", text: res.error });
+
+    setMsg({
+      type: "success",
+      text: `ยกเลิกเกียรติบัตรของ “${r.name}” แล้ว ${res.data.count} ใบ${
+        res.data.eventUnlocked ? " · งานนี้ไม่เหลือใบที่ออกไว้ กลับไปแก้แม่แบบได้แล้ว" : ""
+      }`,
+    });
+    router.refresh();
   }
 
   return (
@@ -50,6 +84,7 @@ export function CertIssuePanel({
           <h1>{eventName}</h1>
           <div className="subtitle">
             เลือกรายการเพื่อออกเกียรติบัตรให้ผู้เข้าร่วมทุกคน · ระบบจะเปิดแท็บใหม่ให้บันทึกเป็น PDF (Ctrl/⌘+P)
+            {" · "}กดออกไปแล้วถอนคืนได้ด้วยปุ่ม “ยกเลิกการออก” (ลองดูหน้าตาใบก่อนได้ ไม่เปลืองเลขทะเบียน)
           </div>
         </div>
         <Link href={backHref} className="btn btn-sm">
@@ -86,7 +121,7 @@ export function CertIssuePanel({
                     {r.issuedCount > 0 ? `${r.issuedCount} ใบ` : <span className="muted">—</span>}
                   </td>
                   <td className="num td-actions">
-                    <div className="row" style={{ justifyContent: "flex-end" }}>
+                    <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
                       {r.ready ? (
                         <button
                           className="btn btn-sm btn-primary"
@@ -95,13 +130,24 @@ export function CertIssuePanel({
                         >
                           <Icon name="printer" size={16} />{" "}
                           {busyId === r.id
-                            ? "กำลังออก…"
+                            ? "กำลังทำงาน…"
                             : r.issuedCount > 0
                               ? "ออก/พิมพ์ซ้ำ"
                               : "ออกเกียรติบัตร"}
                         </button>
                       ) : (
                         <span className="badge">{r.reason}</span>
+                      )}
+                      {/* ออกไปแล้วต้องถอนได้เสมอ แม้รายการจะกลับไปสถานะออกใหม่ไม่ได้ (เช่น ยกเลิกประกาศผล) */}
+                      {r.issuedCount > 0 && (
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          onClick={() => undo(r)}
+                          disabled={busyId === r.id}
+                          title="ลบใบที่ออกไปแล้วทั้งหมดของรายการนี้ และคืนเลขทะเบียน"
+                        >
+                          <Icon name="close" size={16} /> ยกเลิกการออก
+                        </button>
                       )}
                     </div>
                   </td>

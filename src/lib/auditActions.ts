@@ -35,6 +35,7 @@ export const AUDIT_GROUPS: { key: AuditGroupKey; label: string; actions: string[
       "save_cert_template",
       "upload_cert_asset",
       "issue_certificates",
+      "undo_certificates",
     ],
   },
   {
@@ -103,6 +104,7 @@ export const ACTION_LABEL: Record<string, string> = {
   save_cert_template: "บันทึกแม่แบบเกียรติบัตร",
   upload_cert_asset: "อัปโหลดรูปเกียรติบัตร",
   issue_certificates: "ออกเกียรติบัตร",
+  undo_certificates: "ยกเลิกการออกเกียรติบัตร",
 
   create_venue: "เพิ่มสถานที่",
   update_venue: "แก้ไขสถานที่",

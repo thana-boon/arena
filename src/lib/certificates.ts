@@ -365,6 +365,87 @@ export async function issueCertificates(params: {
   }
 }
 
+export type UndoResult = {
+  deleted: number;
+  serials: string[];
+  eventId: number | null;
+  /** งานถูกปลดจาก locked กลับเป็น published เพราะไม่เหลือใบในงานเลย */
+  eventUnlocked: boolean;
+};
+
+/**
+ * ยกเลิกการออกเกียรติบัตรของรายการหนึ่ง — ลบใบทั้งล็อตทิ้งจริง ๆ ไม่ใช่ soft delete
+ *
+ * ทำไมต้องลบ ไม่ใช่ทำเครื่องหมาย "ยกเลิก": ครูกด "ออกเกียรติบัตร" เพื่อดูว่าใบจริงหน้าตาเป็นยังไงบ่อยมาก
+ * ถ้าเก็บแถวไว้ ทุกครั้งที่ลองจะเผาเลขทะเบียนของโรงเรียนทิ้งถาวรและงานค้างสถานะ locked แก้ดีไซน์ไม่ได้
+ * (ช่อง revoked_at ยังมีไว้สำหรับ "ใบจริงที่แจกไปแล้วแต่ต้องประกาศเป็นโมฆะ" ซึ่งคนละเรื่องกัน)
+ *
+ * สองอย่างที่ต้องคืนสภาพด้วย ไม่งั้นเรียกว่ายกเลิกไม่ได้จริง:
+ *   1) ตัวเดินเลขทะเบียน — ถอยกลับไปเท่าเลขสูงสุดที่ยังเหลืออยู่จริงในปีนั้น
+ *      ⚠ ต้องล็อกแถว counter ก่อนแตะอะไรทั้งสิ้น: ครูอีกคนที่กำลังจองเลขอยู่จะถูกบังคับให้รอ
+ *      และใบที่เขา commit ไปก่อนหน้าจะถูกมองเห็นตอนหาค่า MAX (READ COMMITTED อ่านค่าล่าสุด
+ *      หลังได้ล็อก) — ไม่งั้นเราถอยเลขทับใบที่เพิ่งออกไป แล้วใบถัดไปได้เลขซ้ำ
+ *   2) สถานะงาน — ถ้าทั้งงานไม่เหลือใบเลย ปลด locked กลับเป็น published ให้ admin แก้แม่แบบต่อได้
+ */
+export async function undoIssuesForCompetition(competitionId: number): Promise<UndoResult> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const rows = (
+      await client.query<{ year_id: number; event_id: number; serial_no: string }>(
+        `SELECT year_id, event_id, serial_no FROM certificate_issues
+         WHERE competition_id = $1 ORDER BY id`,
+        [competitionId]
+      )
+    ).rows;
+    if (!rows.length) {
+      await client.query("COMMIT");
+      return { deleted: 0, serials: [], eventId: null, eventUnlocked: false };
+    }
+
+    // ใบของรายการเดียวอยู่ปีเดียวและงานเดียวเสมอ (มาจาก competition ตัวเดียวกัน)
+    const yearId = rows[0].year_id;
+    const eventId = rows[0].event_id;
+
+    await client.query(`SELECT last_no FROM certificate_counters WHERE year_id = $1 FOR UPDATE`, [
+      yearId,
+    ]);
+
+    await client.query(`DELETE FROM certificate_issues WHERE competition_id = $1`, [competitionId]);
+
+    // เลขล่าสุดใหม่ = เลขสูงสุดที่ยังเหลือในปีนั้น (0 = ไม่เหลือใบเลย → ปีนี้เริ่มนับหนึ่งใหม่)
+    // เลขที่อยู่กลาง ๆ ของช่วง (รายการอื่นออกใบคร่อมไว้) ถอยคืนไม่ได้ กลายเป็นเลขว่างตามจริง
+    await client.query(
+      `UPDATE certificate_counters SET last_no = COALESCE(
+         (SELECT MAX(split_part(serial_no, '/', 2)::int) FROM certificate_issues WHERE year_id = $1), 0)
+       WHERE year_id = $1`,
+      [yearId]
+    );
+
+    const left = await client.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM certificate_issues WHERE event_id = $1`,
+      [eventId]
+    );
+    let eventUnlocked = false;
+    if (Number(left.rows[0].n) === 0) {
+      const upd = await client.query(
+        `UPDATE events SET status = 'published' WHERE id = $1 AND status = 'locked'`,
+        [eventId]
+      );
+      eventUnlocked = (upd.rowCount ?? 0) > 0;
+    }
+
+    await client.query("COMMIT");
+    return { deleted: rows.length, serials: rows.map((r) => r.serial_no), eventId, eventUnlocked };
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 /** ล็อกงานเมื่อออกใบแรก — admin ต้องกดปลดล็อกเองถ้าจะแก้ดีไซน์ (กันใบพิมพ์ซ้ำหน้าตาไม่ตรงกับใบที่แจกไปแล้ว) */
 export async function lockEventIfNeeded(eventId: number): Promise<void> {
   await db

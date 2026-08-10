@@ -190,3 +190,8 @@ export const certIssueInput = z.object({
   competitionId: z.number().int().positive(),
   entryIds: z.array(z.number().int().positive()).optional(), // ว่าง = ทุก entry ที่ได้เหรียญ
 });
+
+// ยกเลิกการออกเกียรติบัตร: ถอนทั้งรายการเท่านั้น (ถอนทีละใบจะทำให้เลขทะเบียนเป็นรูโหว่)
+export const certUndoInput = z.object({
+  competitionId: z.number().int().positive(),
+});

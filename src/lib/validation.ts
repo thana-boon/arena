@@ -114,6 +114,11 @@ export const certEventInput = z.object({
   compEditOpen: z.boolean().optional(),
   compEditStart: z.string().nullable().optional(),
   compEditEnd: z.string().nullable().optional(),
+  // การเปลี่ยนตัวผู้เข้าแข่งขัน — เปิด/ปิดแยกเดี่ยวกับทีม ; ช่วงเวลาใช้ร่วมกัน (admin ไม่ติดทั้งคู่)
+  subOpenIndividual: z.boolean().optional(),
+  subOpenTeam: z.boolean().optional(),
+  subStart: z.string().nullable().optional(),
+  subEnd: z.string().nullable().optional(),
 });
 export type CertEventInput = z.infer<typeof certEventInput>;
 

@@ -2,8 +2,11 @@ import type { Role, SessionPayload } from "@/lib/auth/session";
 import {
   competitionEditWindow,
   registrationWindow,
+  substitutionWindow,
   type CompEditWindowEvent,
+  type CompType,
   type RegWindowEvent,
+  type SubWindowEvent,
 } from "@/lib/domain";
 
 /**
@@ -115,6 +118,48 @@ export function withdrawGuard(
     allowed: w.open,
     message: w.open ? "" : `${w.reason} — ยกเลิกการลงทะเบียนไม่ได้แล้ว หากจำเป็นกรุณาติดต่อผู้ดูแลระบบ`,
   };
+}
+
+/**
+ * ตอนนี้เปลี่ยนตัวผู้เข้าแข่งขันในรายการนี้ได้ไหม — ด่าน "เวลา" ของการเปลี่ยนตัว
+ *
+ * คู่กับ canSubstitute ที่ถามว่า "ใครมีสิทธิ์" — ต้องผ่านทั้งคู่ถึงจะเปลี่ยนได้จริง
+ * ถามเป็นรายรายการ ไม่ใช่รายงาน เพราะสวิตช์แยกเดี่ยว/ทีม (ดู substitutionWindow)
+ *
+ * admin เปลี่ยนได้ตลอดเวลา — เป็นทางออกเดียวเมื่อมีเหตุจำเป็นนอกช่วงที่ตั้งไว้
+ * (เช่น นักเรียนป่วยเช้าวันแข่ง) และทุกครั้งมีร่องรอยทั้งใน audit log และประวัติการเปลี่ยนตัว
+ * นักเรียนไม่มีสิทธิ์เลย ไม่ว่าช่วงเวลาไหน — การเปลี่ยนตัวเป็นการตัดสินใจของครูผู้ดูแลรายการ
+ */
+export function substitutionGuard(
+  actor: { role: Role },
+  event: SubWindowEvent | null | undefined,
+  compType: CompType,
+  now: Date = new Date()
+): { allowed: boolean; message: string } {
+  if (actor.role === "admin") return { allowed: true, message: "" };
+  if (actor.role === "student")
+    return { allowed: false, message: "นักเรียนเปลี่ยนตัวเองไม่ได้ — ต้องให้ครูผู้ดูแลรายการเป็นผู้เปลี่ยน" };
+  const w = substitutionWindow(event, compType, now);
+  return {
+    allowed: w.open,
+    message: w.open ? "" : `${w.reason} — หากจำเป็นต้องเปลี่ยนตัว กรุณาติดต่อผู้ดูแลระบบ`,
+  };
+}
+
+/**
+ * ใครเปลี่ยนตัวในรายการนี้ได้ — เกณฑ์เดียวกับ "ใครเห็นรายการนี้"
+ * (admin/recorder ทุกรายการ · ครูเห็นเฉพาะของตัวเองกับหมวดตัวเอง) แต่ตัดนักเรียนออกชัด ๆ
+ *
+ * ใช้เกณฑ์เดียวกับการบันทึกคะแนน ไม่ใช่ canEditCompetition เพราะการเปลี่ยนตัวเป็นงาน "หน้างาน"
+ * แบบเดียวกับบันทึกผล ไม่ใช่การแก้โครงสร้างรายการ
+ */
+export function canSubstitute(
+  session: SessionPayload,
+  createdByCode: string,
+  groupCatalogNo: number | null | undefined
+): boolean {
+  if (session.role === "student") return false;
+  return canViewCompetition(session, createdByCode, groupCatalogNo);
 }
 
 /**

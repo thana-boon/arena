@@ -2,7 +2,7 @@ import { getActiveYearWithSettings } from "@/lib/queries";
 import { db } from "@/db";
 import { events, competitions, announcements } from "@/db/schema";
 import { asc, desc, eq, sql } from "drizzle-orm";
-import { competitionEditWindow } from "@/lib/domain";
+import { competitionEditWindow, substitutionSummary } from "@/lib/domain";
 import { SettingsForm } from "./SettingsForm";
 import { EventsManager, type EventItem } from "./EventsManager";
 import { AnnouncementsManager, type AnnouncementItem } from "./AnnouncementsManager";
@@ -79,8 +79,13 @@ export default async function SettingsPage() {
     compEditOpen: e.compEditOpen,
     compEditStart: toLocalInput(e.compEditStart),
     compEditEnd: toLocalInput(e.compEditEnd),
+    subOpenIndividual: e.subOpenIndividual,
+    subOpenTeam: e.subOpenTeam,
+    subStart: toLocalInput(e.subStart),
+    subEnd: toLocalInput(e.subEnd),
     // สรุปสถานะ ณ ตอน render ที่เซิร์ฟเวอร์ — คิดฝั่ง client จะได้ค่าคนละอย่างกับ SSR (hydration เพี้ยน)
     compEditReason: competitionEditWindow(e).reason,
+    subStatus: substitutionSummary(e),
     competitionCount: countMap.get(e.id) ?? 0,
   }));
 

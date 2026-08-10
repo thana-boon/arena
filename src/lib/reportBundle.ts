@@ -17,7 +17,7 @@ import type { SessionPayload } from "@/lib/auth/session";
 import { computeCompetitionResults } from "@/lib/results";
 import { getRoster } from "@/lib/roster";
 import { resolveClassNumbers, withClassNumbers, type ClassNumberMap } from "@/lib/classNumbers";
-import { MEDAL_LABEL, parseJsonArray, isUnlimited, UNLIMITED_CAPACITY } from "@/lib/domain";
+import { MEDAL_LABEL, parseJsonArray, isUnlimited, UNLIMITED_CAPACITY, minClassLevelIndex } from "@/lib/domain";
 import type { SheetEntry } from "@/components/report/sheetLayout";
 
 export type MedalPct = { gold: number; silver: number; bronze: number };
@@ -202,9 +202,13 @@ export async function getReportBundles(
     );
   }
 
-  // เรียงตามหมวด แล้วตามชื่อรายการ ให้เอกสารออกมาเป็นระเบียบ
-  bundles.sort((a, b) =>
-    a.groupName.localeCompare(b.groupName, "th") || a.meta.competitionName.localeCompare(b.meta.competitionName, "th")
+  // เรียงตามหมวด → ระดับชั้น (เตรียม → อ → ป → ม) → ชื่อรายการ
+  // ระดับชั้นมาก่อนชื่อ เพราะเอกสารพิมพ์ออกมาแล้วคนอ่านไล่จากชั้นเล็กไปชั้นโต ไม่ได้ไล่ตามตัวอักษร
+  bundles.sort(
+    (a, b) =>
+      a.groupName.localeCompare(b.groupName, "th") ||
+      minClassLevelIndex(a.levels) - minClassLevelIndex(b.levels) ||
+      a.meta.competitionName.localeCompare(b.meta.competitionName, "th")
   );
   return { yearBe: year.yearBe, bundles };
 }

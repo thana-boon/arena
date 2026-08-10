@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
-import { CLASS_LEVELS } from "@/lib/domain";
+import { classLevelIndex } from "@/lib/domain";
 import type { ReportBundle } from "@/lib/reportBundle";
 import {
   CatalogSheet,
@@ -16,12 +16,6 @@ import {
 
 // basePath (/arena) ไม่ถูกเติมให้ window.open อัตโนมัติ ต้อง prefix เอง
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-
-/** ลำดับระดับชั้นตาม CLASS_LEVELS (ชั้นที่ไม่รู้จักไปท้ายสุด) */
-const levelIndex = (lv: string) => {
-  const i = (CLASS_LEVELS as readonly string[]).indexOf(lv);
-  return i === -1 ? 999 : i;
-};
 
 export function ReportsByEvent({
   yearBe,
@@ -46,7 +40,8 @@ export function ReportsByEvent({
   const [groupIds, setGroupIds] = useState<Set<number>>(new Set());
   const [levels, setLevels] = useState<Set<string>>(new Set());
   // ใบรายการให้นักเรียน: ขึ้นหน้าใหม่ทีละหมวด (เอาไว้แจกแยกกลุ่มสาระ)
-  const [splitByGroup, setSplitByGroup] = useState(false);
+  // เปิดไว้ให้ตั้งแต่แรกเหมือนเอกสารสรุปตัวอื่น — ปิดได้ถ้าอยากได้ไฟล์เดียวยาว ๆ ประหยัดกระดาษ
+  const [splitByGroup, setSplitByGroup] = useState(true);
 
   const eventName = events.find((e) => e.id === eventId)?.name ?? "";
   const inEvent = useMemo(() => bundles.filter((b) => b.eventId === eventId), [bundles, eventId]);
@@ -63,7 +58,7 @@ export function ReportsByEvent({
   const levelOptions = useMemo(() => {
     const seen = new Set<string>();
     for (const b of inEvent) for (const lv of b.levels) seen.add(lv);
-    return [...seen].sort((a, b) => levelIndex(a) - levelIndex(b));
+    return [...seen].sort((a, b) => classLevelIndex(a) - classLevelIndex(b));
   }, [inEvent]);
 
   // รายการที่จะพิมพ์จริง — ต้องผ่านทั้งตัวกรองหมวดและระดับชั้น
@@ -79,6 +74,22 @@ export function ReportsByEvent({
   );
   const isSummaryDoc = SUMMARY_DOCS.includes(docType);
   const isFiltered = groupIds.size > 0 || levels.size > 0;
+  // หลายหมวด = เอกสารสรุปแยกหน้าให้อัตโนมัติ — บอกไว้ก่อนกดพิมพ์ว่าจะได้กี่หน้าเป็นอย่างน้อย
+  const selectedGroupCount = useMemo(
+    () => new Set(selectedBundles.map((b) => b.subjectGroupId ?? -1)).size,
+    [selectedBundles]
+  );
+
+  /** เอกสารสรุปชุดนี้จะออกมาหน้าตาแบบไหน — ใช้ในกล่องข้อความก่อนกดพิมพ์ */
+  function summaryShapeHint(): string {
+    if (docType === "catalog") return splitByGroup ? "เอกสารแยกเป็นชุดละหมวด" : "เอกสารสรุปเป็นตารางรวมฉบับเดียว";
+    if (docType === "venues") return "เอกสารสรุปเป็นตารางรวมฉบับเดียว";
+    const byGroup =
+      selectedGroupCount > 1
+        ? `แยกหน้าตามหมวด (${selectedGroupCount} หมวด = ${selectedGroupCount} หน้าเป็นอย่างน้อย)`
+        : "เอกสารสรุปเป็นตารางรวมฉบับเดียว";
+    return docType === "regcount" ? `${byGroup} + หน้าท้ายสรุปยอดแยกระดับชั้น` : byGroup;
+  }
 
   function toggleGroup(id: number) {
     setGroupIds((prev) => {
@@ -231,7 +242,7 @@ export function ReportsByEvent({
             <span>
               <span className="switch-label">แยกหน้าตามหมวดวิชา</span>
               <span className="form-hint">
-                แต่ละหมวดขึ้นหน้าใหม่พร้อมหัวเอกสารของตัวเอง — เอาไว้แจกแยกกลุ่มสาระ
+                แต่ละหมวดขึ้นหน้าใหม่พร้อมหัวเอกสารของตัวเอง — เอาไว้แจกแยกกลุ่มสาระ (ปิดได้ถ้าอยากได้ตารางรวมยาวฉบับเดียว)
               </span>
             </span>
           </label>
@@ -241,11 +252,7 @@ export function ReportsByEvent({
           {!selectedBundles.length
             ? "ไม่มีรายการตามตัวกรองที่เลือก — ลองเอาตัวกรองบางตัวออก"
             : isSummaryDoc
-              ? `เลือกไว้ ${selectedBundles.length} รายการ${isFiltered ? ` (จากทั้งหมด ${inEvent.length})` : ""} — ${
-                  docType === "catalog" && splitByGroup
-                    ? "เอกสารแยกเป็นชุดละหมวด"
-                    : "เอกสารสรุปเป็นตารางรวมฉบับเดียว"
-                } (กด "พิมพ์" เพื่อเปิดเอกสารในแท็บใหม่)`
+              ? `เลือกไว้ ${selectedBundles.length} รายการ${isFiltered ? ` (จากทั้งหมด ${inEvent.length})` : ""} — ${summaryShapeHint()} (กด "พิมพ์" เพื่อเปิดเอกสารในแท็บใหม่)`
               : `เลือกไว้ ${selectedBundles.length} รายการ${isFiltered ? ` (จากทั้งหมด ${inEvent.length})` : ""} — กด "พิมพ์" เพื่อเปิดเอกสารในแท็บใหม่ (แต่ละรายการขึ้นหน้าใหม่)`}
         </div>
       </div>

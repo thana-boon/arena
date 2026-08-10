@@ -13,6 +13,11 @@ export type RosterMember = {
   classNumber: string;
   /** ลงทะเบียนไว้แต่ไม่มาแข่ง — ยังอยู่ในรายชื่อ แต่ไม่ออกเกียรติบัตรให้ */
   absent: boolean;
+  /**
+   * คนนี้เข้ามาแทนคนเดิม (เปลี่ยนตัว) — ใช้ติดป้าย "(เปลี่ยนตัว)" ที่หน้าบันทึกผลเท่านั้น
+   * ห้ามเอาไปต่อท้ายชื่อในเอกสาร/เกียรติบัตร (ดูหมายเหตุที่ entry_members.substituted)
+   */
+  substituted: boolean;
 };
 
 export type RosterEntry = {
@@ -41,6 +46,7 @@ export async function getRoster(competitionId: number): Promise<RosterEntry[]> {
         classRoom: m.classRoomSnapshot,
         classNumber: m.classNumberSnapshot,
         absent: m.absent,
+        substituted: m.substituted,
       })),
   }));
 }

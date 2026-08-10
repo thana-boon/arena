@@ -26,6 +26,7 @@ const TABLES = [
   "criteria",
   "entries",
   "entry_members",
+  "entry_substitutions",
   "scores",
   "audit_log",
   "announcements",

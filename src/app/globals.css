@@ -2140,6 +2140,12 @@ p {
   .report-section:first-child {
     break-before: auto;
   }
+  /* เส้นคั่นบนจอมีไว้ดูตัวอย่าง — บนกระดาษแต่ละใบอยู่คนละหน้าอยู่แล้ว เส้นกับช่องว่างหัวหน้าไม่ต้องมี */
+  .report-section + .report-section {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
   /* แถวหัวหมวดในเอกสารสรุป: พื้นเทาให้พิมพ์ติด + ไม่ให้หัวหมวดหลุดไปอยู่ท้ายหน้าโดด ๆ */
   .report-group-row td {
     background: #e5e5e5 !important;

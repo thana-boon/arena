@@ -22,6 +22,8 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/competitions", label: "รายการแข่งขัน", icon: "trophy", short: "รายการ", primary: true },
       { href: "/admin/class-registrations", label: "การสมัครรายห้อง", icon: "clipboard", short: "รายห้อง", primary: true },
+      // อยู่ต่อจากการสมัคร เพราะเป็นงานที่เกิดหลังปิดรับสมัคร (คนที่ลงไว้แล้วมาไม่ได้)
+      { href: "/admin/substitutions", label: "การเปลี่ยนตัว", icon: "restore", short: "เปลี่ยนตัว" },
       { href: "/admin/results", label: "ประกาศผล", icon: "chart" },
     ],
   },
@@ -53,6 +55,8 @@ export const TEACHER_NAV_GROUPS: NavGroup[] = [
       // ครูประจำชั้นใช้บ่อยที่สุด (ลงสมัครแทนนักเรียนในห้องตัวเอง) — ต้องอยู่ติดกับ "รายการ" บนแถบล่าง
       // เรียงให้ตรงกับเมนูฝั่ง admin (รายการแข่งขัน → การสมัครรายห้อง) จะได้ไม่สลับที่กันคนละมุม
       { href: "/teacher/class-registrations", label: "การสมัครรายห้อง", icon: "graduation", short: "ห้องของฉัน", primary: true },
+      // เปลี่ยนตัวผู้เข้าแข่งขันในหมวดตัวเอง (ตามช่วงเวลาที่ผู้ดูแลระบบเปิดไว้)
+      { href: "/teacher/substitutions", label: "การเปลี่ยนตัว", icon: "restore", short: "เปลี่ยนตัว" },
       // ครูทุกคนบันทึกคะแนนรายการในหมวดตัวเองได้ (admin/recorder ได้ทุกรายการ)
       { href: "/teacher/scoring", label: "บันทึกผล", icon: "pencil", primary: true },
       // ภาพรวม "ประกาศแล้ว/ยังไม่ประกาศ" ของทั้งหมวด — งานหลังบันทึกคะแนนเสร็จ จึงอยู่ถัดจาก "บันทึกผล"

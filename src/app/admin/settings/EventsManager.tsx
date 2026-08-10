@@ -26,6 +26,13 @@ export type EventItem = {
   compEditEnd: string;
   /** เหตุผลที่ครูแก้รายการไม่ได้ ณ ตอนนี้ (null = ยังแก้ได้) — คิดมาจากเซิร์ฟเวอร์ */
   compEditReason: string | null;
+  // การเปลี่ยนตัวผู้เข้าแข่งขัน — สวิตช์แยกเดี่ยว/ทีม + ช่วงเวลาที่ใช้ร่วมกัน
+  subOpenIndividual: boolean;
+  subOpenTeam: boolean;
+  subStart: string;
+  subEnd: string;
+  /** สรุปสถานะการเปลี่ยนตัว ณ ตอนนี้ (null = ปิดทั้งเดี่ยวและทีม) — คิดมาจากเซิร์ฟเวอร์ */
+  subStatus: { label: string; open: boolean } | null;
   competitionCount: number;
 };
 
@@ -157,6 +164,10 @@ function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) 
       compEditOpen: f.compEditOpen,
       compEditStart: f.compEditStart || null,
       compEditEnd: f.compEditEnd || null,
+      subOpenIndividual: f.subOpenIndividual,
+      subOpenTeam: f.subOpenTeam,
+      subStart: f.subStart || null,
+      subEnd: f.subEnd || null,
     });
     setBusy(false);
     if (!res.ok) {
@@ -193,6 +204,7 @@ function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) 
           {ev.visibleToStudents && <span className="badge badge-purple">นักเรียนเห็น</span>}
           {ev.registrationOpen && <span className="badge badge-gold">เปิดรับสมัคร</span>}
           {ev.compEditReason && <span className="badge badge-warning">ครูแก้รายการไม่ได้</span>}
+          {ev.subStatus?.open && <span className="badge badge-purple">เปลี่ยนตัวได้</span>}
           {isDefault && <span className="badge badge-purple">ค่าเริ่มต้น</span>}
           {ev.eventDate && <span className="muted text-sm">· จัดวันที่ {formatThaiDate(ev.eventDate)}</span>}
           <span className="muted text-sm">· {ev.competitionCount} รายการ</span>
@@ -271,6 +283,39 @@ function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) 
           <span className="form-hint" style={{ marginTop: -8 }}>
             นอกช่วงนี้ ครูจะสร้าง/แก้ไข/ลบรายการในงานนี้ไม่ได้ — ผู้ดูแลระบบยังทำได้ตลอด ·
             เว้นว่างไว้ = ไม่จำกัดช่วงเวลา · ควรปิดก่อนวันที่นักเรียนเริ่มลงทะเบียน
+          </span>
+
+          <div style={{ borderTop: "0.5px solid var(--skdw-border)", paddingTop: 12 }}>
+            <strong className="text-sm">การเปลี่ยนตัวผู้เข้าแข่งขัน</strong>
+            {ev.subStatus && (
+              <div className="text-sm muted">ขณะนี้: {ev.subStatus.label}</div>
+            )}
+            {!ev.subStatus && (
+              <div className="text-sm muted">ขณะนี้: ปิดการเปลี่ยนตัวทั้งเดี่ยวและทีม (ผู้ดูแลระบบยังเปลี่ยนได้)</div>
+            )}
+          </div>
+          <label className="form-check">
+            <input type="checkbox" checked={f.subOpenIndividual} onChange={(e) => set("subOpenIndividual", e.target.checked)} />
+            <span>ให้เปลี่ยนตัวได้ — รายการประเภทเดี่ยว</span>
+          </label>
+          <label className="form-check">
+            <input type="checkbox" checked={f.subOpenTeam} onChange={(e) => set("subOpenTeam", e.target.checked)} />
+            <span>ให้เปลี่ยนตัวได้ — รายการประเภททีม</span>
+          </label>
+          <div className="grid-2">
+            <div className="field">
+              <span>เริ่มเปลี่ยนตัวได้ (วัน-เวลา)</span>
+              <ThaiDateTimePicker value={f.subStart} onChange={(v) => set("subStart", v)} defaultTime="08:00" />
+            </div>
+            <div className="field">
+              <span>ปิดการเปลี่ยนตัว (วัน-เวลา)</span>
+              <ThaiDateTimePicker value={f.subEnd} onChange={(v) => set("subEnd", v)} defaultTime="16:30" />
+            </div>
+          </div>
+          <span className="form-hint" style={{ marginTop: -8 }}>
+            ช่วงเวลาใช้ร่วมกันทั้งเดี่ยวและทีม · เว้นว่างไว้ = ไม่จำกัดช่วงเวลา (เปิดค้างจนกว่าจะปิดสวิตช์) ·
+            ครูเปลี่ยนได้เฉพาะรายการในหมวดตัวเอง — ผู้ดูแลระบบเปลี่ยนได้ทุกรายการตลอดเวลา ·
+            ทุกครั้งที่เปลี่ยนจะมีประวัติว่าใครเปลี่ยนจากใครเป็นใคร ที่เมนู “การเปลี่ยนตัว”
           </span>
 
           <div className="row" style={{ gap: 8 }}>

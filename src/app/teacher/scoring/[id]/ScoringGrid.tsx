@@ -158,6 +158,13 @@ export function ScoringGrid({
                               style={away ? { textDecoration: "line-through", opacity: 0.6 } : undefined}
                             >
                               {m.name} <span className="muted">({m.classLevel}/{m.classRoom})</span>
+                              {/* คนนี้เข้ามาแทนคนเดิม — บอกกรรมการว่าชื่อไม่ตรงกับใบรายชื่อที่ถืออยู่
+                                  ป้ายนี้อยู่แค่หน้านี้ ไม่ตามไปบนเกียรติบัตร (ชื่อบนใบต้องสะอาด) */}
+                              {m.substituted && (
+                                <span className="badge badge-purple" style={{ marginLeft: 6 }}>
+                                  เปลี่ยนตัว
+                                </span>
+                              )}
                             </span>
                             <label className="form-check text-xs" style={{ margin: 0 }}>
                               <input

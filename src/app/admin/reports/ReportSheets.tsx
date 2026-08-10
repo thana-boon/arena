@@ -1,4 +1,4 @@
-import { formatThaiDate, formatLevels, hhmm, isUnlimited } from "@/lib/domain";
+import { formatThaiDate, formatLevels, hhmm, isUnlimited, CLASS_BANDS, classBand, type ClassBand } from "@/lib/domain";
 import type { ReportBundle } from "@/lib/reportBundle";
 import {
   PersonHeadCells,
@@ -24,14 +24,14 @@ export const DOC_HINT: Record<DocType, string> = {
   scoresheet: "ตารางเปล่าให้กรรมการกรอกคะแนน",
   announce: "ผลการแข่งขัน อันดับ และเหรียญ",
   summary: "ตารางรวมทุกรายการ ประเภท ห้อง จำนวนรับ",
-  regcount: "ยอดผู้สมัครรายรายการและรวมทั้งงาน",
+  regcount: "ยอดผู้สมัครรายรายการ รวมทั้งงาน และแยกตามระดับชั้น",
   venues: "รายการแข่งขันแยกตามห้อง/สถานที่",
   catalog: "ชื่อรายการ ระดับชั้น รายละเอียด — เอาไว้แจกนักเรียน",
 };
 /** จัดกลุ่มปุ่มเลือกเอกสารในหน้าออกรายงาน ให้เห็นชัดว่าอันไหนพิมพ์ทีละรายการ อันไหนเป็นตารางรวม */
 export const DOC_SECTIONS: { title: string; docs: DocType[] }[] = [
   { title: "เอกสารรายรายการ — แต่ละรายการขึ้นหน้าใหม่", docs: ["roster", "scoresheet", "announce"] },
-  { title: "เอกสารสรุปทั้งงาน — ตารางรวมฉบับเดียว", docs: ["summary", "regcount", "venues", "catalog"] },
+  { title: "เอกสารสรุปทั้งงาน — ตารางรวม (หลายหมวดขึ้นหน้าใหม่ให้เอง)", docs: ["summary", "regcount", "venues", "catalog"] },
 ];
 /** เอกสารสรุป = ตารางรวมฉบับเดียวทั้งงาน (ไม่แยกหน้าใหม่ต่อรายการ) — แสดงตัวอย่างบนจอได้เลย */
 export const SUMMARY_DOCS: DocType[] = ["summary", "regcount", "venues", "catalog"];
@@ -64,7 +64,18 @@ function groupBySubject(bundles: ReportBundle[]): { groupName: string; items: Re
   return out;
 }
 
-/** เอกสารสรุปทั้งงาน: ตารางรวมรายการ (summary) / ยอดผู้สมัคร (regcount) แยกหัวข้อตามหมวด */
+/** นับผู้สมัครแยกช่วงชั้น (เตรียม/อ./ป./ม.) — นับหัวคนตามที่ปรากฏในแต่ละรายการ เหมือน studentCount */
+function bandCounts(bundles: ReportBundle[]): Record<ClassBand, number> {
+  const out: Record<ClassBand, number> = { pre: 0, kg: 0, primary: 0, secondary: 0, other: 0 };
+  for (const b of bundles) for (const e of b.roster) for (const m of e.members) out[classBand(m.classLevel)]++;
+  return out;
+}
+
+/**
+ * เอกสารสรุปทั้งงาน: ตารางรวมรายการ (summary) / ยอดผู้สมัคร (regcount)
+ * หลายหมวด = หมวดละหน้ากระดาษ (พิมพ์แล้วแจกแยกกลุ่มสาระได้เลย ไม่ต้องนั่งตัดหน้า)
+ * ยอดผู้สมัครมีหน้าท้ายสุดสรุปยอดแยกช่วงชั้นของทุกหมวดไว้ให้ดูรวดเดียว
+ */
 export function SummarySheet({
   bundles,
   docType,
@@ -77,12 +88,57 @@ export function SummarySheet({
   yearBe: number;
 }) {
   const groups = groupBySubject(bundles);
+  const splitPages = groups.length > 1;
+
+  return (
+    <>
+      {splitPages ? (
+        groups.map((g, i) => (
+          <SummaryPage
+            key={g.groupName}
+            groups={[g]}
+            docType={docType}
+            eventName={eventName}
+            yearBe={yearBe}
+            soleGroup={g.groupName}
+            pageBreak={i > 0}
+          />
+        ))
+      ) : (
+        <SummaryPage groups={groups} docType={docType} eventName={eventName} yearBe={yearBe} showGrandTotal />
+      )}
+      {docType === "regcount" && (
+        <RegCountByBandPage groups={groups} eventName={eventName} yearBe={yearBe} pageBreak={splitPages} />
+      )}
+    </>
+  );
+}
+
+function SummaryPage({
+  groups,
+  docType,
+  eventName,
+  yearBe,
+  soleGroup = "",
+  showGrandTotal = false,
+  pageBreak = false,
+}: {
+  groups: { groupName: string; items: ReportBundle[] }[];
+  docType: "summary" | "regcount";
+  eventName: string;
+  yearBe: number;
+  /** พิมพ์แยกหมวดละหน้า: ชื่อหมวดขึ้นไปอยู่หัวเอกสารแทนแถวคั่นในตาราง */
+  soleGroup?: string;
+  showGrandTotal?: boolean;
+  pageBreak?: boolean;
+}) {
+  const bundles = groups.flatMap((g) => g.items);
   const totalStudents = bundles.reduce((s, b) => s + b.studentCount, 0);
 
   return (
-    <section className="report-section report-web" style={{ breakBefore: "auto" }}>
+    <section className="report-section report-web" style={pageBreak ? undefined : { breakBefore: "auto" }}>
       <SheetHeader
-        docLabel={DOC_LABEL[docType]}
+        docLabel={DOC_LABEL[docType] + (soleGroup ? ` · ${soleGroup === "-" ? "ไม่ระบุหมวด" : soleGroup}` : "")}
         eventName={eventName}
         note={
           <>
@@ -117,9 +173,9 @@ export function SummarySheet({
           </thead>
           <tbody>
             {groups.map((g) => (
-              <SummaryGroupRows key={g.groupName} group={g} docType={docType} />
+              <SummaryGroupRows key={g.groupName} group={g} docType={docType} showGroupRow={!soleGroup} />
             ))}
-            {docType === "regcount" && (
+            {docType === "regcount" && showGrandTotal && (
               <tr style={{ fontWeight: 700 }}>
                 <td colSpan={4}>รวมทั้งหมด {bundles.length} รายการ</td>
                 <td>{bundles.reduce((s, b) => s + b.rosterCount, 0)} รายการสมัคร</td>
@@ -136,18 +192,22 @@ export function SummarySheet({
 function SummaryGroupRows({
   group,
   docType,
+  showGroupRow,
 }: {
   group: { groupName: string; items: ReportBundle[] };
   docType: "summary" | "regcount";
+  showGroupRow: boolean;
 }) {
   const label = group.groupName === "-" ? "ไม่ระบุหมวด" : group.groupName;
   return (
     <>
-      <tr className="report-group-row">
-        <td colSpan={6}>
-          {label} ({group.items.length} รายการ)
-        </td>
-      </tr>
+      {showGroupRow && (
+        <tr className="report-group-row">
+          <td colSpan={6}>
+            {label} ({group.items.length} รายการ)
+          </td>
+        </tr>
+      )}
       {group.items.map((b, i) =>
         docType === "summary" ? (
           <tr key={b.id}>
@@ -185,6 +245,80 @@ function SummaryGroupRows({
         </tr>
       )}
     </>
+  );
+}
+
+/**
+ * หน้าท้ายของ "สรุปยอดผู้สมัคร": ยอดแยกช่วงชั้น เตรียม/อนุบาล/ประถม/มัธยม รายหมวด + รวมทั้งงาน
+ * โชว์เฉพาะช่วงชั้นที่มีคนสมัครจริง — โรงเรียนที่ไม่มีเตรียมอนุบาลจะได้ไม่ต้องมองคอลัมน์ 0 ทั้งแถบ
+ */
+function RegCountByBandPage({
+  groups,
+  eventName,
+  yearBe,
+  pageBreak,
+}: {
+  groups: { groupName: string; items: ReportBundle[] }[];
+  eventName: string;
+  yearBe: number;
+  pageBreak: boolean;
+}) {
+  const all = groups.flatMap((g) => g.items);
+  const totals = bandCounts(all);
+  const bands = CLASS_BANDS.filter((b) => totals[b.key] > 0);
+  const grandTotal = all.reduce((s, b) => s + b.studentCount, 0);
+  // ไม่มีใครสมัครเลย → ไม่ต้องมีหน้าตารางว่าง ๆ
+  if (!bands.length) return null;
+
+  const rows = groups.map((g) => ({
+    label: g.groupName === "-" ? "ไม่ระบุหมวด" : g.groupName,
+    items: g.items,
+    counts: bandCounts(g.items),
+  }));
+
+  return (
+    <section className="report-section report-web" style={pageBreak ? undefined : { breakBefore: "auto" }}>
+      <SheetHeader
+        docLabel={`${DOC_LABEL.regcount} · แยกตามระดับชั้น`}
+        eventName={eventName}
+        note={`ปีการศึกษา ${yearBe} · ${all.length} รายการ · ผู้สมัครรวม ${grandTotal} คน (คนเดียวสมัครหลายรายการนับซ้ำ)`}
+      />
+
+      <div className="table-wrap" style={{ boxShadow: "none" }}>
+        <table className="table sheet-table">
+          <thead>
+            <tr>
+              <th>หมวดวิชา</th>
+              <th className="col-fit" style={{ width: 90 }}>รายการ</th>
+              {bands.map((b) => (
+                <th key={b.key} className="num col-fit" style={{ width: 110 }}>{b.label}</th>
+              ))}
+              <th className="num col-fit" style={{ width: 100 }}>รวม (คน)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.label}>
+                <td>{r.label}</td>
+                <td className="col-fit">{r.items.length}</td>
+                {bands.map((b) => (
+                  <td key={b.key} className="num col-fit">{r.counts[b.key] || "-"}</td>
+                ))}
+                <td className="num col-fit">{r.items.reduce((s, x) => s + x.studentCount, 0)}</td>
+              </tr>
+            ))}
+            <tr style={{ fontWeight: 700 }}>
+              <td>รวมทั้งหมด</td>
+              <td className="col-fit">{all.length}</td>
+              {bands.map((b) => (
+                <td key={b.key} className="num col-fit">{totals[b.key]}</td>
+              ))}
+              <td className="num col-fit">{grandTotal}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

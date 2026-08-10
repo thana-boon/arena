@@ -22,7 +22,7 @@ export const AUDIT_GROUPS: { key: AuditGroupKey; label: string; actions: string[
   {
     key: "registration",
     label: "การลงทะเบียน",
-    actions: ["register", "register_by_staff", "override_register", "withdraw_entry"],
+    actions: ["register", "register_by_staff", "override_register", "withdraw_entry", "substitute_member"],
   },
   {
     key: "certificate",
@@ -94,6 +94,7 @@ export const ACTION_LABEL: Record<string, string> = {
   register_by_staff: "ลงทะเบียนให้นักเรียน",
   override_register: "ลงทะเบียนแบบ override",
   withdraw_entry: "ยกเลิกการลงทะเบียน",
+  substitute_member: "เปลี่ยนตัวผู้เข้าแข่งขัน",
 
   create_cert_event: "สร้างงาน",
   update_event: "แก้ไขงาน",
@@ -184,6 +185,9 @@ const DETAIL_LABEL: Record<string, string> = {
   isAdmin: "ผู้ดูแลระบบ",
   isRecorder: "ผู้บันทึกคะแนน",
   memberCodes: "สมาชิก",
+  outMember: "คนเดิม",
+  inMember: "คนใหม่",
+  reason: "เหตุผล",
   count: "จำนวน",
   new: "ออกใหม่",
   newCount: "ออกใหม่",

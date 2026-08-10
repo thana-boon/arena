@@ -245,10 +245,54 @@ export const entryMembers = pgTable(
      * และไม่แตะคะแนน/อันดับของทีม — ทีมยังแข่งด้วยสมาชิกที่เหลือตามจริง
      */
     absent: boolean("absent").notNull().default(false),
+    /**
+     * ที่นั่งนี้ผ่านการ "เปลี่ยนตัว" มา (คนปัจจุบันไม่ใช่คนที่ลงทะเบียนไว้แต่แรก)
+     *
+     * เป็นแค่ธงไว้ติดป้าย "(เปลี่ยนตัว)" ที่หน้าบันทึกผล ให้กรรมการรู้ว่าคนที่มาไม่ตรงกับใบรายชื่อเดิม
+     * ตัวประวัติว่าใครเปลี่ยนเป็นใครอยู่ที่ entry_substitutions — ธงนี้แค่ตอบว่า "เปลี่ยนมาไหม" เร็ว ๆ
+     * โดยไม่ต้อง join ทุกหน้าที่แสดงรายชื่อ
+     *
+     * ⚠ ห้ามเอาคำว่า "(เปลี่ยนตัว)" ไปต่อท้าย name_snapshot เด็ดขาด — ชื่อนี้ถูกพิมพ์ลงเกียรติบัตรตรง ๆ
+     */
+    substituted: boolean("substituted").notNull().default(false),
   },
   (t) => [
     index("member_entry_idx").on(t.entryId),
     index("member_student_idx").on(t.studentCode),
+  ]
+);
+
+// ===== ประวัติการเปลี่ยนตัวผู้เข้าแข่งขัน =====
+// 1 แถว = การเปลี่ยน 1 ครั้ง (คนออก → คนเข้า) ของที่นั่งหนึ่งใน entry
+//
+// ทำไมต้องมีตารางแยก ไม่แก้ entry_members ทิ้งไปเฉย ๆ: การเปลี่ยนตัวเป็นเรื่องที่ต้องตอบย้อนหลังได้เสมอ
+// ว่า "เดิมใคร เปลี่ยนเป็นใคร ใครสั่ง ตอนไหน" — พอแก้ทับ snapshot แล้วข้อมูลคนเดิมหายไปทั้งก้อน
+// audit_log ตอบได้แต่ต้องไปไล่อ่านเอง และเป็นของผู้ดูแลระบบ ไม่ใช่ของครูที่ดูแลรายการนั้น
+//
+// เก็บ snapshot ทั้งฝั่งเข้าและออก เพราะคนที่ถูกเปลี่ยนออกไม่เหลือแถวไหนอ้างถึงเขาอีกเลย
+// (ชั้น/ห้องเก็บเป็นข้อความรวม เช่น "ป.5/2" — ใช้อ่านอย่างเดียว ไม่ได้เอาไปคำนวณต่อ)
+export const entrySubstitutions = pgTable(
+  "entry_substitutions",
+  {
+    id: serial("id").primaryKey(),
+    competitionId: integer("competition_id").notNull(),
+    entryId: integer("entry_id").notNull(),
+    memberId: integer("member_id").notNull(), // entry_members.id ของที่นั่งที่ถูกเปลี่ยน
+    outStudentCode: varchar("out_student_code", { length: 64 }).notNull(),
+    outName: varchar("out_name", { length: 191 }).notNull(),
+    outClass: varchar("out_class", { length: 64 }).notNull().default(""),
+    inStudentCode: varchar("in_student_code", { length: 64 }).notNull(),
+    inName: varchar("in_name", { length: 191 }).notNull(),
+    inClass: varchar("in_class", { length: 64 }).notNull().default(""),
+    reason: varchar("reason", { length: 255 }).notNull().default(""),
+    byRole: varchar("by_role", { length: 16 }).notNull(),
+    byCode: varchar("by_code", { length: 64 }).notNull(),
+    byName: varchar("by_name", { length: 191 }).notNull().default(""),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("sub_comp_idx").on(t.competitionId),
+    index("sub_entry_idx").on(t.entryId),
   ]
 );
 
@@ -357,6 +401,20 @@ export const events = pgTable(
     compEditOpen: boolean("comp_edit_open").notNull().default(true),
     compEditStart: timestamp("comp_edit_start", { mode: "date" }),
     compEditEnd: timestamp("comp_edit_end", { mode: "date" }),
+    /**
+     * การเปลี่ยนตัวผู้เข้าแข่งขัน — เปิด/ปิดแยกกันระหว่างรายการเดี่ยวกับรายการทีม
+     *
+     * แยกสองสวิตช์เพราะโรงเรียนคุมคนละแบบ: ทีมมักยอมให้เปลี่ยนได้ (สมาชิกป่วยแล้วทีมแข่งไม่ครบ)
+     * ส่วนเดี่ยวคือ "คัดตัวมาแล้ว" มักปิดไว้ ไม่งั้นกลายเป็นเปลี่ยนคนแข่งกันได้ถึงหน้างาน
+     *
+     * ค่าเริ่มต้น false ทั้งคู่ = งานเดิมทุกงานยังเปลี่ยนตัวไม่ได้จนกว่าผู้ดูแลจะเปิดเอง
+     * ช่วงเวลา (subStart/subEnd) ใช้ร่วมกันทั้งสองประเภท — เว้นว่าง = ไม่จำกัดช่วงเวลา
+     * admin ไม่ติดทั้งสวิตช์และช่วงเวลา (เปลี่ยนได้ตลอด)
+     */
+    subOpenIndividual: boolean("sub_open_individual").notNull().default(false),
+    subOpenTeam: boolean("sub_open_team").notNull().default(false),
+    subStart: timestamp("sub_start", { mode: "date" }),
+    subEnd: timestamp("sub_end", { mode: "date" }),
     status: varchar("status", { length: 16 }).notNull().default("draft"),
     createdBy: varchar("created_by", { length: 64 }).notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -477,6 +535,7 @@ export type CompetitionCapacity = typeof competitionCapacity.$inferSelect;
 export type Criterion = typeof criteria.$inferSelect;
 export type Entry = typeof entries.$inferSelect;
 export type EntryMember = typeof entryMembers.$inferSelect;
+export type EntrySubstitution = typeof entrySubstitutions.$inferSelect;
 export type Score = typeof scores.$inferSelect;
 export type TeacherRole = typeof teacherRoles.$inferSelect;
 export type CertificateAsset = typeof certificateAssets.$inferSelect;

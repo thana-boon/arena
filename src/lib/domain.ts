@@ -8,6 +8,40 @@ export const CLASS_LEVELS = [
 ] as const;
 export type ClassLevel = (typeof CLASS_LEVELS)[number];
 
+/** ลำดับของชั้นตาม CLASS_LEVELS (เตรียมอนุบาล → อ. → ป. → ม.) — ชั้นที่ไม่รู้จักไปท้ายสุด */
+export function classLevelIndex(level: string): number {
+  const i = (CLASS_LEVELS as readonly string[]).indexOf(level);
+  return i === -1 ? 999 : i;
+}
+
+/** ชั้นต่ำสุดของรายการ (รายการหนึ่งรับได้หลายชั้น) — ใช้เรียงรายการเป็น เตรียม → อ → ป → ม */
+export function minClassLevelIndex(levels: string[]): number {
+  return levels.reduce((min, lv) => Math.min(min, classLevelIndex(lv)), 999);
+}
+
+/**
+ * ช่วงชั้นสำหรับสรุปยอด — เรียงตาม CLASS_LEVELS
+ * "other" ไว้รับชั้นที่อ่านไม่ออก/ไม่ระบุ เพื่อให้ยอดแยกช่วงบวกกันได้เท่ายอดรวมเสมอ
+ */
+export const CLASS_BANDS = [
+  { key: "pre", label: "เตรียมอนุบาล" },
+  { key: "kg", label: "อนุบาล" },
+  { key: "primary", label: "ประถมศึกษา" },
+  { key: "secondary", label: "มัธยมศึกษา" },
+  { key: "other", label: "ไม่ระบุชั้น" },
+] as const;
+export type ClassBand = (typeof CLASS_BANDS)[number]["key"];
+
+/** "ม.4" → "secondary" — ใช้จัดยอดผู้สมัครแยกช่วงชั้น */
+export function classBand(level: string | null | undefined): ClassBand {
+  const lv = (level ?? "").trim();
+  if (lv.startsWith("เตรียม")) return "pre";
+  if (lv.startsWith("อ.") || lv.startsWith("อนุบาล")) return "kg";
+  if (lv.startsWith("ป.")) return "primary";
+  if (lv.startsWith("ม.")) return "secondary";
+  return "other";
+}
+
 export type Medal = "gold" | "silver" | "bronze" | "none";
 
 export const MEDAL_LABEL: Record<Medal, string> = {
@@ -394,6 +428,75 @@ export function competitionEditNotice(
 }
 
 export type CompType = "individual" | "team";
+
+// ===== ช่วงเปลี่ยนตัวผู้เข้าแข่งขัน (ระดับงาน) =====
+// ต่างจากอีกสองช่วงตรงที่สวิตช์มีสองตัว แยกตามประเภทของ "รายการ" ที่กำลังถามถึง
+// (ทีมมักเปิดให้เปลี่ยน — สมาชิกป่วยแล้วแข่งไม่ครบ ; เดี่ยวคือคัดตัวมาแล้ว มักปิดไว้)
+// ช่วงวัน-เวลาใช้ร่วมกันทั้งสองประเภท — เว้นว่าง = ไม่จำกัดช่วงเวลา
+/** เท่าที่ต้องรู้ว่างานนี้ยังให้เปลี่ยนตัวอยู่ไหม */
+export type SubWindowEvent = {
+  subOpenIndividual: boolean;
+  subOpenTeam: boolean;
+  subStart: string | Date | null;
+  subEnd: string | Date | null;
+};
+
+const typeWord = (type: CompType) => (type === "team" ? "ประเภททีม" : "ประเภทเดี่ยว");
+
+/** ข้อความของช่วงเปลี่ยนตัว — บอกประเภทไปด้วย เพราะเปิดทีมแต่ปิดเดี่ยวได้ ถ้าไม่บอกครูจะงงว่าทำไมบางรายการเปลี่ยนได้ */
+const subTexts = (type: CompType): WindowTexts => ({
+  missing: "รายการนี้ยังไม่ถูกจัดเข้างาน",
+  off: `งานนี้ไม่เปิดให้เปลี่ยนตัว${typeWord(type)}`,
+  before: "ยังไม่ถึงเวลาเปลี่ยนตัว",
+  after: "หมดเวลาเปลี่ยนตัวแล้ว",
+  noEvents: "ยังไม่มีงานที่เปิดให้เปลี่ยนตัว",
+  openTitle: "เปิดให้เปลี่ยนตัว",
+  deadline: (n, at) => `${n} — เปลี่ยนตัวได้ถึง ${at}`,
+  upcoming: (n, at) => `${n} — เปิดให้เปลี่ยนตัว ${at}`,
+  ended: (n, at) => `${n} — ปิดการเปลี่ยนตัวเมื่อ ${at}`,
+});
+
+const subWin = (e: SubWindowEvent, type: CompType): Window => ({
+  enabled: type === "team" ? e.subOpenTeam : e.subOpenIndividual,
+  start: e.subStart,
+  end: e.subEnd,
+});
+
+/**
+ * ตอนนี้เปลี่ยนตัวในรายการประเภทนี้ได้ไหม + ถ้าไม่ เพราะอะไร (admin ไม่ต้องผ่านด่านนี้)
+ * ถามเป็นราย "ประเภทรายการ" ไม่ใช่รายงาน เพราะงานเดียวกันเปิดทีมแต่ปิดเดี่ยวได้
+ */
+export function substitutionWindow(
+  event: SubWindowEvent | null | undefined,
+  type: CompType,
+  now: Date = new Date()
+): { open: boolean; reason: string | null } {
+  return evalWindow(event ? subWin(event, type) : null, subTexts(type), now);
+}
+
+/**
+ * สรุปช่วงเปลี่ยนตัวของงานหนึ่งเป็นข้อความสั้น ๆ ติดบนการ์ดงาน
+ * ปิดทั้งคู่ = null (ไม่ต้องขึ้นป้าย) · เปิดอย่างน้อยหนึ่งประเภท = บอกว่าเปิดอะไรและถึงเมื่อไหร่
+ */
+export function substitutionSummary(
+  event: SubWindowEvent,
+  now: Date = new Date()
+): { label: string; open: boolean } | null {
+  const types: CompType[] = [];
+  if (event.subOpenIndividual) types.push("individual");
+  if (event.subOpenTeam) types.push("team");
+  if (!types.length) return null;
+
+  const w = substitutionWindow(event, types[0], now);
+  const what = types.length === 2 ? "เดี่ยว+ทีม" : types[0] === "team" ? "เฉพาะทีม" : "เฉพาะเดี่ยว";
+  if (!w.open) return { label: `${w.reason} (${what})`, open: false };
+  return {
+    label: event.subEnd
+      ? `เปลี่ยนตัวได้ (${what}) ถึง ${formatThaiDateTime(event.subEnd)}`
+      : `เปลี่ยนตัวได้ (${what})`,
+    open: true,
+  };
+}
 
 /** นักเรียน 1 คน + รายการที่สมัครไว้ (หน้า "การสมัครรายห้อง") */
 export type RoomStudent = {

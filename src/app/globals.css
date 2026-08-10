@@ -1549,6 +1549,28 @@ p {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* แถบเลื่อนของ ::-webkit-scrollbar ระดับ global เป็นรางสีพื้นเว็บ (สว่าง) — พาดเป็นเส้นขาวบนเมนูม่วงเข้ม
+     ที่นี่จึงทับด้วยรางใส + หัวเลื่อนจาง ๆ กลืนไปกับพื้นหลัง (กว้างเท่าเดิมตลอด เมนูจะได้ไม่ขยับตอน hover) */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(243, 239, 250, 0.22) transparent;
+}
+.side-nav::-webkit-scrollbar {
+  width: 8px;
+}
+.side-nav::-webkit-scrollbar-track,
+.side-nav::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.side-nav::-webkit-scrollbar-thumb {
+  background: rgba(243, 239, 250, 0.22);
+  border-radius: var(--radius-full);
+  /* ขอบใสบวก background-clip = หัวเลื่อนผอมลอยกลางราง โดยรางยังไม่มีสี */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.sidebar:hover .side-nav::-webkit-scrollbar-thumb {
+  background: rgba(243, 239, 250, 0.42);
+  background-clip: padding-box;
 }
 .side-group {
   display: flex;

@@ -53,6 +53,20 @@ function capacityLabel(b: ReportBundle): string {
   return `${b.capacity} ${b.meta.type === "team" ? "ทีม" : "คน"}`;
 }
 
+/** วัน–เวลาแข่งขันแบบบรรทัดเดียว เช่น "12 ส.ค. 2569 09:00–12:00 น." — ไม่มีข้อมูลเลยคืน "" */
+function scheduleLabel(b: ReportBundle): string {
+  const date = formatThaiDate(b.meta.eventDate);
+  const time = b.meta.startTime ? `${hhmm(b.meta.startTime)}–${hhmm(b.meta.endTime)} น.` : "";
+  return [date, time].filter(Boolean).join(" ");
+}
+
+/** บรรทัดเล็กใต้ชื่อรายการ: วัน–เวลา · ห้อง (ข้ามส่วนที่ยังไม่ได้กรอก) */
+function CompetitionSubLine({ b, withVenue = false }: { b: ReportBundle; withVenue?: boolean }) {
+  const parts = [scheduleLabel(b), withVenue ? b.venueName : ""].filter(Boolean);
+  if (!parts.length) return null;
+  return <div className="text-xs muted">{parts.join(" · ")}</div>;
+}
+
 /** จัดกลุ่ม bundle ตามหมวด (คงลำดับที่เรียงมาแล้วจากเซิร์ฟเวอร์: หมวด → ชื่อรายการ) */
 function groupBySubject(bundles: ReportBundle[]): { groupName: string; items: ReportBundle[] }[] {
   const out: { groupName: string; items: ReportBundle[] }[] = [];
@@ -214,12 +228,7 @@ function SummaryGroupRows({
             <td className="col-fit">{i + 1}</td>
             <td>
               {b.meta.competitionName}
-              {(b.meta.eventDate || b.meta.startTime) && (
-                <div className="text-xs muted">
-                  {formatThaiDate(b.meta.eventDate)}
-                  {b.meta.startTime ? ` ${hhmm(b.meta.startTime)}–${hhmm(b.meta.endTime)} น.` : ""}
-                </div>
-              )}
+              <CompetitionSubLine b={b} />
             </td>
             <td className="col-fit">{typeLabel(b)}</td>
             <td className="col-fit">{formatLevels(b.levels) || "-"}</td>
@@ -229,7 +238,11 @@ function SummaryGroupRows({
         ) : (
           <tr key={b.id}>
             <td className="col-fit">{i + 1}</td>
-            <td>{b.meta.competitionName}</td>
+            <td>
+              {b.meta.competitionName}
+              {/* วัน–เวลา + ห้อง ใต้ชื่อรายการ ให้ดูยอดสมัครกับตารางแข่งได้ในแผ่นเดียว */}
+              <CompetitionSubLine b={b} withVenue />
+            </td>
             <td className="col-fit">{typeLabel(b)}</td>
             <td className="col-fit">{capacityLabel(b)}</td>
             <td className="col-fit">{b.meta.type === "team" ? `${b.rosterCount} ทีม` : `${b.rosterCount} คน`}</td>
@@ -402,16 +415,7 @@ function VenueGroupRows({ group }: { group: { venueName: string; items: ReportBu
           <td>{b.meta.competitionName}</td>
           <td className="col-fit">{b.groupName === "-" ? "ไม่ระบุหมวด" : b.groupName}</td>
           <td className="col-fit">{formatLevels(b.levels) || "-"}</td>
-          <td className="col-fit">
-            {b.meta.eventDate || b.meta.startTime ? (
-              <>
-                {formatThaiDate(b.meta.eventDate)}
-                {b.meta.startTime ? ` ${hhmm(b.meta.startTime)}–${hhmm(b.meta.endTime)} น.` : ""}
-              </>
-            ) : (
-              "-"
-            )}
-          </td>
+          <td className="col-fit">{scheduleLabel(b) || "-"}</td>
         </tr>
       ))}
     </>

@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/db";
-import { competitions, competitionVenues, venues } from "@/db/schema";
-import { and, eq, ne, lt, gt, inArray } from "drizzle-orm";
+import { competitions, competitionVenues, subjectGroups, venues } from "@/db/schema";
+import { and, asc, eq, ne, lt, gt, inArray } from "drizzle-orm";
 
 export type VenueConflict = {
   id: number;
@@ -78,6 +78,63 @@ export async function getVenueLabelsByCompetition(compIds: number[]): Promise<Ma
     else out.set(r.competitionId, [label]);
   }
   return out;
+}
+
+/**
+ * รายการแข่งขันทั้งปี พร้อมห้องที่จอง — ใช้วาด "ผังการใช้ห้อง"
+ *
+ * ดึงทั้งปีทีเดียวแล้วให้ฝั่งจอสลับงาน/ช่วงเวลาเอง เพราะจำนวนรายการต่อปีอยู่ในหลักร้อย
+ * (ถ้าแยกดึงรายงาน ทุกครั้งที่เปลี่ยนงานจะต้องรอเซิร์ฟเวอร์ ทั้งที่ข้อมูลก้อนเดียวกัน)
+ * รายการที่ยังไม่ได้เลือกห้องจะได้ venueIds = [] (ผังเอาไปเตือนว่ายังไม่ระบุห้อง)
+ */
+export type ScheduledCompetition = {
+  id: number;
+  eventId: number | null;
+  name: string;
+  groupName: string;
+  eventDate: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  venueIds: number[];
+};
+
+export async function getCompetitionSchedule(yearId: number): Promise<ScheduledCompetition[]> {
+  const rows = await db
+    .select({
+      id: competitions.id,
+      eventId: competitions.eventId,
+      name: competitions.name,
+      groupName: subjectGroups.name,
+      eventDate: competitions.eventDate,
+      startTime: competitions.startTime,
+      endTime: competitions.endTime,
+    })
+    .from(competitions)
+    .leftJoin(subjectGroups, eq(subjectGroups.id, competitions.subjectGroupId))
+    .where(eq(competitions.yearId, yearId))
+    .orderBy(asc(competitions.eventDate), asc(competitions.startTime), asc(competitions.name));
+  if (!rows.length) return [];
+
+  const links = await db
+    .select({
+      competitionId: competitionVenues.competitionId,
+      venueId: competitionVenues.venueId,
+      sortOrder: competitionVenues.sortOrder,
+    })
+    .from(competitionVenues)
+    .where(inArray(competitionVenues.competitionId, rows.map((r) => r.id)));
+  const byComp = new Map<number, { venueId: number; sortOrder: number }[]>();
+  for (const l of links) {
+    const list = byComp.get(l.competitionId);
+    if (list) list.push(l);
+    else byComp.set(l.competitionId, [l]);
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    groupName: r.groupName ?? "",
+    venueIds: (byComp.get(r.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder).map((l) => l.venueId),
+  }));
 }
 
 /** venue ids ของรายการหนึ่ง เรียงตามลำดับที่เลือกในฟอร์ม */

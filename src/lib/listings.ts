@@ -2,7 +2,14 @@ import "server-only";
 import { db } from "@/db";
 import { competitions, subjectGroups, competitionCapacity, entries, events } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { parseJsonArray, CLASS_LEVELS, UNLIMITED_CAPACITY, isUnlimited, competitionEditWindow } from "@/lib/domain";
+import {
+  parseJsonArray,
+  CLASS_LEVELS,
+  UNLIMITED_CAPACITY,
+  isUnlimited,
+  competitionEditWindow,
+  minClassLevelIndex,
+} from "@/lib/domain";
 import { listStudents } from "@/lib/external/student-api";
 
 export type CompListItem = {
@@ -47,7 +54,7 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
     .from(entries)
     .where(and(inArray(entries.competitionId, compIds), eq(entries.status, "active")));
 
-  return comps.map((c) => {
+  const rows = comps.map((c) => {
     const cRows = caps.filter((x) => x.competitionId === c.id);
     return {
       id: c.id,
@@ -73,6 +80,16 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
       activeEntries: ents.filter((e) => e.competitionId === c.id).length,
     };
   });
+
+  // เรียงเหมือนตอนออกรายงาน: หมวด → ระดับชั้น (เตรียมอนุบาล → อ. → ป. → ม.) → ชื่อรายการ
+  // ครูไล่หารายการจากชั้นเล็กไปชั้นโต ไม่ได้ไล่ตามลำดับที่สร้าง
+  rows.sort(
+    (a, b) =>
+      a.groupName.localeCompare(b.groupName, "th") ||
+      minClassLevelIndex(a.levels) - minClassLevelIndex(b.levels) ||
+      a.name.localeCompare(b.name, "th")
+  );
+  return rows;
 }
 
 // ===== สรุปยอดรวมรายการแข่งขัน (สำหรับหน้า admin) =====

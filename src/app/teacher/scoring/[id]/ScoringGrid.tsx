@@ -35,6 +35,21 @@ export function ScoringGrid({
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ type: string; text: string } | null>(null);
 
+  /**
+   * คนที่ติ๊กว่า "ไม่มาแข่งขัน" (entry_members.id) — เก็บรายคน ไม่ใช่ทั้งทีม
+   * เพราะทีมหนึ่งอาจมาไม่ครบ คนที่มาแข่งจริงยังต้องได้เกียรติบัตรตามผลของทีม
+   */
+  const [absent, setAbsent] = useState<Set<number>>(
+    () => new Set(roster.flatMap((e) => e.members.filter((m) => m.absent).map((m) => m.memberId)))
+  );
+  const toggleAbsent = (memberId: number, on: boolean) =>
+    setAbsent((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(memberId);
+      else next.delete(memberId);
+      return next;
+    });
+
   const fullScore = criteria.reduce((s, c) => s + c.max, 0);
 
   function key(entryId: number, critId: number) { return `${entryId}:${critId}`; }
@@ -76,10 +91,19 @@ export function ScoringGrid({
         payload.push({ entryId: e.entryId, criterionId: c.id, score: num });
       }
     }
-    const res = await api.post(`/api/competitions/${competitionId}/scores`, { scores: payload });
+    // ส่งรายชื่อ "ไม่มาแข่งขัน" ทั้งชุดไปพร้อมคะแนน — ติ๊กเพิ่ม/เอาติ๊กออกจบในปุ่มเดียว
+    const res = await api.post(`/api/competitions/${competitionId}/scores`, {
+      scores: payload,
+      absentMemberIds: [...absent],
+    });
     setBusy(false);
     if (!res.ok) return setMsg({ type: "error", text: res.error });
-    setMsg({ type: "success", text: "บันทึกคะแนนเรียบร้อยแล้ว" });
+    setMsg({
+      type: "success",
+      text: absent.size
+        ? `บันทึกเรียบร้อยแล้ว · ไม่มาแข่งขัน ${absent.size} คน (จะไม่ได้รับเกียรติบัตร)`
+        : "บันทึกคะแนนเรียบร้อยแล้ว",
+    });
     router.refresh();
   }
 
@@ -124,7 +148,29 @@ export function ScoringGrid({
                   <td className="td-title">
                     <span className="only-sm badge badge-purple" style={{ marginRight: 6 }}>อันดับ {ranked[e.entryId]}</span>
                     {type === "team" && e.teamName && <div style={{ fontWeight: 600 }}>{e.teamName}</div>}
-                    <div className="text-sm">{e.members.map((m) => `${m.name} (${m.classLevel}/${m.classRoom})`).join(", ")}</div>
+                    <div className="stack" style={{ gap: 2 }}>
+                      {e.members.map((m) => {
+                        const away = absent.has(m.memberId);
+                        return (
+                          <div key={m.memberId} className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                            <span
+                              className="text-sm"
+                              style={away ? { textDecoration: "line-through", opacity: 0.6 } : undefined}
+                            >
+                              {m.name} <span className="muted">({m.classLevel}/{m.classRoom})</span>
+                            </span>
+                            <label className="form-check text-xs" style={{ margin: 0 }}>
+                              <input
+                                type="checkbox"
+                                checked={away}
+                                onChange={(ev) => toggleAbsent(m.memberId, ev.target.checked)}
+                              />
+                              <span className={away ? "" : "muted"}>ไม่มาแข่งขัน</span>
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </td>
                   {criteria.map((c) => (
                     <td key={c.id} className="num" data-label={`${c.name} (เต็ม ${c.max})`}>
@@ -153,7 +199,12 @@ export function ScoringGrid({
           {published ? "ยกเลิกการประกาศผล" : "ประกาศผล"}
         </button>
       </div>
-      <p className="form-hint">คะแนนจะบันทึกอัตโนมัติเมื่อกด “บันทึกคะแนน” · อันดับ/เหรียญด้านบนคือตัวอย่างจากคะแนนที่กรอก</p>
+      <p className="form-hint">
+        คะแนนจะบันทึกอัตโนมัติเมื่อกด “บันทึกคะแนน” · อันดับ/เหรียญด้านบนคือตัวอย่างจากคะแนนที่กรอก
+        <br />
+        ติ๊ก “ไม่มาแข่งขัน” ที่ชื่อคนที่ไม่ได้มา — คนนั้นจะไม่ได้รับเกียรติบัตร (ปกติได้ 0 คะแนนก็ยังได้ “เข้าร่วม”)
+        ส่วนคะแนน/อันดับของทีมยังคิดตามเดิม และต้องกด “บันทึกคะแนน” เพื่อให้มีผล
+      </p>
     </div>
   );
 }

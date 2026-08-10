@@ -3,10 +3,22 @@ import { db } from "@/db";
 import { entries, entryMembers, competitionCapacity } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 
+export type RosterMember = {
+  /** entry_members.id — หน้าบันทึกผลใช้อ้างถึงคนคนนี้ตอนติ๊ก "ไม่มาแข่งขัน" (รหัสนักเรียนซ้ำข้าม entry ได้) */
+  memberId: number;
+  studentCode: string;
+  name: string;
+  classLevel: string;
+  classRoom: string;
+  classNumber: string;
+  /** ลงทะเบียนไว้แต่ไม่มาแข่ง — ยังอยู่ในรายชื่อ แต่ไม่ออกเกียรติบัตรให้ */
+  absent: boolean;
+};
+
 export type RosterEntry = {
   entryId: number;
   teamName: string | null;
-  members: { studentCode: string; name: string; classLevel: string; classRoom: string; classNumber: string }[];
+  members: RosterMember[];
 };
 
 export async function getRoster(competitionId: number): Promise<RosterEntry[]> {
@@ -22,11 +34,13 @@ export async function getRoster(competitionId: number): Promise<RosterEntry[]> {
     members: members
       .filter((m) => m.entryId === e.id)
       .map((m) => ({
+        memberId: m.id,
         studentCode: m.studentCode,
         name: m.nameSnapshot,
         classLevel: m.classLevelSnapshot,
         classRoom: m.classRoomSnapshot,
         classNumber: m.classNumberSnapshot,
+        absent: m.absent,
       })),
   }));
 }

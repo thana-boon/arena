@@ -5,9 +5,9 @@ import { subjectGroups, competitions, competitionCapacity, criteria, entries, ev
 import { asc, eq } from "drizzle-orm";
 import { getActiveYear, getTimeSlots, getVenues } from "@/lib/queries";
 import { getCompetitionVenueIds } from "@/lib/venues";
-import { canEditCompetition } from "@/lib/permit";
+import { canEditCompetition, competitionManageGuard } from "@/lib/permit";
 import { canPickGroup } from "@/lib/groupScope";
-import { parseJsonArray, isUnlimited } from "@/lib/domain";
+import { parseJsonArray, isUnlimited, competitionEditWindow } from "@/lib/domain";
 import type { SessionPayload } from "@/lib/auth/session";
 import { CompetitionForm } from "@/components/CompetitionForm";
 
@@ -26,9 +26,12 @@ export async function CompetitionEditBody({
 
   const comp = (await db.select().from(competitions).where(eq(competitions.id, id)).limit(1))[0];
   if (!comp) return <div className="alert alert-error">ไม่พบรายการแข่งขัน</div>;
-  if (!canEditCompetition(session, comp.createdBy)) redirect(returnTo);
 
   const allGroups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
+  // ครูแก้ได้ทั้งรายการของตัวเองและรายการในหมวดเดียวกัน — เทียบด้วยเลขหมวด ไม่ใช่ id รายปี
+  const compGroup = allGroups.find((g) => g.id === comp.subjectGroupId);
+  if (!canEditCompetition(session, comp.createdBy, compGroup?.catalogNo)) redirect(returnTo);
+
   // ครูทั่วไปเลือกได้เฉพาะหมวดตัวเอง (แต่คงหมวดปัจจุบันของรายการไว้ให้เห็นเสมอ); admin เลือกได้ทุกหมวด
   const isAdmin = session.role === "admin";
   const groups = isAdmin
@@ -37,12 +40,36 @@ export async function CompetitionEditBody({
   const caps = await db.select().from(competitionCapacity).where(eq(competitionCapacity.competitionId, id));
   const crits = await db.select().from(criteria).where(eq(criteria.competitionId, id));
   crits.sort((a, b) => a.sortOrder - b.sortOrder);
-  const entRows = await db.select({ id: entries.id }).from(entries).where(eq(entries.competitionId, id)).limit(1);
+  const entRows = await db.select({ id: entries.id, status: entries.status }).from(entries).where(eq(entries.competitionId, id));
   const locked = entRows.length > 0;
+  // เวลาแข่งขันล็อกเมื่อยังมีคนลงทะเบียนอยู่จริง (ที่ถอนแล้วไม่นับ) — กฎเดียวกับที่ API ตรวจซ้ำ
+  const scheduleLocked = !isAdmin && entRows.some((e) => e.status === "active");
   const slots = await getTimeSlots(year.id);
   const venues = await getVenues();
   const venueIds = await getCompetitionVenueIds(id);
-  const eventList = await db.select().from(events).where(eq(events.yearId, year.id)).orderBy(asc(events.name));
+  const allEvents = await db.select().from(events).where(eq(events.yearId, year.id)).orderBy(asc(events.name));
+
+  // นอกช่วงที่งานเปิดให้แก้ไข ครูดูได้อย่างเดียว (เจอมาแล้วว่ามีการแก้รายการหลังนักเรียนลงทะเบียน)
+  const curEvent = allEvents.find((e) => e.id === comp.eventId) ?? null;
+  const guard = competitionManageGuard(session, curEvent);
+  if (!guard.allowed)
+    return (
+      <div className="stack">
+        <div>
+          <Link href={returnTo} className="btn btn-ghost btn-sm">← กลับไปหน้ารายการแข่งขัน</Link>
+        </div>
+        <div className="page-header">
+          <h1>แก้ไขรายการแข่งขัน</h1>
+          <div className="subtitle">{comp.name}</div>
+        </div>
+        <div className="alert alert-warning">{guard.message}</div>
+      </div>
+    );
+
+  // ย้ายรายการไปงานอื่นได้เฉพาะงานที่ยังเปิดให้แก้ไข (คงงานปัจจุบันไว้ในตัวเลือกเสมอ)
+  const eventList = isAdmin
+    ? allEvents
+    : allEvents.filter((e) => competitionEditWindow(e).open || e.id === comp.eventId);
 
   // ไม่จำกัดจำนวน = ทุกแถวโควตาเก็บค่า < 0 ; number field แสดง 0 แทนค่าลบ
   const unlimited = caps.length > 0 && caps.every((c) => isUnlimited(c.capacity));
@@ -71,6 +98,7 @@ export async function CompetitionEditBody({
         returnTo={returnTo}
         lockSubjectGroup={!isAdmin}
         canEditLocked={isAdmin}
+        scheduleLocked={scheduleLocked}
         initial={{
           id: comp.id,
           name: comp.name,

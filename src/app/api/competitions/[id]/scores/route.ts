@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { db } from "@/db";
-import { competitions, criteria, entries, scores, subjectGroups } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { competitions, criteria, entries, entryMembers, scores, subjectGroups } from "@/db/schema";
+import { eq, and, inArray, notInArray } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
 import { canScore } from "@/lib/permit";
@@ -15,6 +15,12 @@ const schema = z.object({
       score: z.number().min(0),
     })
   ),
+  /**
+   * รายชื่อ (entry_members.id) ที่ติ๊กว่า "ไม่มาแข่งขัน" — ส่งมาทั้งชุดของรายการนี้เสมอ
+   * คนที่ไม่ได้อยู่ในชุดจะถูกตั้งกลับเป็น "มาแข่ง" (ติ๊กผิดแล้วเอาออกได้)
+   * ไม่ส่งฟิลด์นี้มาเลย = ไม่แตะสถานะการมาแข่งขัน
+   */
+  absentMemberIds: z.array(z.number().int().positive()).optional(),
 });
 
 // บันทึกคะแนน (admin/recorder ทุกรายการ; ครูเฉพาะรายการในหมวดตัวเอง) — upsert ต่อ (entry, criterion)
@@ -43,6 +49,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (row.score < 0 || row.score > max) return fail(`คะแนนต้องอยู่ระหว่าง 0–${max}`);
     }
 
+    // สมาชิกทุกคนของรายการนี้ — ใช้ทั้งตรวจว่า id ที่ส่งมาเป็นของรายการนี้จริง
+    // และเป็นขอบเขตของการตั้งกลับเป็น "มาแข่ง" (ไม่ไปแตะรายการอื่น)
+    const memberRows = validEntries.size
+      ? await db
+          .select({ id: entryMembers.id, name: entryMembers.nameSnapshot, code: entryMembers.studentCode })
+          .from(entryMembers)
+          .where(inArray(entryMembers.entryId, [...validEntries]))
+      : [];
+    const memberIds = memberRows.map((m) => m.id);
+    const absentIds = body.absentMemberIds ? [...new Set(body.absentMemberIds)] : null;
+    if (absentIds && absentIds.some((id) => !memberIds.includes(id)))
+      return fail("พบผู้เข้าแข่งขันที่ไม่ถูกต้อง");
+
     await db.transaction(async (tx) => {
       for (const row of body.scores) {
         const existing = await tx
@@ -61,9 +80,35 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           });
         }
       }
+
+      // สถานะ "ไม่มาแข่งขัน" — เขียนทับทั้งชุด (ติ๊กเพิ่ม/เอาออกจบในครั้งเดียว)
+      if (absentIds && memberIds.length) {
+        if (absentIds.length)
+          await tx.update(entryMembers).set({ absent: true }).where(inArray(entryMembers.id, absentIds));
+        await tx
+          .update(entryMembers)
+          .set({ absent: false })
+          .where(
+            absentIds.length
+              ? and(inArray(entryMembers.id, memberIds), notInArray(entryMembers.id, absentIds))
+              : inArray(entryMembers.id, memberIds)
+          );
+      }
     });
 
-    await logAudit(s.code, "record_scores", { competitionId: compId, count: body.scores.length });
+    await logAudit(s.code, "record_scores", {
+      competitionId: compId,
+      count: body.scores.length,
+      // บันทึกไว้ว่าใครไม่มาแข่ง — คนเหล่านี้จะไม่ได้เกียรติบัตร ต้องตามรอยได้ว่าใครเป็นคนติ๊ก
+      // เก็บชื่อคู่รหัสเหมือน log ลงทะเบียน (ค้นด้วยชื่อหรือรหัสก็เจอ) ไม่ใช่ id ที่อ่านไม่รู้เรื่อง
+      ...(absentIds?.length
+        ? {
+            absent: memberRows
+              .filter((m) => absentIds.includes(m.id))
+              .map((m) => `${m.name} (${m.code})`),
+          }
+        : {}),
+    });
     return ok();
   });
 }

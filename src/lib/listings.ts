@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "@/db";
 import { competitions, subjectGroups, competitionCapacity, entries, events } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { parseJsonArray, CLASS_LEVELS, UNLIMITED_CAPACITY, isUnlimited } from "@/lib/domain";
+import { parseJsonArray, CLASS_LEVELS, UNLIMITED_CAPACITY, isUnlimited, competitionEditWindow } from "@/lib/domain";
 import { listStudents } from "@/lib/external/student-api";
 
 export type CompListItem = {
@@ -15,6 +15,8 @@ export type CompListItem = {
   groupName: string;
   eventId: number | null;
   eventName: string;
+  /** เหตุผลที่ครูแก้/ลบรายการนี้ไม่ได้ตอนนี้ (null = ยังอยู่ในช่วงที่แก้ได้) — admin ไม่ติดข้อนี้ */
+  compEditReason: string | null;
   levels: string[];
   eventDate: string | null;
   startTime: string | null;
@@ -33,6 +35,9 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
   const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, yearId));
   const evs = await db.select().from(events).where(eq(events.yearId, yearId));
   const eventName = (id: number | null) => (id == null ? "" : evs.find((e) => e.id === id)?.name ?? "-");
+  // คิดช่วงแก้ไขที่เซิร์ฟเวอร์ครั้งเดียว — ตารางเป็น client component ถ้าไปคิดเวลาที่นั่นจะไม่ตรงกับ SSR
+  const editReason = (id: number | null) =>
+    competitionEditWindow(id == null ? null : evs.find((e) => e.id === id)).reason;
   const groupName = (id: number | null) => (id == null ? "" : groups.find((g) => g.id === id)?.name ?? "-");
   const groupCatalogNo = (id: number | null) => (id == null ? null : groups.find((g) => g.id === id)?.catalogNo ?? null);
   const compIds = comps.map((c) => c.id);
@@ -54,6 +59,7 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
       groupName: groupName(c.subjectGroupId),
       eventId: c.eventId,
       eventName: eventName(c.eventId),
+      compEditReason: editReason(c.eventId),
       levels: parseJsonArray(c.allowedClassLevels),
       eventDate: c.eventDate,
       startTime: c.startTime,

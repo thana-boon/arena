@@ -20,6 +20,12 @@ export type EventItem = {
   registrationOpen: boolean;
   regStart: string; // datetime-local string หรือ ""
   regEnd: string;
+  // ช่วงที่ครูสร้าง/แก้ไข/ลบรายการแข่งขันในงานนี้ได้ (admin ทำได้เสมอ)
+  compEditOpen: boolean;
+  compEditStart: string;
+  compEditEnd: string;
+  /** เหตุผลที่ครูแก้รายการไม่ได้ ณ ตอนนี้ (null = ยังแก้ได้) — คิดมาจากเซิร์ฟเวอร์ */
+  compEditReason: string | null;
   competitionCount: number;
 };
 
@@ -148,6 +154,9 @@ function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) 
       registrationOpen: f.registrationOpen,
       regStart: f.regStart || null,
       regEnd: f.regEnd || null,
+      compEditOpen: f.compEditOpen,
+      compEditStart: f.compEditStart || null,
+      compEditEnd: f.compEditEnd || null,
     });
     setBusy(false);
     if (!res.ok) {
@@ -183,6 +192,7 @@ function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) 
           <span className="badge">{ev.kind === "training" ? "อบรม" : "แข่งขัน"}</span>
           {ev.visibleToStudents && <span className="badge badge-purple">นักเรียนเห็น</span>}
           {ev.registrationOpen && <span className="badge badge-gold">เปิดรับสมัคร</span>}
+          {ev.compEditReason && <span className="badge badge-warning">ครูแก้รายการไม่ได้</span>}
           {isDefault && <span className="badge badge-purple">ค่าเริ่มต้น</span>}
           {ev.eventDate && <span className="muted text-sm">· จัดวันที่ {formatThaiDate(ev.eventDate)}</span>}
           <span className="muted text-sm">· {ev.competitionCount} รายการ</span>
@@ -237,6 +247,32 @@ function EventEditRow({ ev, isDefault }: { ev: EventItem; isDefault: boolean }) 
           <span className="form-hint" style={{ marginTop: -8 }}>
             เวลาเป็นแบบ 24 ชั่วโมง (00–23 น.) · เว้นว่างไว้ = ไม่จำกัดช่วงเวลา
           </span>
+
+          <div style={{ borderTop: "0.5px solid var(--skdw-border)", paddingTop: 12 }}>
+            <strong className="text-sm">การสร้าง/แก้ไขรายการแข่งขันของครู</strong>
+            {ev.compEditReason && (
+              <div className="text-sm muted">ขณะนี้: {ev.compEditReason} (ครูแก้ไม่ได้ · ผู้ดูแลระบบยังแก้ได้)</div>
+            )}
+          </div>
+          <label className="form-check">
+            <input type="checkbox" checked={f.compEditOpen} onChange={(e) => set("compEditOpen", e.target.checked)} />
+            <span>ให้ครูสร้าง/แก้ไข/ลบรายการแข่งขันในงานนี้ได้</span>
+          </label>
+          <div className="grid-2">
+            <div className="field">
+              <span>เปิดให้แก้ไขรายการ (วัน-เวลา)</span>
+              <ThaiDateTimePicker value={f.compEditStart} onChange={(v) => set("compEditStart", v)} defaultTime="08:00" />
+            </div>
+            <div className="field">
+              <span>ปิดการแก้ไขรายการ (วัน-เวลา)</span>
+              <ThaiDateTimePicker value={f.compEditEnd} onChange={(v) => set("compEditEnd", v)} defaultTime="16:30" />
+            </div>
+          </div>
+          <span className="form-hint" style={{ marginTop: -8 }}>
+            นอกช่วงนี้ ครูจะสร้าง/แก้ไข/ลบรายการในงานนี้ไม่ได้ — ผู้ดูแลระบบยังทำได้ตลอด ·
+            เว้นว่างไว้ = ไม่จำกัดช่วงเวลา · ควรปิดก่อนวันที่นักเรียนเริ่มลงทะเบียน
+          </span>
+
           <div className="row" style={{ gap: 8 }}>
             <button className="btn btn-primary btn-sm" onClick={save} disabled={busy}>{busy ? "กำลังบันทึก…" : "บันทึก"}</button>
             {ev.competitionCount === 0 && <button className="btn btn-sm btn-danger" onClick={del}>ลบงาน</button>}

@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { competitions, criteria, events, subjectGroups } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { parseJsonArray, formatThaiDate, formatSeats, registrationWindow } from "@/lib/domain";
-import { canScore, canViewCompetition } from "@/lib/permit";
+import { canScore, canViewCompetition, canEditCompetition, competitionManageGuard } from "@/lib/permit";
 import { getRoster, getCapacityRows } from "@/lib/roster";
 import type { SessionPayload } from "@/lib/auth/session";
 import { RosterManager } from "@/app/teacher/competitions/[id]/RosterManager";
@@ -43,6 +43,10 @@ export async function CompetitionDetailBody({
     ? (await db.select().from(events).where(eq(events.id, comp.eventId)).limit(1))[0]
     : null;
   const regClosedReason = registrationWindow(event).reason;
+  // ปุ่มแก้ไข: ต้องเป็นคนที่แก้ได้ และยังอยู่ในช่วงที่งานเปิดให้แก้ (admin ผ่านทั้งสองข้อเสมอ)
+  const canEdit =
+    canEditCompetition(session, comp.createdBy, group?.catalogNo) &&
+    competitionManageGuard(session, event).allowed;
 
   return (
     <div className="stack">
@@ -63,7 +67,7 @@ export async function CompetitionDetailBody({
         </div>
         <div className="page-actions">
           <Link href={`${basePath}/${id}/reports`} className="btn btn-ghost"><Icon name="printer" size={18} /> เอกสาร</Link>
-          <Link href={`${basePath}/${id}/edit`} className="btn btn-secondary">แก้ไข</Link>
+          {canEdit && <Link href={`${basePath}/${id}/edit`} className="btn btn-secondary">แก้ไข</Link>}
           {!comp.noContest && canScore(session, comp.createdBy, group?.catalogNo) && (
             <Link href={`${scoreBasePath}/${id}`} className="btn btn-primary">บันทึกผล</Link>
           )}

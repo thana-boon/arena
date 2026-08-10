@@ -7,11 +7,13 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import { Icon } from "@/components/Icon";
 import type { CompListItem } from "@/lib/listings";
 import type { Role } from "@/lib/auth/session";
+import { canEditCompetition } from "@/lib/permit";
 import { formatThaiDate, isUnlimited } from "@/lib/domain";
 
 export function CompetitionsTable({
   comps,
   myCode,
+  mySubjectGroupId,
   role,
   basePath,
   canPublish,
@@ -19,6 +21,8 @@ export function CompetitionsTable({
 }: {
   comps: CompListItem[];
   myCode: string;
+  /** เลขหมวดของผู้ใช้ (session.subjectGroupId) — ครูแก้รายการในหมวดตัวเองได้ ไม่ใช่แค่ของตัวเอง */
+  mySubjectGroupId?: number;
   role: Role;
   basePath: string;
   canPublish: boolean;
@@ -81,7 +85,11 @@ export function CompetitionsTable({
     }
   }, [eventFilter, groupFilter, restored, storageKey]);
 
-  const canEdit = (c: CompListItem) => role === "admin" || c.createdBy === myCode;
+  // "ใคร" (เจ้าของรายการ/ครูในหมวดเดียวกัน) ตัดสินด้วยกฎกลางร่วมกับฝั่ง server
+  // "ตอนนี้ถึงเวลาไหม" ใช้ compEditReason ที่ SSR คิดมาแล้ว — admin ข้ามช่วงเวลาได้ตลอด
+  const canEdit = (c: CompListItem) =>
+    canEditCompetition({ role, code: myCode, subjectGroupId: mySubjectGroupId }, c.createdBy, c.groupCatalogNo) &&
+    (role === "admin" || !c.compEditReason);
 
   // รายการหลังกรองตามงาน — ใช้เป็นฐานของปุ่มกรองหมวดด้วย
   const inEvent = useMemo(
@@ -227,6 +235,12 @@ export function CompetitionsTable({
                         ? <span className="badge badge-success">ประกาศผลแล้ว</span>
                         : <span className="badge badge-warning">ยังไม่ประกาศ</span>}
                     {!c.visibleToStudents && <span className="badge">ซ่อนจากนักเรียน</span>}
+                    {/* บอกให้เห็นว่าทำไมปุ่มแก้ไข/ลบหายไป — ไม่ใช่ปุ่มหายเฉย ๆ โดยไม่มีเหตุผล */}
+                    {c.compEditReason && (
+                      <span className="badge badge-warning" title={c.compEditReason}>
+                        {role === "admin" ? "ครูแก้ไม่ได้แล้ว" : "ปิดแก้ไขแล้ว"}
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className="num td-actions">

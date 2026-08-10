@@ -130,6 +130,8 @@ export function RosterManager({
   // นอกช่วงรับสมัคร: admin ยังเพิ่มได้ตลอด (server ยกเว้นให้เฉพาะ role นี้) — ครูคนอื่นเพิ่มไม่ได้
   // ยกเว้นรายการที่ยังไม่เข้างาน ซึ่งลงไม่ได้ทุกคน จนกว่าจะแก้รายการให้สังกัดงานก่อน
   const canAdd = !regClosedReason || (canOverride && hasEvent);
+  // ปิดรับสมัครแล้วก็ลบรายชื่อไม่ได้เหมือนกัน (เหลือแต่ admin) — server บังคับซ้ำอีกชั้น
+  const canWithdraw = !regClosedReason || canOverride;
 
   return (
     <div className="card">
@@ -147,8 +149,8 @@ export function RosterManager({
           {!hasEvent
             ? "รายการนี้ยังไม่ถูกจัดเข้างาน — แก้ไขรายการให้สังกัดงานก่อน จึงจะลงทะเบียนผู้เข้าแข่งขันได้"
             : canAdd
-              ? `${regClosedReason} — คุณเป็นผู้ดูแลระบบ จึงเพิ่มผู้เข้าแข่งขันได้ตลอด (ระบบบันทึกไว้ใน log ว่าลงหลังปิดรับ)`
-              : `${regClosedReason} — เพิ่มผู้เข้าแข่งขันได้เฉพาะผู้ดูแลระบบ`}
+              ? `${regClosedReason} — คุณเป็นผู้ดูแลระบบ จึงเพิ่ม/ยกเลิกผู้เข้าแข่งขันได้ตลอด (ระบบบันทึกไว้ใน log ว่าลงหลังปิดรับ)`
+              : `${regClosedReason} — เพิ่มหรือยกเลิกผู้เข้าแข่งขันได้เฉพาะผู้ดูแลระบบ`}
         </div>
       )}
 
@@ -247,7 +249,9 @@ export function RosterManager({
                   </td>
                   <td className="num td-actions">
                     <div className="row" style={{ justifyContent: "flex-end" }}>
-                      <button className="btn btn-danger btn-sm" disabled={busy} onClick={() => withdraw(e.entryId)}>ยกเลิก</button>
+                      {canWithdraw && (
+                        <button className="btn btn-danger btn-sm" disabled={busy} onClick={() => withdraw(e.entryId)}>ยกเลิก</button>
+                      )}
                     </div>
                   </td>
                 </tr>

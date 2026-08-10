@@ -222,6 +222,82 @@ export function formatSlot(label: string, startTime: string, endTime: string): s
   return `${label} (${hhmm(startTime)}–${hhmm(endTime)})`;
 }
 
+// ===== ช่วงเวลาระดับงาน (สวิตช์ + ช่วงวัน-เวลา) =====
+// งานหนึ่งมีหลายช่วงที่คุมคนละเรื่อง (รับสมัครนักเรียน / ให้ครูสร้าง-แก้รายการ) แต่กติกาเหมือนกันเป๊ะ
+// จึงคิดที่เดียวแล้วเปลี่ยนแค่ข้อความ — ไม่งั้นแก้กติกาที่หนึ่งแล้วลืมอีกที่ เหมือนที่เคยเกิดตอนช่วงรับสมัคร
+
+/** ช่วงเวลาแบบดิบ ๆ ที่ตัดสินได้ว่า "ตอนนี้เปิดไหม" */
+type Window = { enabled: boolean; start: string | Date | null; end: string | Date | null };
+
+/** ข้อความประจำแต่ละช่วง — ทำให้เหตุผลที่ผู้ใช้เห็นตรงกันทุกหน้าที่ถามเรื่องเดียวกัน */
+type WindowTexts = {
+  missing: string; // ไม่มีงานผูกอยู่
+  off: string; // ปิดสวิตช์ไว้
+  before: string; // ยังไม่ถึงเวลาเปิด
+  after: string; // เลยเวลาปิดแล้ว
+  noEvents: string; // ไม่มีงานให้พิจารณาเลยสักงาน (ใช้กับแถบสรุป)
+  openTitle: string; // พาดหัวตอนเปิดอยู่
+  deadline: (name: string, at: string) => string; // เปิดอยู่ + มีกำหนดปิด
+  upcoming: (name: string, at: string) => string; // จะเปิดรอบหน้า
+  ended: (name: string, at: string) => string; // ปิดไปแล้วเมื่อไหร่
+};
+
+function evalWindow(
+  w: Window | null | undefined,
+  t: WindowTexts,
+  now: Date
+): { open: boolean; reason: string | null } {
+  if (!w) return { open: false, reason: t.missing };
+  if (!w.enabled) return { open: false, reason: t.off };
+  if (w.start && now < new Date(w.start)) return { open: false, reason: t.before };
+  if (w.end && now > new Date(w.end)) return { open: false, reason: t.after };
+  return { open: true, reason: null };
+}
+
+export type WindowNotice = {
+  open: boolean;
+  /** พาดหัวสั้น เช่น "หมดเวลารับสมัครแล้ว" */
+  title: string;
+  /** บรรทัดขยายความ (ชื่องาน + วันเวลา) — "" ถ้าไม่มีกำหนดเวลาให้บอก */
+  detail: string;
+};
+
+/**
+ * สรุปสถานะของกลุ่มงาน ให้เป็นข้อความเดียวที่ขึ้นหัวหน้าจอได้
+ * ครูสะท้อนว่าเดิมต้องกดเข้าไปเลือกรายการก่อนถึงจะรู้ว่าหมดเวลาแล้ว — ต้องรู้ตั้งแต่เปิดหน้า
+ *
+ * ลำดับความสำคัญตอนไม่มีงานเปิดอยู่: งานที่กำลังจะเปิด > งานที่เพิ่งหมดเวลา > ปิดสวิตช์เฉย ๆ
+ * (วันเปิดรอบหน้าเป็นข้อมูลที่เอาไปใช้ต่อได้มากกว่าวันที่ปิดไปแล้ว)
+ */
+function buildNotice(items: (Window & { name: string })[], t: WindowTexts, now: Date): WindowNotice {
+  const ms = (v: string | Date) => new Date(v).getTime();
+  const open = items.filter((e) => evalWindow(e, t, now).open);
+  if (open.length) {
+    const deadlines = open
+      .filter((e) => e.end)
+      .sort((a, b) => ms(a.end!) - ms(b.end!))
+      .map((e) => t.deadline(e.name, formatThaiDateTime(e.end)));
+    return { open: true, title: t.openTitle, detail: deadlines.join(" · ") };
+  }
+  if (!items.length) return { open: false, title: t.noEvents, detail: "" };
+
+  // จะเปิดรอบหน้า — เอางานที่ใกล้ที่สุด (สวิตช์ต้องเปิดไว้แล้ว ไม่งั้นวันเปิดยังไม่มีความหมาย)
+  const upcoming = items
+    .filter((e) => e.enabled && e.start && now < new Date(e.start))
+    .sort((a, b) => ms(a.start!) - ms(b.start!));
+  if (upcoming.length)
+    return { open: false, title: t.before, detail: t.upcoming(upcoming[0].name, formatThaiDateTime(upcoming[0].start)) };
+
+  // หมดเวลาไปแล้ว — เอางานที่ปิดล่าสุด (ใกล้ปัจจุบันที่สุด) เป็นตัวแทน
+  const ended = items
+    .filter((e) => e.end && now > new Date(e.end))
+    .sort((a, b) => ms(b.end!) - ms(a.end!));
+  if (ended.length)
+    return { open: false, title: t.after, detail: t.ended(ended[0].name, formatThaiDateTime(ended[0].end)) };
+
+  return { open: false, title: t.off, detail: "" };
+}
+
 // ===== ช่วงรับสมัคร (ระดับงาน) =====
 /** เท่าที่ต้องรู้เพื่อตัดสินว่างานยังรับสมัครอยู่ไหม (รับได้ทั้งแถว events และข้อมูลที่ส่งให้ client) */
 export type RegWindowEvent = {
@@ -229,6 +305,24 @@ export type RegWindowEvent = {
   regStart: string | Date | null;
   regEnd: string | Date | null;
 };
+
+const REG_TEXTS: WindowTexts = {
+  missing: "รายการนี้ยังไม่ถูกจัดเข้างาน",
+  off: "ขณะนี้ปิดรับสมัคร",
+  before: "ยังไม่ถึงเวลาเปิดรับสมัคร",
+  after: "หมดเวลารับสมัครแล้ว",
+  noEvents: "ยังไม่มีงานที่เปิดรับสมัคร",
+  openTitle: "เปิดรับสมัคร",
+  deadline: (n, at) => `${n} — ปิดรับ ${at}`,
+  upcoming: (n, at) => `${n} — เปิดรับ ${at}`,
+  ended: (n, at) => `${n} — ปิดรับเมื่อ ${at}`,
+};
+
+const regWin = (e: RegWindowEvent): Window => ({
+  enabled: e.registrationOpen,
+  start: e.regStart,
+  end: e.regEnd,
+});
 
 /**
  * งานนี้ยังรับสมัครอยู่ไหม + ถ้าไม่ เพราะอะไร
@@ -239,68 +333,64 @@ export function registrationWindow(
   event: RegWindowEvent | null | undefined,
   now: Date = new Date()
 ): { open: boolean; reason: string | null } {
-  if (!event) return { open: false, reason: "รายการนี้ยังไม่ถูกจัดเข้างาน" };
-  if (!event.registrationOpen) return { open: false, reason: "ขณะนี้ปิดรับสมัคร" };
-  if (event.regStart && now < new Date(event.regStart))
-    return { open: false, reason: "ยังไม่ถึงเวลาเปิดรับสมัคร" };
-  if (event.regEnd && now > new Date(event.regEnd))
-    return { open: false, reason: "หมดเวลารับสมัครแล้ว" };
-  return { open: true, reason: null };
+  return evalWindow(event ? regWin(event) : null, REG_TEXTS, now);
 }
 
 /** งาน + ชื่อ — ใช้ทำข้อความบอกสถานะรับสมัครที่อ้างถึงงานได้ */
 export type NamedRegWindowEvent = RegWindowEvent & { name: string };
 
-export type RegNotice = {
-  open: boolean;
-  /** พาดหัวสั้น เช่น "หมดเวลารับสมัครแล้ว" */
-  title: string;
-  /** บรรทัดขยายความ (ชื่องาน + วันเวลา) — "" ถ้าไม่มีกำหนดเวลาให้บอก */
-  detail: string;
+export type RegNotice = WindowNotice;
+
+/** สรุปสถานะรับสมัครของกลุ่มงาน เป็นข้อความเดียวที่ขึ้นหัวหน้าจอได้ */
+export function registrationNotice(events: NamedRegWindowEvent[], now: Date = new Date()): RegNotice {
+  return buildNotice(events.map((e) => ({ ...regWin(e), name: e.name })), REG_TEXTS, now);
+}
+
+// ===== ช่วงสร้าง/แก้ไขรายการแข่งขัน (ระดับงาน) =====
+// คนละเรื่องกับช่วงรับสมัคร: อันนั้นคุมนักเรียน อันนี้คุมครู
+// เจอมาแล้วว่าครูเข้าไปแก้รายการตอนนักเรียนลงทะเบียนไปแล้ว โดยไม่ได้บอกใคร — นอกช่วงนี้เหลือแต่ admin ที่แก้ได้
+/** เท่าที่ต้องรู้ว่างานนี้ยังให้ครูจัดการรายการแข่งขันอยู่ไหม */
+export type CompEditWindowEvent = {
+  compEditOpen: boolean;
+  compEditStart: string | Date | null;
+  compEditEnd: string | Date | null;
 };
 
-/**
- * สรุปสถานะรับสมัครของกลุ่มงาน ให้เป็นข้อความเดียวที่ขึ้นหัวหน้าจอได้
- * ครูสะท้อนว่าเดิมต้องกดเข้าไปเลือกรายการก่อนถึงจะรู้ว่าหมดเวลาแล้ว — ต้องรู้ตั้งแต่เปิดหน้า
- *
- * ลำดับความสำคัญตอนไม่มีงานเปิดอยู่: งานที่กำลังจะเปิด > งานที่เพิ่งหมดเวลา > ปิดสวิตช์เฉย ๆ
- * (วันเปิดรอบหน้าเป็นข้อมูลที่เอาไปใช้ต่อได้มากกว่าวันที่ปิดไปแล้ว)
- */
-export function registrationNotice(events: NamedRegWindowEvent[], now: Date = new Date()): RegNotice {
-  const ms = (v: string | Date) => new Date(v).getTime();
-  const open = events.filter((e) => registrationWindow(e, now).open);
-  if (open.length) {
-    const deadlines = open
-      .filter((e) => e.regEnd)
-      .sort((a, b) => ms(a.regEnd!) - ms(b.regEnd!))
-      .map((e) => `${e.name} — ปิดรับ ${formatThaiDateTime(e.regEnd)}`);
-    return { open: true, title: "เปิดรับสมัคร", detail: deadlines.join(" · ") };
-  }
-  if (!events.length) return { open: false, title: "ยังไม่มีงานที่เปิดรับสมัคร", detail: "" };
+const COMP_EDIT_TEXTS: WindowTexts = {
+  missing: "รายการนี้ยังไม่ถูกจัดเข้างาน",
+  off: "ขณะนี้ปิดการสร้าง/แก้ไขรายการแข่งขัน",
+  before: "ยังไม่ถึงเวลาเปิดให้สร้าง/แก้ไขรายการแข่งขัน",
+  after: "หมดเวลาสร้าง/แก้ไขรายการแข่งขันแล้ว",
+  noEvents: "ยังไม่มีงานที่เปิดให้สร้าง/แก้ไขรายการแข่งขัน",
+  openTitle: "เปิดให้สร้าง/แก้ไขรายการแข่งขัน",
+  deadline: (n, at) => `${n} — แก้ไขได้ถึง ${at}`,
+  upcoming: (n, at) => `${n} — เปิดให้แก้ไข ${at}`,
+  ended: (n, at) => `${n} — ปิดแก้ไขเมื่อ ${at}`,
+};
 
-  // จะเปิดรอบหน้า — เอางานที่ใกล้ที่สุด (สวิตช์รับสมัครต้องเปิดไว้แล้ว ไม่งั้นวันเปิดยังไม่มีความหมาย)
-  const upcoming = events
-    .filter((e) => e.registrationOpen && e.regStart && now < new Date(e.regStart))
-    .sort((a, b) => ms(a.regStart!) - ms(b.regStart!));
-  if (upcoming.length)
-    return {
-      open: false,
-      title: "ยังไม่ถึงเวลาเปิดรับสมัคร",
-      detail: `${upcoming[0].name} — เปิดรับ ${formatThaiDateTime(upcoming[0].regStart)}`,
-    };
+const compEditWin = (e: CompEditWindowEvent): Window => ({
+  enabled: e.compEditOpen,
+  start: e.compEditStart,
+  end: e.compEditEnd,
+});
 
-  // หมดเวลาไปแล้ว — เอางานที่ปิดล่าสุด (ใกล้ปัจจุบันที่สุด) เป็นตัวแทน
-  const ended = events
-    .filter((e) => e.regEnd && now > new Date(e.regEnd))
-    .sort((a, b) => ms(b.regEnd!) - ms(a.regEnd!));
-  if (ended.length)
-    return {
-      open: false,
-      title: "หมดเวลารับสมัครแล้ว",
-      detail: `${ended[0].name} — ปิดรับเมื่อ ${formatThaiDateTime(ended[0].regEnd)}`,
-    };
+/** งานนี้ยังให้ครูสร้าง/แก้ไข/ลบรายการแข่งขันอยู่ไหม + ถ้าไม่ เพราะอะไร (admin ไม่ต้องผ่านด่านนี้) */
+export function competitionEditWindow(
+  event: CompEditWindowEvent | null | undefined,
+  now: Date = new Date()
+): { open: boolean; reason: string | null } {
+  return evalWindow(event ? compEditWin(event) : null, COMP_EDIT_TEXTS, now);
+}
 
-  return { open: false, title: "ขณะนี้ปิดรับสมัคร", detail: "" };
+/** งาน + ชื่อ — ใช้ทำข้อความบอกสถานะช่วงแก้ไขที่อ้างถึงงานได้ */
+export type NamedCompEditWindowEvent = CompEditWindowEvent & { name: string };
+
+/** สรุปสถานะช่วงแก้ไขรายการของกลุ่มงาน เป็นข้อความเดียวที่ขึ้นหัวหน้าจอครูได้ */
+export function competitionEditNotice(
+  events: NamedCompEditWindowEvent[],
+  now: Date = new Date()
+): WindowNotice {
+  return buildNotice(events.map((e) => ({ ...compEditWin(e), name: e.name })), COMP_EDIT_TEXTS, now);
 }
 
 export type CompType = "individual" | "team";

@@ -235,6 +235,16 @@ export const entryMembers = pgTable(
      * เก็บเป็นข้อความ: "" = ไม่รู้ (สมัครก่อนมีคอลัมน์นี้ / SchoolOS ไม่ได้ส่งมา) ซึ่ง 0 สื่อผิด
      */
     classNumberSnapshot: varchar("class_number_snapshot", { length: 16 }).notNull().default(""),
+    /**
+     * ไม่มาแข่งขัน — ติ๊กที่หน้าบันทึกผล (รายคน ไม่ใช่ทั้งทีม)
+     *
+     * มีเพราะทุกคนที่ลงทะเบียนได้เกียรติบัตรเสมอ คะแนน 0 ก็ยังได้ "เข้าร่วม" — คนที่ไม่ได้มา
+     * จึงได้ใบเหมือนคนที่มาแข่งจริง คนที่ติ๊กไว้จะถูกข้ามตอนออกเกียรติบัตร
+     *
+     * ไม่ลบทิ้ง/ไม่ถอนการลงทะเบียน เพราะยังต้องเห็นในรายชื่อและเอกสารว่าคนนี้ลงไว้แต่ไม่มา
+     * และไม่แตะคะแนน/อันดับของทีม — ทีมยังแข่งด้วยสมาชิกที่เหลือตามจริง
+     */
+    absent: boolean("absent").notNull().default(false),
   },
   (t) => [
     index("member_entry_idx").on(t.entryId),
@@ -342,6 +352,11 @@ export const events = pgTable(
     registrationOpen: boolean("registration_open").notNull().default(false),
     regStart: timestamp("reg_start", { mode: "date" }),
     regEnd: timestamp("reg_end", { mode: "date" }),
+    // ช่วงที่ครูสร้าง/แก้ไข/ลบ "รายการแข่งขัน" ในงานนี้ได้ (admin ทำได้เสมอ ไม่สนช่วงนี้)
+    // มีเพราะครูเคยเข้าไปแก้รายการหลังนักเรียนลงทะเบียนไปแล้ว — ต้องล็อกได้ตามเวลา ไม่ใช่อาศัยความจำ
+    compEditOpen: boolean("comp_edit_open").notNull().default(true),
+    compEditStart: timestamp("comp_edit_start", { mode: "date" }),
+    compEditEnd: timestamp("comp_edit_end", { mode: "date" }),
     status: varchar("status", { length: 16 }).notNull().default("draft"),
     createdBy: varchar("created_by", { length: 64 }).notNull(),
     createdAt: timestamp("created_at").notNull().defaultNow(),

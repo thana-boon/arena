@@ -7,7 +7,15 @@ import { decideMedal, scorePercent, type Medal, parseJsonArray, UNLIMITED_CAPACI
 export type EntryResult = {
   entryId: number;
   teamName: string | null;
-  members: { studentCode: string; name: string; classLevel: string; classRoom: string; classNumber: string }[];
+  /** absent = ลงทะเบียนไว้แต่ไม่มาแข่ง — ยังนับเป็นสมาชิกของ entry แต่ไม่ได้เกียรติบัตร */
+  members: {
+    studentCode: string;
+    name: string;
+    classLevel: string;
+    classRoom: string;
+    classNumber: string;
+    absent: boolean;
+  }[];
   total: number;
   fullScore: number;
   percent: number;
@@ -61,6 +69,7 @@ export async function computeCompetitionResults(
         classLevel: m.classLevelSnapshot,
         classRoom: m.classRoomSnapshot,
         classNumber: m.classNumberSnapshot,
+        absent: m.absent,
       }));
     const byCrit: Record<number, number> = {};
     let total = 0;

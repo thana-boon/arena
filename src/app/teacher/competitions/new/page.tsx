@@ -1,10 +1,13 @@
+import Link from "next/link";
 import { requireStaff } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { subjectGroups, events } from "@/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { getActiveYearWithSettings, getTimeSlots, getVenues } from "@/lib/queries";
 import { canPickGroup } from "@/lib/groupScope";
+import { competitionEditWindow } from "@/lib/domain";
 import { CompetitionForm } from "@/components/CompetitionForm";
+import { CompEditWindowNotice } from "@/components/RegWindowNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -15,13 +18,32 @@ export default async function NewCompetition() {
   const allGroups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
   const slots = await getTimeSlots(year.id);
   const venues = await getVenues();
-  const eventList = await db.select().from(events).where(eq(events.yearId, year.id)).orderBy(asc(events.name));
+  const allEvents = await db.select().from(events).where(eq(events.yearId, year.id)).orderBy(asc(events.name));
   // ครูทั่วไปเลือกได้เฉพาะหมวดตัวเอง; admin เลือกได้ทุกหมวด
   const isAdmin = session.role === "admin";
   const groups = allGroups.filter((g) => canPickGroup(session, g.catalogNo));
 
+  // สร้างรายการได้เฉพาะงานที่ยังอยู่ในช่วงเปิดให้แก้ไข (admin ไม่ติดช่วงนี้)
+  // ตัดออกตั้งแต่ dropdown ไม่ให้กรอกทั้งฟอร์มเสร็จแล้วค่อยโดนเซิร์ฟเวอร์ปฏิเสธ
+  const eventList = isAdmin ? allEvents : allEvents.filter((e) => competitionEditWindow(e).open);
+
   if (!groups.length)
     return <div className="alert alert-warning">ไม่พบหมวดวิชาของท่านในปีการศึกษานี้ กรุณาติดต่อผู้ดูแลระบบให้เพิ่มหมวดของท่าน</div>;
+
+  if (!eventList.length)
+    return (
+      <div className="stack">
+        <div>
+          <Link href="/teacher/competitions" className="btn btn-ghost btn-sm">← กลับไปหน้ารายการแข่งขัน</Link>
+        </div>
+        <CompEditWindowNotice
+          events={allEvents}
+          note="ตอนนี้จึงสร้างรายการใหม่ไม่ได้ — หากจำเป็น กรุณาติดต่อผู้ดูแลระบบ"
+          showWhenOpen={false}
+        />
+        {!allEvents.length && <div className="alert alert-warning">ยังไม่มีงานในปีการศึกษานี้ กรุณาติดต่อผู้ดูแลระบบ</div>}
+      </div>
+    );
 
   // มีหมวดเดียว (ครูทั่วไป) → เลือกให้อัตโนมัติ
   const defaultGroupId = groups.length === 1 ? groups[0].id : "";

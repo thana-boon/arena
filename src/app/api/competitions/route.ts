@@ -6,6 +6,7 @@ import { apiRequireRole } from "@/lib/auth/guards";
 import { getActiveYear } from "@/lib/queries";
 import { competitionInput } from "@/lib/validation";
 import { isGroupAllowed } from "@/lib/groupScope";
+import { competitionManageGuard } from "@/lib/permit";
 import { logAudit } from "@/lib/audit";
 import { UNLIMITED_CAPACITY } from "@/lib/domain";
 import { findVenueConflicts } from "@/lib/venues";
@@ -23,6 +24,10 @@ export async function POST(req: Request) {
       await db.select().from(events).where(and(eq(events.id, body.eventId), eq(events.yearId, year.id))).limit(1)
     )[0];
     if (!event) return fail("กรุณาเลือกงานที่ถูกต้อง");
+
+    // นอกช่วงที่งานเปิดให้จัดการรายการ ครูสร้างรายการใหม่ไม่ได้ (admin ทำได้เสมอ)
+    const guard = competitionManageGuard(s, event);
+    if (!guard.allowed) return fail(guard.message, 403);
 
     // ครูสร้างได้เฉพาะหมวดของตัวเอง (admin เลือกได้ทุกหมวด) — ตรวจเฉพาะเมื่อระบุหมวด
     if (body.subjectGroupId != null && !(await isGroupAllowed(s, year.id, body.subjectGroupId)))

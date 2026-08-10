@@ -32,6 +32,8 @@ const CHECKS = [
   { id: "0010", what: "สีผู้ลงนามบนเกียรติบัตร", how: () => column("certificate_signatures", "color"), fix: "node drizzle/apply_0010.mjs" },
   { id: "0011", what: "ขนาดตัวอักษรผู้ลงนาม", how: () => column("certificate_signatures", "font_size"), fix: "node drizzle/apply_0011.mjs" },
   { id: "0012", what: "ขนาดเฉพาะรูปลายเซ็น", how: () => column("certificate_signatures", "image_scale"), fix: "node drizzle/apply_0012.mjs" },
+  { id: "0013", what: "ช่วงเวลาสร้าง/แก้ไขรายการแข่งขัน", how: () => column("events", "comp_edit_open"), fix: "node drizzle/apply_0013.mjs" },
+  { id: "0014", what: "ไม่มาแข่งขัน (รายคน)", how: () => column("entry_members", "absent"), fix: "node drizzle/apply_0014.mjs" },
 ];
 
 try {

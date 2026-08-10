@@ -110,6 +110,10 @@ export const certEventInput = z.object({
   registrationOpen: z.boolean().optional(),
   regStart: z.string().nullable().optional(),
   regEnd: z.string().nullable().optional(),
+  // ช่วงที่ครูสร้าง/แก้ไขรายการแข่งขันในงานนี้ได้ (admin ไม่ติดช่วงนี้)
+  compEditOpen: z.boolean().optional(),
+  compEditStart: z.string().nullable().optional(),
+  compEditEnd: z.string().nullable().optional(),
 });
 export type CertEventInput = z.infer<typeof certEventInput>;
 

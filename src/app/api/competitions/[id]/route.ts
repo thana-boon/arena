@@ -1,18 +1,44 @@
 import { db } from "@/db";
-import { competitions, competitionCapacity, competitionVenues, criteria, entries, entryMembers, scores, timeSlots, events } from "@/db/schema";
+import { competitions, competitionCapacity, competitionVenues, criteria, entries, entryMembers, scores, subjectGroups, timeSlots, events } from "@/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
 import { competitionInput } from "@/lib/validation";
 import { isGroupAllowed } from "@/lib/groupScope";
 import { logAudit } from "@/lib/audit";
-import { canEditCompetition } from "@/lib/permit";
+import { canEditCompetition, competitionManageGuard, scheduleChangeGuard } from "@/lib/permit";
 import { UNLIMITED_CAPACITY, isUnlimited } from "@/lib/domain";
 import { findVenueConflicts } from "@/lib/venues";
 
 async function hasEntries(compId: number): Promise<boolean> {
   const rows = await db.select({ id: entries.id }).from(entries).where(eq(entries.competitionId, compId)).limit(1);
   return rows.length > 0;
+}
+
+/** มีคนลงทะเบียนอยู่จริงไหม (ไม่นับที่ถอนไปแล้ว) — ใช้ตัดสินว่าเวลาแข่งขันถูกล็อกหรือยัง */
+async function hasActiveEntries(compId: number): Promise<boolean> {
+  const rows = await db
+    .select({ id: entries.id })
+    .from(entries)
+    .where(and(eq(entries.competitionId, compId), eq(entries.status, "active")))
+    .limit(1);
+  return rows.length > 0;
+}
+
+/**
+ * เลขหมวด (subject_group_catalog.group_no) ของรายการ — ใช้ตัดสินว่าครูอยู่หมวดเดียวกับรายการไหม
+ * รายการผูกกับ subjectGroups.id (PK รายปี) แต่ session ของครูถือเลขหมวด จึงต้องแปลงก่อนเทียบ
+ */
+async function groupCatalogNo(subjectGroupId: number | null): Promise<number | null> {
+  if (subjectGroupId == null) return null;
+  const g = (
+    await db
+      .select({ catalogNo: subjectGroups.catalogNo })
+      .from(subjectGroups)
+      .where(eq(subjectGroups.id, subjectGroupId))
+      .limit(1)
+  )[0];
+  return g?.catalogNo ?? null;
 }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -88,7 +114,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const compRows = await db.select().from(competitions).where(eq(competitions.id, id)).limit(1);
     const comp = compRows[0];
     if (!comp) return fail("ไม่พบรายการแข่งขัน", 404);
-    if (!canEditCompetition(s, comp.createdBy)) return fail("ไม่มีสิทธิ์แก้ไขรายการนี้", 403);
+    if (!canEditCompetition(s, comp.createdBy, await groupCatalogNo(comp.subjectGroupId)))
+      return fail("ไม่มีสิทธิ์แก้ไขรายการนี้", 403);
 
     const body = competitionInput.parse(await req.json());
 
@@ -97,6 +124,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       await db.select().from(events).where(and(eq(events.id, body.eventId), eq(events.yearId, comp.yearId))).limit(1)
     )[0];
     if (!event) return fail("กรุณาเลือกงานที่ถูกต้อง");
+
+    // ต้องอยู่ในช่วงที่งานเปิดให้ครูจัดการรายการ — เช็คทั้งงานเดิม (สิทธิ์แตะรายการนี้)
+    // และงานปลายทาง (สิทธิ์เอารายการไปวางไว้ในงานนั้น) ไม่งั้นย้ายงานหนีช่วงล็อกได้
+    const curEvent =
+      comp.eventId == null || comp.eventId === event.id
+        ? null
+        : (await db.select().from(events).where(eq(events.id, comp.eventId)).limit(1))[0] ?? null;
+    for (const ev of curEvent ? [curEvent, event] : [event]) {
+      const guard = competitionManageGuard(s, ev);
+      if (!guard.allowed) return fail(guard.message, 403);
+    }
 
     // ครูย้ายหมวดได้เฉพาะหมวดของตัวเอง (คงหมวดเดิมไว้ได้เสมอ; admin เปลี่ยนได้ทุกหมวด)
     if (
@@ -111,6 +149,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       await db.select().from(timeSlots).where(and(eq(timeSlots.id, body.timeSlotId), eq(timeSlots.yearId, comp.yearId))).limit(1)
     )[0];
     if (!slot) return fail("ช่วงเวลาแข่งขันไม่ถูกต้อง กรุณาเลือกใหม่");
+
+    // มีคนลงทะเบียนอยู่ = เลื่อนวัน/เวลาไม่ได้ (เวลาที่ลงไว้ผ่านการตรวจว่าไม่ชนมาแล้ว ห้ามให้เปลี่ยนทีหลังลอย ๆ)
+    // ตรวจก่อนด่านสถานที่ชนกัน เพื่อให้ครูเจอเหตุผลจริงทันที ไม่ใช่ไปติดกล่องยืนยันเรื่องห้องก่อน
+    const sched = scheduleChangeGuard(
+      s,
+      await hasActiveEntries(id),
+      { timeSlotId: comp.timeSlotId, eventDate: comp.eventDate },
+      { timeSlotId: slot.id, eventDate: body.eventDate || null }
+    );
+    if (!sched.allowed) return fail(sched.message, 403);
 
     // ห้องซ้ำในฟอร์มนับครั้งเดียว — คงลำดับที่เลือก
     const venueIds = [...new Set(body.venueIds)];
@@ -229,7 +277,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     const compRows = await db.select().from(competitions).where(eq(competitions.id, id)).limit(1);
     const comp = compRows[0];
     if (!comp) return fail("ไม่พบรายการแข่งขัน", 404);
-    if (!canEditCompetition(s, comp.createdBy)) return fail("ไม่มีสิทธิ์ลบรายการนี้", 403);
+    if (!canEditCompetition(s, comp.createdBy, await groupCatalogNo(comp.subjectGroupId)))
+      return fail("ไม่มีสิทธิ์ลบรายการนี้", 403);
+
+    // นอกช่วงที่งานเปิดให้จัดการรายการ ครูลบรายการไม่ได้ (admin ลบได้เสมอ)
+    const ev = comp.eventId == null ? null : (await db.select().from(events).where(eq(events.id, comp.eventId)).limit(1))[0] ?? null;
+    const guard = competitionManageGuard(s, ev);
+    if (!guard.allowed) return fail(guard.message, 403);
 
     const active = await db.select({ id: entries.id }).from(entries)
       .where(and(eq(entries.competitionId, id), eq(entries.status, "active"))).limit(1);

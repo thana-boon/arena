@@ -51,6 +51,7 @@ export function CompetitionForm({
   returnTo = "/teacher/competitions",
   lockSubjectGroup = false,
   canEditLocked = false,
+  scheduleLocked = false,
 }: {
   events: { id: number; name: string; kind: string; eventDate: string | null }[];
   groups: { id: number; name: string }[];
@@ -63,6 +64,8 @@ export function CompetitionForm({
   lockSubjectGroup?: boolean;
   /** admin แก้ได้ทุกช่องแม้มีผู้ลงทะเบียนแล้ว (ครูทั่วไปยังถูกล็อกเหมือนเดิม) */
   canEditLocked?: boolean;
+  /** ล็อกวัน/เวลาแข่งขัน — ยังมีนักเรียนลงทะเบียนอยู่ เวลาใหม่อาจไปชนรายการอื่นที่เขาลงไว้ */
+  scheduleLocked?: boolean;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -230,7 +233,8 @@ export function CompetitionForm({
       )}
       {locked && (
         <div className="alert alert-warning">
-          รายการนี้มีผู้ลงทะเบียนแล้ว แก้ไขได้เฉพาะชื่อ/วันเวลา/จำนวนรับ (ไม่สามารถเปลี่ยนประเภท ระดับชั้น หรือเกณฑ์) —
+          รายการนี้มีผู้ลงทะเบียนแล้ว แก้ไขได้เฉพาะชื่อ/สถานที่/จำนวนรับ
+          (ไม่สามารถเปลี่ยนประเภท ระดับชั้น หรือเกณฑ์{scheduleLocked ? " และเลื่อนวัน/เวลาแข่งขันไม่ได้ เพราะเวลาใหม่อาจไปชนกับรายการอื่นที่นักเรียนลงไว้" : ""}) —
           ถ้าต้องการแก้ไขโปรดติดต่อผู้ดูแลระบบ (admin)
         </div>
       )}
@@ -238,7 +242,8 @@ export function CompetitionForm({
         <div className="alert alert-info">
           รายการนี้มีผู้ลงทะเบียนแล้ว — ท่านเป็นผู้ดูแลระบบจึงแก้ไขได้ทุกช่อง โปรดตรวจสอบให้ดีก่อนบันทึก
           การเปลี่ยนประเภท ระดับชั้น หรือเกณฑ์ อาจกระทบผู้ที่ลงทะเบียนและคะแนนที่บันทึกไว้แล้ว
-          (เกณฑ์ที่ถูกลบจะลบคะแนนของเกณฑ์นั้นไปด้วย)
+          (เกณฑ์ที่ถูกลบจะลบคะแนนของเกณฑ์นั้นไปด้วย) และการเลื่อนวัน/เวลาแข่งขันจะไม่ถูกตรวจซ้ำว่าชนกับรายการอื่น
+          ที่นักเรียนลงไว้หรือไม่ — ครูทั่วไปถูกล็อกช่องนี้ไว้ด้วยเหตุนี้
         </div>
       )}
 
@@ -455,13 +460,15 @@ export function CompetitionForm({
           <div className="grid-2">
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">วันที่แข่ง</label>
-              <ThaiDatePicker value={f.eventDate} onChange={(v) => set("eventDate", v)} />
-              <span className="form-hint">ระบบเติมให้จาก “วันจัดงาน” ของงานที่เลือก — เปลี่ยนได้</span>
+              <ThaiDatePicker value={f.eventDate} disabled={scheduleLocked} onChange={(v) => set("eventDate", v)} />
+              <span className="form-hint">
+                {scheduleLocked ? "ล็อกไว้เพราะมีนักเรียนลงทะเบียนแล้ว" : "ระบบเติมให้จาก “วันจัดงาน” ของงานที่เลือก — เปลี่ยนได้"}
+              </span>
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">ช่วงเวลาแข่งขัน</label>
               {slots.length ? (
-                <select className="form-select" value={f.timeSlotId} onChange={(e) => set("timeSlotId", e.target.value === "" ? "" : Number(e.target.value))}>
+                <select className="form-select" value={f.timeSlotId} disabled={scheduleLocked} onChange={(e) => set("timeSlotId", e.target.value === "" ? "" : Number(e.target.value))}>
                   <option value="">— เลือกช่วงเวลา —</option>
                   {slots.map((sl) => (
                     <option key={sl.id} value={sl.id}>{formatSlot(sl.label, sl.startTime, sl.endTime)}</option>
@@ -470,6 +477,7 @@ export function CompetitionForm({
               ) : (
                 <div className="form-hint">ยังไม่มีช่วงเวลา — ผู้ดูแลระบบต้องเพิ่มช่วงเวลาที่เมนู “ช่วงเวลาแข่งขัน” ก่อน</div>
               )}
+              {scheduleLocked && <span className="form-hint">ล็อกไว้เพราะมีนักเรียนลงทะเบียนแล้ว</span>}
             </div>
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>

@@ -3,7 +3,14 @@ process.env.TZ = "Asia/Bangkok";
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { registrationNotice, registrationWindow, type NamedRegWindowEvent } from "./domain";
+import {
+  registrationNotice,
+  registrationWindow,
+  competitionEditNotice,
+  competitionEditWindow,
+  type NamedRegWindowEvent,
+  type NamedCompEditWindowEvent,
+} from "./domain";
 
 const NOW = new Date("2026-08-07T10:00:00+07:00");
 const open = { registrationOpen: true, regStart: null, regEnd: null };
@@ -124,4 +131,60 @@ test("เปิดแบบไม่มีกำหนดปิด → เปิ
     title: "เปิดรับสมัคร",
     detail: "",
   });
+});
+
+// ===== ช่วงสร้าง/แก้ไขรายการแข่งขัน (competitionEditWindow) =====
+// คุมครู ไม่ใช่คุมนักเรียน — เจอครูเข้าไปแก้รายการหลังนักเรียนลงทะเบียนแล้ว
+
+const cw = (e: Partial<NamedCompEditWindowEvent> = {}): NamedCompEditWindowEvent => ({
+  name: "งาน",
+  compEditOpen: true,
+  compEditStart: null,
+  compEditEnd: null,
+  ...e,
+});
+
+test("งานที่เพิ่งอัปเกรดมา (เปิดไว้ ไม่ตั้งเวลา) → แก้ได้เหมือนเดิม", () => {
+  assert.deepEqual(competitionEditWindow(cw(), NOW), { open: true, reason: null });
+});
+
+test("ปิดสวิตช์ / ยังไม่ถึงเวลา / หมดเวลา → ปิดพร้อมเหตุผลของเรื่องแก้รายการ (ไม่ใช่ข้อความรับสมัคร)", () => {
+  assert.equal(
+    competitionEditWindow(cw({ compEditOpen: false }), NOW).reason,
+    "ขณะนี้ปิดการสร้าง/แก้ไขรายการแข่งขัน"
+  );
+  assert.equal(
+    competitionEditWindow(cw({ compEditStart: "2026-08-08T00:00:00+07:00" }), NOW).reason,
+    "ยังไม่ถึงเวลาเปิดให้สร้าง/แก้ไขรายการแข่งขัน"
+  );
+  assert.equal(
+    competitionEditWindow(cw({ compEditEnd: "2026-08-06T23:59:59+07:00" }), NOW).reason,
+    "หมดเวลาสร้าง/แก้ไขรายการแข่งขันแล้ว"
+  );
+});
+
+test("รายการที่ยังไม่เข้างาน → แก้ไม่ได้ (ต้องให้แอดมินจัดเข้างานก่อน)", () => {
+  assert.deepEqual(competitionEditWindow(null, NOW), {
+    open: false,
+    reason: "รายการนี้ยังไม่ถูกจัดเข้างาน",
+  });
+});
+
+test("แถบสรุปตอนหมดเวลา → บอกวันที่ปิดแก้ไขของงานที่เพิ่งปิด", () => {
+  const n = competitionEditNotice(
+    [cw({ name: "วันวิชาการ", compEditEnd: "2026-08-05T16:30:00+07:00" })],
+    NOW
+  );
+  assert.equal(n.open, false);
+  assert.equal(n.title, "หมดเวลาสร้าง/แก้ไขรายการแข่งขันแล้ว");
+  assert.equal(n.detail, "วันวิชาการ — ปิดแก้ไขเมื่อ 5 ส.ค. 2569 16:30 น.");
+});
+
+test("แถบสรุปตอนยังเปิด → เตือนเส้นตายล่วงหน้าตั้งแต่เปิดหน้า", () => {
+  const n = competitionEditNotice(
+    [cw({ name: "วันวิชาการ", compEditEnd: "2026-08-20T16:30:00+07:00" })],
+    NOW
+  );
+  assert.equal(n.open, true);
+  assert.equal(n.detail, "วันวิชาการ — แก้ไขได้ถึง 20 ส.ค. 2569 16:30 น.");
 });

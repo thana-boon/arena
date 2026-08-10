@@ -70,6 +70,7 @@ export async function POST(req: Request) {
       for (const e of roster) {
         if (wantEntry && !wantEntry.has(e.entryId)) continue;
         for (const m of e.members) {
+          if (m.absent) continue; // ติ๊ก "ไม่มาแข่งขัน" ไว้ — ไม่ออกใบให้
           const cls = [m.classLevel, m.classRoom].filter(Boolean).join("/");
           targets.push({
             competitionId,
@@ -95,6 +96,7 @@ export async function POST(req: Request) {
       for (const r of computed.results) {
         if (wantEntry && !wantEntry.has(r.entryId)) continue;
         for (const m of r.members) {
+          if (m.absent) continue; // ติ๊ก "ไม่มาแข่งขัน" ไว้ — ไม่ออกใบให้ แม้ทีมจะได้รางวัล
           const cls = [m.classLevel, m.classRoom].filter(Boolean).join("/");
           targets.push({
             competitionId,
@@ -111,7 +113,9 @@ export async function POST(req: Request) {
         }
       }
     }
-    if (!targets.length) return fail("ไม่มีผู้เข้าร่วมให้ออกเกียรติบัตร");
+    // ว่างได้สองแบบ: ไม่มีใครลงทะเบียนเลย หรือคนที่ลงไว้ถูกติ๊กว่าไม่มาแข่งขันหมด
+    if (!targets.length)
+      return fail("ไม่มีผู้เข้าร่วมให้ออกเกียรติบัตร (ผู้ที่ติ๊กว่า “ไม่มาแข่งขัน” จะไม่ได้รับใบ)");
 
     const issued = await issueCertificates({
       yearId: year.id,

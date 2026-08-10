@@ -1,10 +1,11 @@
 import { db } from "@/db";
-import { entries, entryMembers } from "@/db/schema";
+import { competitions, entries, entryMembers, events } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { getSession } from "@/lib/auth/session";
 import { ApiAuthError } from "@/lib/auth/guards";
 import { withdrawEntry, RegistrationError } from "@/lib/registration";
+import { withdrawGuard } from "@/lib/permit";
 import { logAudit } from "@/lib/audit";
 
 // DELETE = ยกเลิกการลงทะเบียน (นักเรียนเจ้าของ / ครู / recorder / admin)
@@ -23,6 +24,17 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
       if (!members.some((m) => m.studentCode === session.code))
         return fail("ยกเลิกได้เฉพาะการลงทะเบียนของตนเอง", 403);
     }
+
+    // ปิดรับสมัครแล้ว = ลบรายชื่อไม่ได้ด้วย (ทั้งเจ้าของรายการ ครูประจำชั้น และตัวนักเรียนเอง)
+    // เดิมด่านนี้มีแต่ขาเพิ่ม รายชื่อที่ปิดไปแล้วจึงยังถูกลบทิ้งได้หลังหมดเวลา — เหลือแต่ admin ที่ยังลบได้
+    const comp = (
+      await db.select().from(competitions).where(eq(competitions.id, entry.competitionId)).limit(1)
+    )[0];
+    const event = comp?.eventId
+      ? (await db.select().from(events).where(eq(events.id, comp.eventId)).limit(1))[0] ?? null
+      : null;
+    const guard = withdrawGuard(session, event);
+    if (!guard.allowed) return fail(guard.message, 403);
 
     try {
       await withdrawEntry(id);

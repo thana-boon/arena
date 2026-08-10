@@ -31,6 +31,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         ...(body.registrationOpen !== undefined ? { registrationOpen: body.registrationOpen } : {}),
         regStart: body.regStart ? new Date(body.regStart) : null,
         regEnd: body.regEnd ? new Date(body.regEnd) : null,
+        ...(body.compEditOpen !== undefined ? { compEditOpen: body.compEditOpen } : {}),
+        compEditStart: body.compEditStart ? new Date(body.compEditStart) : null,
+        compEditEnd: body.compEditEnd ? new Date(body.compEditEnd) : null,
       })
       .where(eq(events.id, id));
     await logAudit(s.code, "update_event", { id });

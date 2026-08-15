@@ -2102,13 +2102,14 @@ p {
   .print-only {
     display: block !important;
   }
-  /* เอกสาร: ใช้ฟอนต์ Sarabun ขนาด 13 ทั้งหมด (รวมหัวเรื่อง) */
+  /* เอกสาร: ใช้ฟอนต์เดียวกับบนหน้าจอ (IBM Plex Sans Thai) — ที่พรีวิวสวยกว่าเพราะฟอนต์นี้
+     ไม่ใช่ Sarabun; พิมพ์ออกมาต้องได้หน้าตาเดียวกับที่เห็นบนจอ ไม่ใช่คนละใบ */
   body,
   .card,
   .card *,
   .print-title,
   .print-title * {
-    font-family: "Sarabun", sans-serif !important;
+    font-family: var(--font-th-serif) !important;
     font-size: 13px !important;
   }
   body {
@@ -2129,32 +2130,37 @@ p {
     font-family: var(--font-th-serif);
     text-align: center;
   }
-  /* ตารางในเอกสาร: เส้นชัดเจน เห็นชัด ใช้ Sarabun ขนาด 13 ทั้งหมด */
+  /* ตารางในเอกสาร: เส้นบางสีเทาอมม่วง หัวตารางพื้นม่วงอ่อน — ชุดเดียวกับตารางบนหน้าจอ
+     line-height 1.5 เพราะ IBM Plex Sans Thai ต้องการที่ให้วรรณยุกต์ (1.35 ตัดหัว "เ-ื") */
   .table {
     border-collapse: collapse;
     width: 100%;
-    font-family: "Sarabun", sans-serif !important;
+    font-family: var(--font-th-serif) !important;
     font-size: 13px !important;
   }
   .table th,
   .table td,
   .table th *,
   .table td * {
-    font-family: "Sarabun", sans-serif !important;
+    font-family: var(--font-th-serif) !important;
     font-size: 13px !important;
-    color: #000 !important;
+    color: #1a1625 !important;
   }
   .table th,
   .table td {
-    border: 1px solid #000 !important;
-    padding: 2px 10px !important;
-    line-height: 1.35 !important;
+    border: 0.75px solid #cdc4dc !important;
+    padding: 6px 10px !important;
+    line-height: 1.5 !important;
   }
   .table th {
-    background: #e5e5e5 !important;
-    font-weight: 700;
+    background: #f1edf7 !important;
+    color: #4c2a7a !important;
+    font-weight: 600;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+  .table th * {
+    color: #4c2a7a !important;
   }
   /* เอกสารรวม: ขึ้นหน้าใหม่ทุกรายการ */
   .report-section {
@@ -2169,10 +2175,11 @@ p {
     padding-top: 0;
     border-top: none;
   }
-  /* แถวหัวหมวดในเอกสารสรุป: พื้นเทาให้พิมพ์ติด + ไม่ให้หัวหมวดหลุดไปอยู่ท้ายหน้าโดด ๆ */
+  /* แถวหัวหมวดในเอกสารสรุป: พื้นม่วงอ่อนให้พิมพ์ติด + ไม่ให้หัวหมวดหลุดไปอยู่ท้ายหน้าโดด ๆ */
   .report-group-row td {
-    background: #e5e5e5 !important;
-    color: #000 !important;
+    background: #f1edf7 !important;
+    color: #4c2a7a !important;
+    font-weight: 700;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -2232,10 +2239,16 @@ p {
   /* ===== เอกสารกระดาษ: หัวเรื่อง + หัวตาราง ===== */
   /* ประเภทเอกสารต้องใหญ่กว่าบรรทัดอื่น — กฎ 13px ด้านบนคลุม .print-title * ทั้งก้อน ต้องแย่งคืนตรงนี้ */
   .print-title .sheet-head-doc {
-    font-size: 15px !important;
+    font-size: 17px !important;
     font-weight: 700;
   }
+  .print-title .sheet-head-event {
+    font-size: 14px !important;
+  }
   .sheet-head-compact .sheet-head-doc {
+    font-size: 14px !important;
+  }
+  .sheet-head-compact .sheet-head-event {
     font-size: 13px !important;
   }
   /* หัวตารางจัดกลาง — ต้องชนะ .report-web .table th ที่ชิดซ้าย จึงต้องระบุทั้งสองชั้น */
@@ -2247,14 +2260,24 @@ p {
   }
   .sheet-table .col-seq,
   .sheet-table .col-class,
-  .sheet-table .col-team,
   .sheet-table .col-medal {
     text-align: center;
     white-space: nowrap;
     width: 1px !important;
   }
+  /* ชื่อ-สกุลคือสิ่งที่กรรมการต้องอ่านออกก่อนเพื่อน — บังคับบรรทัดเดียวเสมอ
+     (ดูคำอธิบายเรื่องชื่อทีมในบล็อกนอก @media print) */
   .sheet-table .col-name {
-    width: 100% !important;
+    white-space: nowrap;
+    width: 1% !important;
+  }
+  .sheet-table .col-team {
+    width: 22% !important;
+  }
+  /* ช่องให้กรรมการเขียนคะแนน: กว้างพอเขียนตัวเลขสามหลัก หัวคอลัมน์ตัดบรรทัดได้ */
+  .sheet-table th.num {
+    width: 16mm !important;
+    white-space: normal;
   }
   /* แถวของคนคนหนึ่งอย่าถูกตัดคาหน้ากระดาษ (ทีมที่ merge ช่องไว้จะเบี้ยวทันทีถ้าโดนตัด) */
   .sheet-table tr {
@@ -2291,20 +2314,33 @@ p {
 .sheet-table th.num {
   text-align: center;
 }
-/* ช่องสั้น ๆ (ลำดับ/เลขที่/ชั้น/ชื่อทีม/เหรียญ) บีบพอดีเนื้อหาและจัดกลางให้อ่านเป็นคอลัมน์ */
+/* ชื่อเกณฑ์ให้คะแนนยาวได้ ("ความถูกต้องรวดเร็ว (100)") — ตัดบรรทัดในหัวคอลัมน์
+   แทนที่จะดัน nowrap ตาม .table th จนคอลัมน์กว้างเกินไปหนึ่งช่อง */
+.sheet-table th.num {
+  white-space: normal;
+}
+/* ช่องสั้น ๆ (ลำดับ/เลขที่/ชั้น/เหรียญ) บีบพอดีเนื้อหาและจัดกลางให้อ่านเป็นคอลัมน์ */
 .sheet-table .col-seq,
 .sheet-table .col-class,
-.sheet-table .col-team,
 .sheet-table .col-medal {
   text-align: center;
   white-space: nowrap;
   width: 1px;
 }
-/* ชื่อ-สกุลกินที่ที่เหลือทั้งหมด — ไม่งั้นชื่อไทยยาว ๆ ถูกบีบตัดขึ้นสามบรรทัด
-   ทั้งที่ช่องคะแนนข้าง ๆ ว่างอยู่ (width:100% คู่กับ width:1px ของช่องอื่นคือวิธีมาตรฐาน) */
+/* ชื่อ-สกุลต้องได้อยู่บรรทัดเดียว — เป็นข้อมูลที่กรรมการใช้จริงตอนขานชื่อ/ตรวจตัวผู้แข่ง
+   nowrap + width:1% = ช่องกว้างเท่าชื่อที่ยาวที่สุดพอดี ไม่แย่งที่ช่องคะแนน */
 .sheet-table .col-name {
-  width: 100%;
+  white-space: nowrap;
+  width: 1%;
   min-width: 12ch;
+}
+/* ชื่อทีมเป็นชื่อเล่นที่ครู/นักเรียนตั้งเอง ยาวแค่ไหนก็ได้ — ให้ตัดบรรทัดในช่องแคบ ๆ
+   ห้าม nowrap เด็ดขาด ไม่งั้นทีมชื่อยาวหนึ่งทีมดันช่องชื่อ-สกุลจนชื่อนักเรียนแตกสามบรรทัด */
+.sheet-table .col-team {
+  text-align: center;
+  width: 22%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 /* ช่องที่ merge ข้ามหลายแถว (ลำดับ/ชื่อทีม/คะแนนของทีม) อยู่กลางแนวตั้งด้วย ไม่ลอยติดขอบบน */
 .sheet-table td[rowspan] {
@@ -2335,6 +2371,23 @@ p {
   margin: 0 auto;
   padding: 15mm;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+}
+/* ตัวอย่างบนจอต้องเป็นใบเดียวกับที่พิมพ์ออกมาจริง — ลอกเส้นตาราง/ระยะจากบล็อก @media print
+   (ไม่งั้นคนกดพิมพ์แล้วได้คนละหน้าตากับที่เห็น) ความกว้างคอลัมน์ใช้กฎ .sheet-table ร่วมกันอยู่แล้ว
+   ยกเว้น .report-web (เอกสารสรุป) ที่ตั้งใจให้เป็นตารางเส้นแนวนอนอย่างเดียวทั้งบนจอและบนกระดาษ */
+.report-paper .report-section:not(.report-web) .sheet-table th,
+.report-paper .report-section:not(.report-web) .sheet-table td {
+  border: 0.75px solid #cdc4dc;
+  padding: 6px 10px;
+  line-height: 1.5;
+}
+.report-paper .report-section:not(.report-web) .sheet-table th {
+  background: #f1edf7;
+  color: #4c2a7a;
+  font-weight: 600;
+}
+.report-paper .sheet-table tr:hover td {
+  background: none;
 }
 .report-print-toolbar {
   position: sticky;

@@ -17,9 +17,13 @@ import { headers } from "next/headers";
 import type { PoolClient } from "pg";
 import { formatThaiDate, type CertAward, type Medal } from "@/lib/domain";
 import {
+  buildSampleData,
+  defaultSampleVariant,
   type CertBlock,
   type CertLayout,
   type CertRenderData,
+  type SampleCompetition,
+  type SampleVariant,
   defaultLayout,
   formatSerial,
   parseLayout,
@@ -32,6 +36,12 @@ export {
   type CertBlock,
   type CertLayout,
   type CertRenderData,
+  type SampleCompetition,
+  type SampleVariant,
+  buildSampleData,
+  defaultSampleVariant,
+  parseSampleVariant,
+  variantForComp,
   defaultLayout,
   formatSerial,
   parseLayout,
@@ -154,59 +164,66 @@ export async function getEventTemplates(eventId: number): Promise<CertTemplateVi
 }
 
 /**
- * ข้อมูลตัวอย่างของงานหนึ่ง สำหรับ preview ในหน้าออกแบบและใบทดลองพิมพ์
+ * รายการทั้งหมดในงาน พร้อม "คนตัวอย่าง" ของแต่ละรายการ — วัตถุดิบของใบตัวอย่างในหน้าออกแบบ
  *
- * ใช้ "ชื่อที่ยาวที่สุด" ของคนที่อยู่ในงานจริง ๆ เพื่อให้เห็นปัญหาชื่อล้นกรอบตั้งแต่ตอนออกแบบ
- * เลขทะเบียนตั้งเป็น 0000 ซึ่งตัวเดินเลขไม่มีวันแจก (เริ่มที่ 1) — ใบทดลองจึงไม่ถูกเข้าใจผิดว่าเป็นใบจริง
+ * แต่ละรายการหยิบผู้สมัครที่ "ชื่อยาวที่สุด" มาเป็นตัวอย่าง เพื่อให้เห็นปัญหาชื่อล้นกรอบตั้งแต่ตอนออกแบบ
+ * (ส่งไปให้ฝั่งเบราว์เซอร์ทั้งชุด หน้าออกแบบจึงสลับดูรายการอื่นได้ทันทีโดยไม่ต้องยิงเซิร์ฟเวอร์ใหม่)
  */
-export async function sampleRenderData(
-  eventId: number,
-  eventName: string,
-  yearBe: number
-): Promise<CertRenderData> {
+export async function sampleCompetitions(eventId: number): Promise<SampleCompetition[]> {
   const comps = await db
     .select()
     .from(competitions)
     .where(eq(competitions.eventId, eventId))
     .orderBy(asc(competitions.name));
 
-  let studentName = "เด็กหญิงตัวอย่าง นามสกุลยาวมากพอสมควร";
-  let className = "ม.3/8";
-  let competitionName = comps[0]?.name ?? "การแข่งขันตัวอย่าง";
-
-  if (comps.length) {
-    const entRows = await db
-      .select({ id: entries.id, competitionId: entries.competitionId })
-      .from(entries)
-      .where(and(inArray(entries.competitionId, comps.map((c) => c.id)), eq(entries.status, "active")));
-    if (entRows.length) {
-      const members = await db
-        .select()
-        .from(entryMembers)
-        .where(inArray(entryMembers.entryId, entRows.map((e) => e.id)));
-      const longest = members.sort((a, b) => b.nameSnapshot.length - a.nameSnapshot.length)[0];
-      if (longest) {
-        studentName = longest.nameSnapshot;
-        className = [longest.classLevelSnapshot, longest.classRoomSnapshot].filter(Boolean).join("/");
-        const ent = entRows.find((e) => e.id === longest.entryId);
-        const comp = comps.find((c) => c.id === ent?.competitionId);
-        if (comp) competitionName = comp.name;
-      }
-    }
-  }
-
-  return {
-    studentName,
-    className,
+  const rows: SampleCompetition[] = comps.map((c) => ({
+    id: c.id,
+    name: c.name,
+    type: c.type,
+    noContest: c.noContest,
+    isPublished: c.isPublished,
+    studentName: null,
+    className: null,
     teamName: null,
-    competitionName,
-    eventName,
-    medal: "gold",
-    rank: 1,
-    serialNo: formatSerial(yearBe, 0),
-    verifyToken: "sample",
-    dateText: formatThaiDate(new Date()),
-  };
+  }));
+  if (!comps.length) return rows;
+
+  const entRows = await db
+    .select({ id: entries.id, competitionId: entries.competitionId, teamName: entries.teamName })
+    .from(entries)
+    .where(and(inArray(entries.competitionId, comps.map((c) => c.id)), eq(entries.status, "active")));
+  if (!entRows.length) return rows;
+
+  const members = await db
+    .select()
+    .from(entryMembers)
+    .where(inArray(entryMembers.entryId, entRows.map((e) => e.id)));
+  const entOf = new Map(entRows.map((e) => [e.id, e]));
+
+  for (const r of rows) {
+    const inComp = members.filter((m) => entOf.get(m.entryId)?.competitionId === r.id);
+    const longest = inComp.sort((a, b) => b.nameSnapshot.length - a.nameSnapshot.length)[0];
+    if (!longest) continue;
+    r.studentName = longest.nameSnapshot;
+    r.className = [longest.classLevelSnapshot, longest.classRoomSnapshot].filter(Boolean).join("/");
+    r.teamName = entOf.get(longest.entryId)?.teamName ?? null;
+  }
+  return rows;
+}
+
+/**
+ * ข้อมูลใบตัวอย่างของงานหนึ่ง สำหรับใบทดลองพิมพ์
+ * ไม่ระบุ variant = ใบที่ระบบเลือกให้ (ชื่อยาวที่สุดในงาน + รางวัลตามชนิดของรายการนั้น)
+ */
+export async function sampleRenderData(
+  eventId: number,
+  eventName: string,
+  yearBe: number,
+  opts: { eventKind?: string; variant?: Partial<SampleVariant> } = {}
+): Promise<CertRenderData> {
+  const comps = await sampleCompetitions(eventId);
+  const variant = { ...defaultSampleVariant(comps, opts.eventKind ?? ""), ...opts.variant };
+  return buildSampleData({ comps, eventName, yearBe, dateText: formatThaiDate(new Date()), variant });
 }
 
 /**

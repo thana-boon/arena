@@ -1,9 +1,17 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { events, competitions } from "@/db/schema";
-import { asc, eq } from "drizzle-orm";
+import { events } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { getActiveYear } from "@/lib/queries";
-import { getEventTemplates, defaultLayout, sampleRenderData, verifyBaseUrl } from "@/lib/certificates";
+import {
+  buildSampleData,
+  defaultLayout,
+  defaultSampleVariant,
+  getEventTemplates,
+  sampleCompetitions,
+  verifyBaseUrl,
+} from "@/lib/certificates";
+import { formatThaiDate } from "@/lib/domain";
 import QRCode from "qrcode";
 import { CertEditor } from "./CertEditor";
 
@@ -22,15 +30,19 @@ export default async function CertEventEditorPage({ params }: { params: Promise<
   const templates = await getEventTemplates(eventId);
   const main = templates.find((t) => t.medalFilter === "") ?? null;
 
-  // รายการในงานนี้ (source of truth = competitions.event_id)
-  const compsInEvent = await db
-    .select()
-    .from(competitions)
-    .where(eq(competitions.eventId, eventId))
-    .orderBy(asc(competitions.name));
+  // รายการในงานนี้ + คนตัวอย่างของแต่ละรายการ (source of truth = competitions.event_id)
+  // ส่งไปทั้งชุด เพื่อให้หน้าออกแบบสลับดูใบของรายการ/รางวัลอื่นได้เองโดยไม่ต้องโหลดหน้าใหม่
+  const compsInEvent = await sampleCompetitions(eventId);
 
   // ตัวอย่างชุดเดียวกับที่ใบทดลองพิมพ์ใช้ — ที่เห็นบนจอกับที่ออกจากเครื่องพิมพ์จะได้ตรงกัน
-  const sample = await sampleRenderData(eventId, ev.name, year.yearBe);
+  const initialVariant = defaultSampleVariant(compsInEvent, ev.kind);
+  const sample = buildSampleData({
+    comps: compsInEvent,
+    eventName: ev.name,
+    yearBe: year.yearBe,
+    dateText: formatThaiDate(new Date()),
+    variant: initialVariant,
+  });
 
   // QR ของจริง (ชี้ token "sample" ซึ่งหน้า /verify จะตอบว่าไม่พบ) — สร้างที่ฝั่งเซิร์ฟเวอร์เหมือนตอนพิมพ์
   // เพื่อให้ตัวอย่างในหน้าออกแบบเห็นลายจุดจริง ไม่ใช่กล่องเปล่า และไม่ต้องแบก qrcode ไปไว้ใน bundle ฝั่งเบราว์เซอร์
@@ -42,7 +54,7 @@ export default async function CertEventEditorPage({ params }: { params: Promise<
 
   return (
     <CertEditor
-      event={{ id: ev.id, name: ev.name, eventDate: ev.eventDate, status: ev.status }}
+      event={{ id: ev.id, name: ev.name, eventDate: ev.eventDate, status: ev.status, kind: ev.kind }}
       yearBe={year.yearBe}
       initialLayout={main?.layout ?? defaultLayout()}
       initialOrientation={main?.orientation ?? "landscape"}
@@ -61,7 +73,8 @@ export default async function CertEventEditorPage({ params }: { params: Promise<
           imageScale: s.imageScale,
         })) ?? []
       }
-      competitions={compsInEvent.map((c) => ({ id: c.id, name: c.name, type: c.type, isPublished: c.isPublished }))}
+      competitions={compsInEvent}
+      initialVariant={initialVariant}
       sample={sample}
       sampleQrSvg={sampleQrSvg}
     />

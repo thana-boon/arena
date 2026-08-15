@@ -3693,6 +3693,22 @@ p {
 .cert-tool-text {
   width: 170px;
 }
+/* แถบเลือกใบตัวอย่างในโหมดเต็มจอ — กินที่ทางซ้ายของแถบบน แล้วดันปุ่มอื่นไปชิดขวา
+   (ยุบลงบรรทัดใหม่เองเมื่อจอแคบ เพราะแถบบนเป็น flex-wrap อยู่แล้ว) */
+.cert-sample-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-inline-end: auto;
+}
+.cert-sample-group select {
+  height: 32px;
+  max-width: 220px;
+  padding: 0 6px;
+  font-size: var(--text-sm);
+}
+
 .cert-zoom {
   display: inline-flex;
   align-items: center;

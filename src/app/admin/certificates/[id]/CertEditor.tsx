@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
@@ -15,23 +15,29 @@ import {
   BLOCK_LABEL,
   blockRect,
   blockShrinks,
+  buildSampleData,
   COMBO_TOKENS,
   LINE_H,
   pageMaxY,
   pageRatio,
   clampSigScale,
+  SAMPLE_AWARDS,
   SIG_FONT_DEFAULT,
   SIG_IMAGE_SCALE_DEFAULT,
   SIG_IMAGE_SCALE_MAX,
   SIG_IMAGE_SCALE_MIN,
   sigRect,
+  variantForComp,
   type BlockKind,
   type CertBlock,
   type CertLayout,
   type CertRenderData,
   type Orientation,
   type Rect,
+  type SampleCompetition,
+  type SampleVariant,
 } from "@/lib/certificateLayout";
+import { AWARD_LABEL, rankAwardLabel, type CertAward } from "@/lib/domain";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const assetUrl = (id: number | null) => (id == null ? null : `${BASE}/api/admin/certificate-assets/${id}`);
@@ -78,7 +84,8 @@ function sameRects(a: TextRects, b: TextRects): boolean {
   });
 }
 
-type CompRow = { id: number; name: string; type: string; isPublished: boolean };
+/** อันดับที่ให้เลือกดูตัวอย่าง — 0 = ไม่มีอันดับ (บล็อก "อันดับ" หายไปทั้งบรรทัด) */
+const SAMPLE_RANKS = [0, 1, 2, 3, 4, 5];
 
 /** สิ่งที่กำลังเลือกอยู่ — บล็อกข้อความ หรือผู้ลงนามลำดับที่ i */
 type Target = { kind: "block"; id: string } | { kind: "sig"; i: number };
@@ -117,13 +124,14 @@ const sameTarget = (a: Target | null, b: Target) =>
   a != null && (a.kind === "block" && b.kind === "block" ? a.id === b.id : a.kind === "sig" && b.kind === "sig" ? a.i === b.i : false);
 
 export function CertEditor(props: {
-  event: { id: number; name: string; eventDate: string | null; status: string };
+  event: { id: number; name: string; eventDate: string | null; status: string; kind: string };
   yearBe: number;
   initialLayout: CertLayout;
   initialOrientation: Orientation;
   initialBackgroundId: number | null;
   initialSignatures: SigEdit[];
-  competitions: CompRow[];
+  competitions: SampleCompetition[];
+  initialVariant: SampleVariant;
   sample: CertRenderData;
   sampleQrSvg: string;
 }) {
@@ -145,6 +153,40 @@ export function CertEditor(props: {
   const [bgSize, setBgSize] = useState<{ w: number; h: number } | null>(null);
   /** รูปลายเซ็นที่กำลังปรับอยู่ในกล่อง SignatureTuner (null = ไม่ได้เปิด) */
   const [sigTune, setSigTune] = useState<{ i: number; src: File | string; initial: SigTune; name: string } | null>(null);
+
+  /**
+   * ใบตัวอย่างที่กำลังดูอยู่ — เปลี่ยนรายการ/รางวัล/อันดับได้ เพื่อดูว่าใบของคนอื่นในงานเดียวกัน
+   * จะพิมพ์ออกมาหน้าตาแบบไหน (ชื่อสั้น-ยาวไม่เท่ากัน คำว่า "เหรียญทองแดง" ยาวกว่า "เหรียญทอง" ฯลฯ)
+   * ประกอบใบด้วย buildSampleData ตัวเดียวกับฝั่งเซิร์ฟเวอร์ ที่เห็นบนจอกับใบทดลองพิมพ์จึงตรงกัน
+   * — วันที่หยิบจากใบที่ server ส่งมา ไม่เรียก new Date() เอง (กัน hydration เพี้ยนตอนข้ามวัน)
+   */
+  const [variant, setVariant] = useState<SampleVariant>(props.initialVariant);
+  const sampleDate = props.sample.dateText;
+  const previewData = useMemo(
+    () =>
+      buildSampleData({
+        comps: props.competitions,
+        eventName: props.event.name,
+        yearBe: props.yearBe,
+        dateText: sampleDate,
+        variant,
+      }),
+    [props.competitions, props.event.name, props.yearBe, sampleDate, variant]
+  );
+
+  /**
+   * เปลี่ยนรายการ = ตั้งรางวัล/อันดับ/ชื่อทีมเป็นแบบที่ "ใบจริงของรายการนั้น" จะได้
+   * ยกเว้นตอนย้ายระหว่างรายการแข่งขันด้วยกันเอง — คงรางวัลที่กำลังดูอยู่ไว้
+   * (กำลังไล่ดูว่า "เหรียญทองแดง" ชนขอบกรอบในรายการไหนบ้าง ไม่ควรถูกดีดกลับเป็นเหรียญทองทุกครั้ง)
+   */
+  const pickComp = (id: number | null) =>
+    setVariant((v) => {
+      const scored = (c: SampleCompetition | null) => props.event.kind !== "training" && c != null && !c.noContest;
+      const next = props.competitions.find((c) => c.id === id) ?? null;
+      const fresh = variantForComp(next, props.event.kind);
+      const keepAward = scored(next) && scored(props.competitions.find((c) => c.id === v.competitionId) ?? null);
+      return keepAward ? { ...fresh, award: v.award, rank: v.rank } : fresh;
+    });
 
   /**
    * ความกว้างจริงของตัวอักษรแต่ละบล็อก วัดจากกระดาษที่กำลังแสดงอยู่
@@ -648,6 +690,7 @@ export function CertEditor(props: {
   /**
    * ทดลองพิมพ์ 1 ใบ — บันทึกก่อน แล้วเปิดใบตัวอย่างในแท็บใหม่ (หน้านั้นสั่งพิมพ์ให้เอง)
    * ต้องเปิดแท็บตั้งแต่จังหวะที่ผู้ใช้กด ไม่งั้นเบราว์เซอร์บล็อกป๊อปอัปที่เปิดหลัง await
+   * ส่งใบที่กำลังดูอยู่ไปด้วย (รายการ/รางวัล/อันดับ/ชื่อทีม) — ที่พิมพ์ออกมาจะได้เป็นใบเดียวกับที่เห็นบนจอ
    */
   async function testPrint() {
     const w = window.open("", "_blank");
@@ -655,7 +698,14 @@ export function CertEditor(props: {
       w?.close();
       return;
     }
-    const url = `${BASE}/certificates/print/sample?eventId=${eventId}`;
+    const q = new URLSearchParams({
+      eventId: String(eventId),
+      award: variant.award,
+      rank: String(variant.rank),
+      team: variant.showTeam ? "1" : "0",
+    });
+    if (variant.competitionId != null) q.set("comp", String(variant.competitionId));
+    const url = `${BASE}/certificates/print/sample?${q.toString()}`;
     if (w) w.location.href = url;
     else await alert("เบราว์เซอร์บล็อกการเปิดแท็บใหม่ กรุณาอนุญาตป๊อปอัปของเว็บนี้แล้วลองอีกครั้ง", { danger: true });
   }
@@ -770,7 +820,7 @@ export function CertEditor(props: {
 
   const stageCommon = {
     template: canvasTemplate,
-    data: props.sample,
+    data: previewData,
     qrSvg: props.sampleQrSvg,
     orientation,
     layout,
@@ -814,14 +864,25 @@ export function CertEditor(props: {
               <strong>1. รายการในงานนี้</strong> ({props.competitions.length})
             </summary>
             <div className="stack" style={{ marginTop: 12 }}>
-              <div className="subtitle">กำหนดว่ารายการอยู่งานไหน ได้ที่หน้าสร้าง/แก้รายการแข่งขัน</div>
+              <div className="subtitle">
+                กำหนดว่ารายการอยู่งานไหน ได้ที่หน้าสร้าง/แก้รายการแข่งขัน · กดชื่อรายการเพื่อดูใบตัวอย่างของรายการนั้น
+              </div>
               <div style={{ maxHeight: 220, overflowY: "auto" }}>
                 {props.competitions.length === 0 && <div className="subtitle">ยังไม่มีรายการในงานนี้</div>}
                 {props.competitions.map((c) => (
-                  <div key={c.id} className="row" style={{ gap: 8, padding: "4px 0", alignItems: "center" }}>
+                  <button
+                    key={c.id}
+                    className={`btn btn-sm${variant.competitionId === c.id ? " btn-primary" : ""}`}
+                    style={{ width: "100%", justifyContent: "flex-start", gap: 8 }}
+                    onClick={() => pickComp(c.id)}
+                    title="ดูใบตัวอย่างของรายการนี้"
+                  >
                     <span>{c.name}</span>
-                    {!c.isPublished && <span className="badge" style={{ marginInlineStart: "auto" }}>ยังไม่ประกาศผล</span>}
-                  </div>
+                    {c.noContest && <span className="badge">ไม่มีการแข่งขัน</span>}
+                    {!c.isPublished && !c.noContest && (
+                      <span className="badge" style={{ marginInlineStart: "auto" }}>ยังไม่ประกาศผล</span>
+                    )}
+                  </button>
                 ))}
               </div>
             </div>
@@ -1176,11 +1237,19 @@ export function CertEditor(props: {
         {/* ขวา: ภาพย่อ — กดแล้วเข้าโหมดเต็มจอเพื่อลาก/ปรับขนาด */}
         <div className="stack cert-preview-col">
           <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-            <div className="subtitle">ตัวอย่าง — ใช้ชื่อที่ยาวที่สุดจากรายการในงาน</div>
+            <div className="subtitle">ตัวอย่างใบเกียรติบัตร (เลขทะเบียน {props.yearBe}/0000 ไม่ใช่ใบจริง)</div>
             <button className="btn btn-sm btn-primary" onClick={() => setFull(true)} style={{ flexShrink: 0 }}>
               <Icon name="dashboard" size={16} /> เปิดเต็มจอเพื่อจัดหน้า
             </button>
           </div>
+
+          <SampleBar
+            comps={props.competitions}
+            eventKind={props.event.kind}
+            variant={variant}
+            onPickComp={pickComp}
+            onChange={(patch) => setVariant((v) => ({ ...v, ...patch }))}
+          />
           <button type="button" className="cert-preview-click" onClick={() => setFull(true)} title="คลิกเพื่อเปิดหน้าใหญ่แล้วลากจัดตำแหน่ง">
             <AutoWidth ratio={ratio}>{(w) => <CertStage {...stageCommon} w={w} interactive={false} />}</AutoWidth>
             <span className="cert-preview-hint">คลิกเพื่อเปิดหน้าใหญ่แล้วลากจัดตำแหน่ง</span>
@@ -1195,7 +1264,15 @@ export function CertEditor(props: {
       {full && createPortal(
         <div className="cert-fs">
           <div className="cert-fs-bar">
-            <strong style={{ marginInlineEnd: "auto" }}>{props.event.name}</strong>
+            <strong>{props.event.name}</strong>
+            <SampleBar
+              compact
+              comps={props.competitions}
+              eventKind={props.event.kind}
+              variant={variant}
+              onPickComp={pickComp}
+              onChange={(patch) => setVariant((v) => ({ ...v, ...patch }))}
+            />
             <span className="cert-zoom">
               <button className="btn btn-sm" onClick={() => changeZoom(zoom - 0.1)} title="ย่อ">
                 −
@@ -1433,6 +1510,133 @@ export function CertEditor(props: {
           onUse={applySigResult}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * แถบเลือก "ใบตัวอย่างที่แสดง" — สลับรายการ/รางวัล/อันดับ/ชื่อทีม เพื่อดูก่อนว่าใบของคนอื่นในงานเดียวกัน
+ * จะพิมพ์ออกมาหน้าตาแบบไหน (ชื่อสั้น-ยาวไม่เท่ากัน "เหรียญทองแดง" ยาวกว่า "เหรียญทอง"
+ * รายการที่ไม่มีการแข่งขันไม่มีอันดับเลย ฯลฯ) — เรื่องที่รู้ตอนแจกใบจริงแล้วมันสายไป
+ *
+ * ไม่แตะแม่แบบสักช่อง จึงไม่ต้องบันทึกและไม่ต้องกลัวว่าจะเผลอเปลี่ยนดีไซน์
+ */
+function SampleBar({
+  comps,
+  eventKind,
+  variant,
+  onPickComp,
+  onChange,
+  compact,
+}: {
+  comps: SampleCompetition[];
+  eventKind: string;
+  variant: SampleVariant;
+  onPickComp: (id: number | null) => void;
+  onChange: (patch: Partial<SampleVariant>) => void;
+  /** true = แถบเตี้ยสำหรับโหมดเต็มจอ (ไม่มีกรอบการ์ด ไม่มีคำอธิบาย) */
+  compact?: boolean;
+}) {
+  const cur = comps.find((c) => c.id === variant.competitionId) ?? null;
+  // ใบจริงของรายการแบบนี้ได้รางวัลเดียวกันทุกใบหรือไม่ — ถ้าใช่ ค่อยบอกว่าจะเป็นอะไร
+  // (รายการแข่งขันปกติแล้วแต่คะแนนของแต่ละคน จะบอกว่า "ใบจริงจะเป็นแบบนี้" ไม่ได้)
+  const fixed = eventKind === "training" || cur?.noContest === true;
+  const real = variantForComp(cur, eventKind);
+
+  // เรียกตรง ๆ ไม่ใช่คอมโพเนนต์ย่อย — ไม่งั้น React ถอด/ใส่ <select> ใหม่ทุกครั้งที่ render แล้วโฟกัสหลุด
+  const field = (label: string, control: React.ReactNode) =>
+    compact ? (
+      <>
+        <span className="cert-tool-label">{label}</span>
+        {control}
+      </>
+    ) : (
+      <label className="field">
+        <span>{label}</span>
+        {control}
+      </label>
+    );
+
+  const teamToggle = cur?.type === "team" && (
+    <label className="row" style={{ gap: 6, alignItems: "center" }}>
+      <input type="checkbox" checked={variant.showTeam} onChange={(e) => onChange({ showTeam: e.target.checked })} />
+      <span>แสดงชื่อทีม</span>
+    </label>
+  );
+
+  const controls = (
+    <>
+      {field(
+        "รายการ",
+        <select
+          value={variant.competitionId ?? ""}
+          onChange={(e) => onPickComp(e.target.value ? Number(e.target.value) : null)}
+          disabled={!comps.length}
+          title="ดูใบของรายการอื่นในงานนี้"
+        >
+          {!comps.length && <option value="">ยังไม่มีรายการในงานนี้</option>}
+          {comps.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+              {c.noContest ? " (ไม่มีการแข่งขัน)" : ""}
+            </option>
+          ))}
+        </select>
+      )}
+      {field(
+        "รางวัล",
+        <select
+          value={variant.award}
+          // "เข้าร่วมกิจกรรม" มาจากรายการที่ไม่มีการแข่งขัน ซึ่งไม่มีอันดับเลย — ตัดอันดับทิ้งให้ตรงกับใบจริง
+          onChange={(e) => {
+            const award = e.target.value as CertAward;
+            onChange(award === "activity" ? { award, rank: 0 } : { award });
+          }}
+        >
+          {SAMPLE_AWARDS.map((a) => (
+            <option key={a} value={a}>
+              {AWARD_LABEL[a]}
+            </option>
+          ))}
+        </select>
+      )}
+      {field(
+        "อันดับ",
+        <select value={variant.rank} onChange={(e) => onChange({ rank: Number(e.target.value) })}>
+          {SAMPLE_RANKS.map((r) => (
+            <option key={r} value={r}>
+              {r === 0 ? "ไม่มีอันดับ" : rankAwardLabel(r)}
+            </option>
+          ))}
+        </select>
+      )}
+    </>
+  );
+
+  if (compact) {
+    return (
+      <span className="cert-sample-group">
+        {controls}
+        {teamToggle}
+      </span>
+    );
+  }
+
+  return (
+    <div className="card stack" style={{ gap: 8 }}>
+      <strong>ใบตัวอย่างที่แสดง</strong>
+      <div className="form-row">{controls}</div>
+      {teamToggle}
+      <div className="subtitle">
+        ชื่อ ชั้น และชื่อทีม หยิบจากผู้สมัครจริงของรายการที่เลือก (คนที่ชื่อยาวที่สุด — จะได้เห็นก่อนว่าล้นกรอบไหม)
+        {fixed && (
+          <>
+            {" "}· {eventKind === "training" ? "งานนี้เป็นงานอบรม" : "รายการนี้ตั้งไว้ว่าไม่มีการแข่งขัน"} ใบจริงทุกใบจึงเป็น
+            “{AWARD_LABEL[real.award]}” และไม่มีอันดับ
+          </>
+        )}{" "}
+        · เลือกตรงนี้ไม่กระทบแม่แบบและไม่ต้องบันทึก — กด “ทดลองพิมพ์” จะได้ใบเดียวกับที่เห็นอยู่
+      </div>
     </div>
   );
 }

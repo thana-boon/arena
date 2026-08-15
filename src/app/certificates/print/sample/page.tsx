@@ -7,6 +7,7 @@ import { getActiveYear } from "@/lib/queries";
 import {
   getEventTemplates,
   loadTemplatesForPrint,
+  parseSampleVariant,
   sampleRenderData,
   verifyBaseUrl,
 } from "@/lib/certificates";
@@ -24,15 +25,19 @@ export const dynamic = "force-dynamic";
  *
  * ใบนี้ไม่ได้ออกเลขทะเบียนจริง: เลขเป็น 0000 (ตัวเดินเลขเริ่มที่ 1 จึงไม่มีวันซ้ำกับใบจริง)
  * และ QR ชี้ไป token "sample" ซึ่งหน้า /verify จะตอบว่าไม่พบ
+ *
+ * comp/award/rank/team = ใบที่หน้าออกแบบกำลังแสดงอยู่ (ไม่ส่งมา = ใบที่ระบบเลือกให้)
+ * — กด "ทดลองพิมพ์" แล้วต้องได้ใบเดียวกับที่เห็นบนจอ ไม่ใช่ใบอื่นในงานเดียวกัน
  */
 export default async function CertificateSamplePrintPage({
   searchParams,
 }: {
-  searchParams: Promise<{ eventId?: string }>;
+  searchParams: Promise<{ eventId?: string; comp?: string; award?: string; rank?: string; team?: string }>;
 }) {
   await requireAdmin();
 
-  const eventId = Number((await searchParams).eventId);
+  const q = await searchParams;
+  const eventId = Number(q.eventId);
   if (!Number.isInteger(eventId) || eventId <= 0) notFound();
 
   const year = await getActiveYear();
@@ -53,7 +58,10 @@ export default async function CertificateSamplePrintPage({
   const tpl = (await loadTemplatesForPrint([main.id])).get(main.id);
   if (!tpl) notFound();
 
-  const data = await sampleRenderData(eventId, ev.name, year.yearBe);
+  const data = await sampleRenderData(eventId, ev.name, year.yearBe, {
+    eventKind: ev.kind,
+    variant: parseSampleVariant(q),
+  });
   const qrSvg = await QRCode.toString(`${await verifyBaseUrl()}/${data.verifyToken}`, {
     type: "svg",
     margin: 0,

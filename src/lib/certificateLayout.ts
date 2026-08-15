@@ -4,6 +4,8 @@
  * ทุกพิกัด/ขนาดฟอนต์เป็น % ของหน้ากระดาษ
  */
 
+import type { CertAward } from "@/lib/domain";
+
 export const BLOCK_KINDS = [
   "student_name",
   "class",
@@ -221,4 +223,115 @@ export function parseLayout(raw: string): CertLayout {
 
 export function formatSerial(yearBe: number, no: number): string {
   return `${yearBe}/${String(no).padStart(4, "0")}`;
+}
+
+// ===== ใบตัวอย่างของหน้าออกแบบ =====
+// สร้างจากข้อมูลจริงในงาน แต่ประกอบเป็นใบด้วยฟังก์ชันบริสุทธิ์ตัวเดียว (buildSampleData)
+// หน้าออกแบบจึงสลับรายการ/รางวัล/อันดับดูบนจอได้ทันทีโดยไม่ต้องยิงเซิร์ฟเวอร์
+// และใบทดลองพิมพ์ (ฝั่ง server) ก็ประกอบด้วยฟังก์ชันเดียวกัน — ที่เห็นกับที่พิมพ์จึงตรงกันเสมอ
+
+/** รายการหนึ่งในงาน + "คนตัวอย่าง" ของรายการนั้น = ผู้สมัครที่ชื่อยาวที่สุด (เห็นปัญหาชื่อล้นกรอบก่อน) */
+export type SampleCompetition = {
+  id: number;
+  name: string;
+  type: string; // 'individual' | 'team'
+  noContest: boolean;
+  isPublished: boolean;
+  studentName: string | null; // null = ยังไม่มีใครลงทะเบียนในรายการนี้
+  className: string | null;
+  teamName: string | null;
+};
+
+/** ใบตัวอย่างที่กำลังดูอยู่ — เปลี่ยนได้จากหน้าออกแบบ เพื่อดูว่ารายการ/รางวัลอื่นพิมพ์ออกมาหน้าตาแบบไหน */
+export type SampleVariant = {
+  competitionId: number | null; // null = ให้ระบบเลือกให้ (คนที่ชื่อยาวที่สุดในงาน)
+  award: CertAward;
+  rank: number; // 0 = ไม่มีอันดับ (บล็อก "อันดับ" จะว่างเปล่า)
+  showTeam: boolean;
+};
+
+export const SAMPLE_AWARDS = ["gold", "silver", "bronze", "none", "activity"] as const satisfies readonly CertAward[];
+
+/** ค่าที่ใช้เมื่อยังไม่มีข้อมูลจริงให้หยิบ (งานที่ยังไม่มีรายการ/ยังไม่มีคนสมัคร) */
+const SAMPLE_FALLBACK = {
+  studentName: "เด็กหญิงตัวอย่าง นามสกุลยาวมากพอสมควร",
+  className: "ม.3/8",
+  teamName: "ทีมตัวอย่าง",
+  competitionName: "การแข่งขันตัวอย่าง",
+};
+
+/** รายการที่ใช้เป็นตัวอย่าง — ไม่ได้เลือกเองก็หยิบรายการของคนที่ชื่อยาวที่สุดในงานให้ */
+export function pickSampleComp(
+  comps: SampleCompetition[],
+  competitionId: number | null
+): SampleCompetition | null {
+  if (competitionId != null) {
+    const chosen = comps.find((c) => c.id === competitionId);
+    if (chosen) return chosen;
+  }
+  const named = comps.filter((c) => c.studentName);
+  if (named.length) return named.reduce((a, b) => (b.studentName!.length > a.studentName!.length ? b : a));
+  return comps[0] ?? null;
+}
+
+/**
+ * ใบจริงของรายการนี้จะได้รางวัล/อันดับแบบไหน — กติกาเดียวกับที่ /api/certificates/issue ใช้ออกใบจริง
+ * งานอบรมทั้งงาน = "เข้าร่วม" · รายการที่ตั้งว่าไม่มีการแข่งขัน = "เข้าร่วมกิจกรรม" (ทั้งสองแบบไม่มีอันดับ)
+ * ที่เหลือเป็นการแข่งขัน — ตัวอย่างเริ่มที่เหรียญทอง/ชนะเลิศ แล้วผู้ใช้กดเปลี่ยนดูแบบอื่นได้
+ */
+export function variantForComp(c: SampleCompetition | null, eventKind: string): SampleVariant {
+  const scored = eventKind !== "training" && !c?.noContest;
+  return {
+    competitionId: c?.id ?? null,
+    award: c?.noContest ? "activity" : scored ? "gold" : "none",
+    rank: scored ? 1 : 0,
+    // ประเภททีมพิมพ์ชื่อทีมลงใบจริงเสมอ (ถ้าแม่แบบมีช่องชื่อทีม) — ตัวอย่างจึงโชว์ไว้ก่อน
+    showTeam: c?.type === "team",
+  };
+}
+
+export function defaultSampleVariant(comps: SampleCompetition[], eventKind: string): SampleVariant {
+  return variantForComp(pickSampleComp(comps, null), eventKind);
+}
+
+export function buildSampleData(args: {
+  comps: SampleCompetition[];
+  eventName: string;
+  yearBe: number;
+  /** วันที่บนใบ — ส่งเข้ามาแทนการเรียก new Date() เอง เพื่อให้ค่าที่ server กับ browser วาดตรงกันเป๊ะ */
+  dateText: string;
+  variant: SampleVariant;
+}): CertRenderData {
+  const { comps, eventName, yearBe, dateText, variant } = args;
+  const c = pickSampleComp(comps, variant.competitionId);
+  return {
+    studentName: c?.studentName || SAMPLE_FALLBACK.studentName,
+    className: c?.className || SAMPLE_FALLBACK.className,
+    teamName: variant.showTeam ? c?.teamName || SAMPLE_FALLBACK.teamName : null,
+    competitionName: c?.name || SAMPLE_FALLBACK.competitionName,
+    eventName,
+    medal: variant.award,
+    rank: variant.rank,
+    // เลข 0000 ตัวเดินเลขไม่มีวันแจก (เริ่มที่ 1) — ใบตัวอย่างจึงไม่ถูกเข้าใจผิดว่าเป็นใบจริง
+    serialNo: formatSerial(yearBe, 0),
+    verifyToken: "sample",
+    dateText,
+  };
+}
+
+/** อ่านใบตัวอย่างที่ขอมาจาก query string ของหน้าใบทดลองพิมพ์ (ค่าที่อ่านไม่ออก = ไม่ได้ระบุ → ใช้ค่าเริ่มต้น) */
+export function parseSampleVariant(q: {
+  comp?: string;
+  award?: string;
+  rank?: string;
+  team?: string;
+}): Partial<SampleVariant> {
+  const out: Partial<SampleVariant> = {};
+  const comp = Number(q.comp);
+  if (Number.isInteger(comp) && comp > 0) out.competitionId = comp;
+  if (q.award && (SAMPLE_AWARDS as readonly string[]).includes(q.award)) out.award = q.award as CertAward;
+  const rank = Number(q.rank);
+  if (Number.isInteger(rank) && rank >= 0 && rank <= 99) out.rank = rank;
+  if (q.team === "1" || q.team === "0") out.showTeam = q.team === "1";
+  return out;
 }

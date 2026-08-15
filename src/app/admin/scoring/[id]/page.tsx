@@ -6,5 +6,6 @@ export const dynamic = "force-dynamic";
 export default async function AdminScoringDetail({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireAdmin();
   const id = Number((await params).id);
-  return <ScoringBody id={id} session={session} />;
+  // ฝั่ง admin ไม่มีหน้า /admin/scoring — เข้ามาจากหน้าประกาศผล จึงย้อนกลับไปที่นั่น
+  return <ScoringBody id={id} session={session} backHref="/admin/results" />;
 }

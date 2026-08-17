@@ -81,6 +81,60 @@ export function rankAwardLabel(rank: number): string {
   return rank > 0 ? `อันดับที่ ${rank}` : "";
 }
 
+// ===== เกียรติบัตรของรายการนี้ออกได้หรือยัง (เงื่อนไขระดับงาน + รายการ) =====
+
+/** สาเหตุที่ยังออกใบไม่ได้ — "ok" = ออกได้ (เงื่อนไขรายคนไม่รวมอยู่ในนี้) */
+export type CertGateCode = "ok" | "no_event" | "event_draft" | "not_published" | "attendance_pending";
+
+export type CertGateEvent = { kind: string; status: string };
+
+export type CertGateComp = {
+  noContest: boolean;
+  isPublished: boolean;
+  /** เช็คชื่อผู้เข้าร่วมแล้วหรือยัง — ใช้เฉพาะรายการที่ noContest */
+  attendanceChecked: boolean;
+};
+
+/** ข้อความบอกทางออกสำหรับตอน "กดออกใบจริงแล้วไม่ผ่าน" — สั้นกว่านั้นบนป้ายในตาราง (reason) */
+export const CERT_GATE_FIX: Record<Exclude<CertGateCode, "ok">, string> = {
+  no_event: "รายการนี้ยังไม่ถูกจัดเข้างาน กรุณาแจ้งผู้ดูแลระบบ",
+  event_draft: "งานนี้ยังไม่เผยแพร่ กรุณารอผู้ดูแลระบบตั้งค่าเกียรติบัตรให้เสร็จ",
+  not_published: "ต้องประกาศผลรายการนี้ก่อนจึงจะออกเกียรติบัตรได้",
+  attendance_pending: "ต้องเช็คชื่อผู้เข้าร่วมรายการนี้ก่อน (หน้าบันทึกผล → เช็คชื่อ) จึงจะออกเกียรติบัตรได้",
+};
+
+/**
+ * ออกเกียรติบัตรของรายการนี้ได้หรือยัง — ตอบเฉพาะเงื่อนไขของ "งาน + รายการ"
+ * (เงื่อนไขรายคน เช่น ถอนการสมัคร หรือไม่ได้มาร่วม เป็นของผู้เรียกแต่ละที่)
+ *
+ * อยู่ที่เดียวเพราะถูกถามจากสามที่: หน้าออกเกียรติบัตร (การ์ดงาน/ตารางรายการ),
+ * ทะเบียนเกียรติบัตร, และตอนกดออกใบจริงที่ API — ถ้าตอบไม่ตรงกันจะกลายเป็น
+ * ปุ่มกดได้แต่เซิร์ฟเวอร์ปฏิเสธ (หรือแย่กว่า: ป้ายบอกว่าออกไม่ได้แต่ API ปล่อยผ่าน)
+ *
+ * ลำดับการตรวจมีความหมาย: งานต้องพร้อมก่อนรายการ ไม่งั้นครูจะเห็นเหตุผลปลายทาง
+ * ("ยังไม่ประกาศผล") ทั้งที่ต้นทางคือ admin ยังตั้งค่างานไม่เสร็จ
+ *
+ * @param ev งานที่รายการสังกัด — null = ยังไม่ถูกจัดเข้างาน
+ */
+export function certIssueGate(
+  ev: CertGateEvent | null,
+  comp: CertGateComp
+):
+  | { ready: true; code: "ok"; reason: "" }
+  | { ready: false; code: Exclude<CertGateCode, "ok">; reason: string } {
+  if (!ev) return { ready: false, code: "no_event", reason: "ยังไม่ถูกจัดเข้างาน" };
+  if (ev.status === "draft") return { ready: false, code: "event_draft", reason: "ผู้ดูแลยังตั้งค่าไม่เสร็จ" };
+  // ไม่มีคะแนน = งานอบรมทั้งงาน หรือรายการที่ติ๊ก "ไม่มีการแข่งขัน" → ไม่มีผลให้ประกาศ
+  const noScoring = ev.kind === "training" || comp.noContest;
+  if (!noScoring && !comp.isPublished)
+    return { ready: false, code: "not_published", reason: "ยังไม่ประกาศผล" };
+  // รายการที่ไม่มีการแข่งขันใช้การเช็คชื่อผู้เข้าร่วมแทนการประกาศผล — ไม่เช็คชื่อ = ไม่รู้ว่าใครมา
+  // (ถ้าปล่อยผ่าน ครูที่ลืมเช็คชื่อจะออกใบให้ทุกคนที่ลงทะเบียนไว้ รวมคนที่ไม่ได้มา)
+  if (comp.noContest && !comp.attendanceChecked)
+    return { ready: false, code: "attendance_pending", reason: "ยังไม่เช็คชื่อผู้เข้าร่วม" };
+  return { ready: true, code: "ok", reason: "" };
+}
+
 /** parse json array จากคอลัมน์ text อย่างปลอดภัย */
 export function parseJsonArray(raw: string | null | undefined): string[] {
   if (!raw) return [];

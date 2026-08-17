@@ -18,6 +18,11 @@ export type CompListItem = {
   name: string;
   type: "individual" | "team";
   noContest: boolean; // true = ไม่มีการแข่งขัน (ไม่มีคะแนน/อันดับ/รางวัล)
+  /**
+   * เช็คชื่อผู้เข้าร่วมแล้วหรือยัง — ใช้เฉพาะรายการที่ noContest (รายการแข่งขันปกติเป็น false เสมอ)
+   * false = ยังไม่มีใครยืนยันว่าใครมา จึงยังออกเกียรติบัตรไม่ได้
+   */
+  attendanceChecked: boolean;
   subjectGroupId: number | null;
   groupCatalogNo: number | null;
   groupName: string;
@@ -65,6 +70,7 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
       name: c.name,
       type: c.type as "individual" | "team",
       noContest: c.noContest,
+      attendanceChecked: c.attendanceCheckedAt != null,
       subjectGroupId: c.subjectGroupId,
       groupCatalogNo: groupCatalogNo(c.subjectGroupId),
       groupName: groupName(c.subjectGroupId),

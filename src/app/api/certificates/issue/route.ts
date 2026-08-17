@@ -17,6 +17,7 @@ import {
   type IssueTarget,
 } from "@/lib/certificates";
 import { logAudit } from "@/lib/audit";
+import { certIssueGate, CERT_GATE_FIX } from "@/lib/domain";
 import type { SessionPayload } from "@/lib/auth/session";
 
 /**
@@ -50,16 +51,18 @@ export async function POST(req: Request) {
     if (!allowed) return fail("ออกเกียรติบัตรได้เฉพาะรายการในหมวดของท่าน", 403);
 
     const event = await findEventForCompetition(competitionId);
-    if (!event) return fail("รายการนี้ยังไม่ถูกจัดเข้างาน กรุณาแจ้งผู้ดูแลระบบ");
-    if (event.status === "draft")
-      return fail("งานนี้ยังไม่เผยแพร่ กรุณารอผู้ดูแลระบบตั้งค่าเกียรติบัตรให้เสร็จ");
+    // เงื่อนไข "ออกใบได้หรือยัง" มาจากฟังก์ชันเดียวกับที่หน้าจอใช้ตัดสิน (domain.certIssueGate)
+    // ที่นี่แค่แปลงรหัสเหตุผลเป็นข้อความที่บอกทางออก — ป้ายบนตารางใช้ข้อความสั้นของมันเอง
+    if (!event) return fail(CERT_GATE_FIX.no_event);
+    const gate = certIssueGate(event, {
+      noContest: comp.noContest,
+      isPublished: comp.isPublished,
+      attendanceChecked: comp.attendanceCheckedAt != null,
+    });
+    if (!gate.ready) return fail(CERT_GATE_FIX[gate.code]);
 
-    const isTraining = event.kind === "training";
     // ไม่มีคะแนน = งานอบรม (ทั้งงาน) หรือรายการที่ติ๊ก "ไม่มีการแข่งขัน" (รายการเดียว)
-    const noScoring = isTraining || comp.noContest;
-    // งานแข่งขันต้องประกาศผลก่อน; ที่ไม่มีคะแนนออกให้ผู้เข้าร่วมได้เลย
-    if (!noScoring && !comp.isPublished)
-      return fail("ต้องประกาศผลรายการนี้ก่อนจึงจะออกเกียรติบัตรได้");
+    const noScoring = event.kind === "training" || comp.noContest;
 
     // ปีและเกณฑ์เหรียญต้องมาจาก "ปีของรายการแข่งขัน" ไม่ใช่ปีที่เปิดใช้งานอยู่
     // ไม่งั้นการออกใบย้อนหลังจะได้เลขทะเบียน/ปี พ.ศ. บนใบเป็นปีปัจจุบัน (งานปี 2567 ได้เลข 2569/xxxx)
@@ -81,7 +84,9 @@ export async function POST(req: Request) {
       for (const e of roster) {
         if (wantEntry && !wantEntry.has(e.entryId)) continue;
         for (const m of e.members) {
-          if (m.absent) continue; // ติ๊ก "ไม่มาแข่งขัน" ไว้ — ไม่ออกใบให้
+          // ติ๊ก "ไม่มาแข่งขัน" ไว้ — ไม่ออกใบให้
+          // รายการที่ไม่มีการแข่งขัน: absent = คนที่ครูไม่ได้ติ๊ก "เข้าร่วม" ตอนเช็คชื่อ
+          if (m.absent) continue;
           const cls = [m.classLevel, m.classRoom].filter(Boolean).join("/");
           targets.push({
             competitionId,
@@ -126,7 +131,11 @@ export async function POST(req: Request) {
     }
     // ว่างได้สองแบบ: ไม่มีใครลงทะเบียนเลย หรือคนที่ลงไว้ถูกติ๊กว่าไม่มาแข่งขันหมด
     if (!targets.length)
-      return fail("ไม่มีผู้เข้าร่วมให้ออกเกียรติบัตร (ผู้ที่ติ๊กว่า “ไม่มาแข่งขัน” จะไม่ได้รับใบ)");
+      return fail(
+        comp.noContest
+          ? "ไม่มีผู้เข้าร่วมให้ออกเกียรติบัตร — ตอนเช็คชื่อไม่ได้ติ๊ก “เข้าร่วม” ให้ใครเลย"
+          : "ไม่มีผู้เข้าร่วมให้ออกเกียรติบัตร (ผู้ที่ติ๊กว่า “ไม่มาแข่งขัน” จะไม่ได้รับใบ)"
+      );
 
     const issued = await issueCertificates({
       yearId: year.id,

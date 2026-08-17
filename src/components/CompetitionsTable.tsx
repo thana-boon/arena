@@ -235,9 +235,11 @@ export function CompetitionsTable({
                 <td className="num" data-label="รับ/สมัคร">{isUnlimited(c.capacity) ? "ไม่จำกัด" : c.capacity} / {c.registered}</td>
                 <td data-label="สถานะ">
                   <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
-                    {/* ไม่มีการแข่งขัน = ไม่มีสถานะประกาศผล (ออกเกียรติบัตรได้เลย) */}
+                    {/* ไม่มีการแข่งขัน = ไม่มีสถานะประกาศผล แต่ต้องเช็คชื่อผู้เข้าร่วมก่อนออกเกียรติบัตร */}
                     {c.noContest
-                      ? <span className="badge">ออกเกียรติบัตรได้</span>
+                      ? c.attendanceChecked
+                        ? <span className="badge badge-success">เช็คชื่อแล้ว</span>
+                        : <span className="badge badge-warning">ยังไม่เช็คชื่อ</span>
                       : c.isPublished
                         ? <span className="badge badge-success">ประกาศผลแล้ว</span>
                         : <span className="badge badge-warning">ยังไม่ประกาศ</span>}

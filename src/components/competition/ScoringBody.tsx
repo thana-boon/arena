@@ -5,10 +5,17 @@ import { eq, inArray } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { getRoster } from "@/lib/roster";
 import { canScore } from "@/lib/permit";
+import { formatThaiDateTime } from "@/lib/domain";
 import type { SessionPayload } from "@/lib/auth/session";
 import { ScoringGrid } from "@/app/teacher/scoring/[id]/ScoringGrid";
+import { AttendanceGrid } from "@/app/teacher/scoring/[id]/AttendanceGrid";
 
-/** เนื้อหาหน้าบันทึกผล — ใช้ร่วมกันทั้ง /teacher และ /admin (ต่างกันแค่ปลายทาง backHref) */
+/**
+ * เนื้อหาหน้าบันทึกผล — ใช้ร่วมกันทั้ง /teacher และ /admin (ต่างกันแค่ปลายทาง backHref)
+ *
+ * รายการที่ "ไม่มีการแข่งขัน" เข้าหน้าเดียวกันนี้ แต่ได้ตารางเช็คชื่อผู้เข้าร่วมแทนตารางคะแนน
+ * (ครูจำได้ทางเดียวว่า "บันทึกผล" อยู่ไหน — ไม่ต้องมีเมนูที่สองให้หลง)
+ */
 export async function ScoringBody({
   id,
   session,
@@ -38,13 +45,27 @@ export async function ScoringBody({
   const group = comp.subjectGroupId == null ? undefined : (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0];
   if (!canScore(session, comp.createdBy, group?.catalogNo))
     return withBack(<div className="alert alert-error">บันทึกคะแนนได้เฉพาะรายการในหมวดของท่าน</div>);
-  // เข้าตรงด้วย URL ได้แม้ปุ่ม "บันทึกผล" ถูกซ่อนไว้ — กันหน้าเปล่า/สับสน
-  if (comp.noContest)
-    return withBack(
-      <div className="alert alert-warning">
-        รายการนี้ตั้งไว้ว่า “ไม่มีการแข่งขัน” จึงไม่มีคะแนนให้บันทึก — ใช้สำหรับลงทะเบียนรายชื่อและออกเกียรติบัตรเท่านั้น
-      </div>,
+  // ไม่มีการแข่งขัน = ไม่มีคะแนนให้กรอก เหลือแค่ "มาร่วมกิจกรรมจริงไหม" → เช็คชื่อรายคน
+  if (comp.noContest) {
+    const roster = await getRoster(id);
+    return (
+      <div className="stack">
+        {back}
+        <div className="page-header">
+          <h1>เช็คชื่อผู้เข้าร่วม: {comp.name}</h1>
+          <div className="subtitle">
+            ไม่มีการแข่งขัน · {comp.type === "team" ? "ประเภททีม" : "ประเภทเดี่ยว"} · ไม่มีคะแนน/อันดับ/รางวัล
+          </div>
+        </div>
+        <AttendanceGrid
+          competitionId={id}
+          type={comp.type as "individual" | "team"}
+          roster={roster}
+          checkedAtText={comp.attendanceCheckedAt ? formatThaiDateTime(comp.attendanceCheckedAt) : null}
+        />
+      </div>
     );
+  }
 
   const crits = await db.select().from(criteria).where(eq(criteria.competitionId, id));
   crits.sort((a, b) => a.sortOrder - b.sortOrder);

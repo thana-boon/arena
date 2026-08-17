@@ -241,6 +241,11 @@ export async function registerEntry(args: RegisterArgs): Promise<RegisterResult>
         classLevelSnapshot: m.classLevel,
         classRoomSnapshot: m.classRoom,
         classNumberSnapshot: m.classNumber ?? "",
+        // รายการที่ "ไม่มีการแข่งขัน" เริ่มที่ "ยังไม่ได้เช็คชื่อ = ถือว่าไม่มาร่วม"
+        // ต้องให้ครูติ๊ก "เข้าร่วม" ที่หน้าเช็คชื่อก่อนจึงจะได้เกียรติบัตร
+        // (สำคัญกับคนที่มาลงทะเบียนทีหลัง หลังครูเช็คชื่อไปแล้ว — ไม่งั้นได้ใบฟรีโดยไม่มีใครยืนยันว่ามา)
+        // รายการแข่งขันปกติยังเหมือนเดิม: มาแข่งทุกคน จนกว่าจะติ๊กว่าไม่มา
+        absent: comp.noContest,
       }))
     );
     return newEntryId;

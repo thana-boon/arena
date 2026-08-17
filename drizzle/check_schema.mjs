@@ -35,6 +35,7 @@ const CHECKS = [
   { id: "0013", what: "ช่วงเวลาสร้าง/แก้ไขรายการแข่งขัน", how: () => column("events", "comp_edit_open"), fix: "node drizzle/apply_0013.mjs" },
   { id: "0014", what: "ไม่มาแข่งขัน (รายคน)", how: () => column("entry_members", "absent"), fix: "node drizzle/apply_0014.mjs" },
   { id: "0015", what: "การเปลี่ยนตัวผู้เข้าแข่งขัน", how: async () => (await table("entry_substitutions")) && (await column("events", "sub_open_team")) && (await column("entry_members", "substituted")), fix: "node drizzle/apply_0015.mjs" },
+  { id: "0016", what: "เช็คชื่อผู้เข้าร่วม (รายการไม่มีการแข่งขัน)", how: () => column("competitions", "attendance_checked_at"), fix: "node drizzle/apply_0016.mjs" },
 ];
 
 try {

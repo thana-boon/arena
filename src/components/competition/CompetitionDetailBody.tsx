@@ -68,8 +68,11 @@ export async function CompetitionDetailBody({
         <div className="page-actions">
           <Link href={`${basePath}/${id}/reports`} className="btn btn-ghost"><Icon name="printer" size={18} /> เอกสาร</Link>
           {canEdit && <Link href={`${basePath}/${id}/edit`} className="btn btn-secondary">แก้ไข</Link>}
-          {!comp.noContest && canScore(session, comp.createdBy, group?.catalogNo) && (
-            <Link href={`${scoreBasePath}/${id}`} className="btn btn-primary">บันทึกผล</Link>
+          {/* ไม่มีการแข่งขัน = ไม่มีคะแนนให้กรอก แต่ยังต้องเช็คชื่อว่าใครมาร่วม (ปลายทางเดียวกัน) */}
+          {canScore(session, comp.createdBy, group?.catalogNo) && (
+            <Link href={`${scoreBasePath}/${id}`} className="btn btn-primary">
+              {comp.noContest ? "เช็คชื่อผู้เข้าร่วม" : "บันทึกผล"}
+            </Link>
           )}
         </div>
       </div>

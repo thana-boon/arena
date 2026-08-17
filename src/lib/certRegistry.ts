@@ -9,7 +9,7 @@ import {
   events,
 } from "@/db/schema";
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
-import type { CertAward } from "@/lib/domain";
+import { certIssueGate, type CertAward } from "@/lib/domain";
 
 /**
  * ทะเบียนเกียรติบัตร — ค้นย้อนหลัง "ข้ามทุกปีการศึกษา"
@@ -71,12 +71,14 @@ export async function searchRegistry(q: string): Promise<RegistryRow[]> {
       name: entryMembers.nameSnapshot,
       classLevel: entryMembers.classLevelSnapshot,
       classRoom: entryMembers.classRoomSnapshot,
+      absent: entryMembers.absent,
       entryId: entries.id,
       teamName: entries.teamName,
       entryStatus: entries.status,
       competitionId: competitions.id,
       competitionName: competitions.name,
       noContest: competitions.noContest,
+      attendanceCheckedAt: competitions.attendanceCheckedAt,
       isPublished: competitions.isPublished,
       yearBe: academicYears.yearBe,
       eventId: events.id,
@@ -108,14 +110,19 @@ export async function searchRegistry(q: string): Promise<RegistryRow[]> {
 
   const rows: RegistryRow[] = participations.map((r) => {
     const withdrawn = r.entryStatus !== "active";
-    // เงื่อนไขเดียวกับหน้า "ออกเกียรติบัตร": ต้องอยู่ในงานที่เผยแพร่แล้ว
-    // และงานแข่งขัน (ที่มีคะแนน) ต้องประกาศผลก่อน
-    const noScoring = r.eventKind === "training" || r.noContest;
-    let blockReason = "";
-    if (r.eventId == null) blockReason = "ยังไม่ถูกจัดเข้างาน";
-    else if (r.eventStatus === "draft") blockReason = "ผู้ดูแลยังตั้งค่าไม่เสร็จ";
-    else if (!noScoring && !r.isPublished) blockReason = "ยังไม่ประกาศผล";
-    else if (withdrawn) blockReason = "ถอนการสมัครแล้ว";
+    // เงื่อนไขระดับงาน/รายการ มาจากฟังก์ชันเดียวกับหน้า "ออกเกียรติบัตร" และ API ขาออกใบ
+    const gate = certIssueGate(
+      r.eventId == null ? null : { kind: r.eventKind ?? "", status: r.eventStatus ?? "" },
+      { noContest: r.noContest, isPublished: r.isPublished, attendanceChecked: r.attendanceCheckedAt != null }
+    );
+    // ที่เหลือเป็นเงื่อนไขรายคน ซึ่ง certIssueGate ไม่รู้จัก (เป็นของแถวนี้แถวเดียว)
+    let blockReason = gate.reason;
+    if (!blockReason) {
+      if (withdrawn) blockReason = "ถอนการสมัครแล้ว";
+      // ขาออกใบข้ามคนที่ไม่ได้มาเสมอ — ถ้าไม่บอกไว้ที่นี่ ปุ่ม "ออกใบ" จะกดได้แต่ไม่มีใบโผล่มา
+      else if (r.absent)
+        blockReason = r.noContest ? "เช็คชื่อแล้วว่าไม่ได้มาร่วม" : "ติ๊กไว้ว่าไม่มาแข่งขัน";
+    }
 
     return {
       key: `p-${r.entryId}-${r.studentCode}`,

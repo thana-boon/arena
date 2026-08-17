@@ -217,7 +217,9 @@ export async function substituteMember(args: SubstituteArgs): Promise<Substitute
         classNumberSnapshot: newMember.classNumber ?? "",
         substituted: true,
         // คนใหม่ยังไม่ได้ถูกตัดสินว่ามาหรือไม่มา — ล้างธง "ไม่มาแข่งขัน" ของคนเดิมทิ้ง
-        absent: false,
+        // รายการที่ไม่มีการแข่งขันกลับด้าน: ค่าเริ่มต้นคือ "ยังไม่ได้เช็คชื่อ = ไม่มาร่วม"
+        // ครูต้องไปติ๊ก "เข้าร่วม" ให้คนใหม่ที่หน้าเช็คชื่อ (จะไม่ได้ใบต่อจากคนเดิมโดยอัตโนมัติ)
+        absent: comp.noContest,
       })
       .where(eq(entryMembers.id, member.id));
 

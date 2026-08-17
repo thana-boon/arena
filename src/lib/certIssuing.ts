@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { certificateIssues, events } from "@/db/schema";
 import { asc, eq, inArray, sql } from "drizzle-orm";
 import { listCompetitions, type CompListItem } from "@/lib/listings";
+import { certIssueGate } from "@/lib/domain";
 import { canViewCompetition } from "@/lib/permit";
 import type { SessionPayload } from "@/lib/auth/session";
 
@@ -42,20 +43,6 @@ export type CertIssueEventDetail = {
   event: { id: number; name: string; kind: string; status: string; eventDate: string | null };
   rows: CertIssueCompRow[];
 };
-
-/**
- * ออกเกียรติบัตรของรายการนี้ได้หรือยัง — เงื่อนไขเดียวกับที่ /api/certificates/issue บังคับจริง
- * (งานอบรมทั้งงาน หรือรายการที่ตั้งเป็น "ไม่มีการแข่งขัน" ไม่ต้องรอประกาศผล)
- */
-function issueStatus(
-  ev: { kind: string; status: string },
-  comp: { noContest: boolean; isPublished: boolean }
-): { ready: boolean; reason: string } {
-  const noScoring = ev.kind === "training" || comp.noContest;
-  if (ev.status === "draft") return { ready: false, reason: "ผู้ดูแลยังตั้งค่าไม่เสร็จ" };
-  if (!noScoring && !comp.isPublished) return { ready: false, reason: "ยังไม่ประกาศผล" };
-  return { ready: true, reason: "" };
-}
 
 /** จำนวนใบที่ออกแล้วต่อรายการแข่งขัน */
 async function issuedCountByComp(compIds: number[]): Promise<Map<number, number>> {
@@ -105,7 +92,7 @@ export async function listCertIssueEvents(
       status: ev.status,
       eventDate: ev.eventDate,
       compCount: inEvent.length,
-      readyCount: inEvent.filter((c) => issueStatus(ev, c).ready).length,
+      readyCount: inEvent.filter((c) => certIssueGate(ev, c).ready).length,
       issuedCount: inEvent.reduce((s, c) => s + (issued.get(c.id) ?? 0), 0),
     });
   }
@@ -125,14 +112,18 @@ export async function getCertIssueEvent(
   const issued = await issuedCountByComp(comps.map((c) => c.id));
 
   const rows = comps
-    .map((c) => ({
-      id: c.id,
-      name: c.name,
-      groupName: c.groupName,
-      activeEntries: c.activeEntries,
-      issuedCount: issued.get(c.id) ?? 0,
-      ...issueStatus(ev, c),
-    }))
+    .map((c) => {
+      const gate = certIssueGate(ev, c);
+      return {
+        id: c.id,
+        name: c.name,
+        groupName: c.groupName,
+        activeEntries: c.activeEntries,
+        issuedCount: issued.get(c.id) ?? 0,
+        ready: gate.ready,
+        reason: gate.reason,
+      };
+    })
     .sort((a, b) => a.groupName.localeCompare(b.groupName, "th") || a.name.localeCompare(b.name, "th"));
 
   return {

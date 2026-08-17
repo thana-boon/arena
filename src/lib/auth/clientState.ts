@@ -60,6 +60,50 @@ export function kickedRecently(idleSeconds: number): boolean {
   return age >= 0;
 }
 
+// ===== เด้งไปหน้าแรก SchoolOS ไปแล้วเมื่อกี้ =====
+
+const BOUNCE_KEY = "arena.sso.bouncedAt";
+/** ห้ามเด้งซ้ำภายในกี่มิลลิวินาที */
+const BOUNCE_COOLDOWN_MS = 60_000;
+
+/**
+ * ⚠ กันลูป arena ↔ SchoolOS ซึ่งเป็นความเสี่ยงเดียวของนโยบาย "ไม่มี session = เด้งไป portal"
+ *
+ * เคสจริงที่ทำให้วน: ผู้ใช้ล็อกอิน SchoolOS อยู่ก็จริง แต่ handoff ขอโค้ดไม่ผ่าน (origin ไม่อยู่ใน
+ * SSO_ALLOWED_ORIGINS / ขอถี่เกินโควตา 10 ครั้งต่อนาที) → เราเด้งไป portal → portal เห็นว่ายัง
+ * ล็อกอินอยู่จึงส่งกลับมาที่ arena ทันที → เด้งอีก ไม่จบ และผู้ใช้ทำอะไรไม่ได้เลยสักคลิก
+ *
+ * เด้งได้ครั้งเดียวต่อหนึ่งช่วง cooldown · ครั้งถัดไปต้องหยุดให้ผู้ใช้เห็นหน้าจอที่มีปุ่มกดเอง
+ *
+ * sessionStorage ไม่ใช่ localStorage: ผูกกับแท็บนี้เท่านั้น (ออกไป portal แล้วกลับมาแท็บเดิม
+ * ค่ายังอยู่ เพราะเป็น origin เดิม) และไม่ข้ามไปกวนแท็บอื่นที่ผู้ใช้กำลังทำงานค้างไว้
+ */
+export function markPortalBounce(): void {
+  try {
+    window.sessionStorage.setItem(BOUNCE_KEY, String(Date.now()));
+  } catch {
+    /* เขียนไม่ได้ = อย่างมากคือกันลูปไม่ได้ ไม่ใช่เหตุให้หน้าเว็บพัง */
+  }
+}
+
+/** ล้างธง — เรียกเมื่อเข้าระบบสำเร็จ ไม่งั้นออกแล้วเข้าใหม่ภายในนาทีเดียวจะไม่ได้เด้งอัตโนมัติ */
+export function clearPortalBounce(): void {
+  try {
+    window.sessionStorage.removeItem(BOUNCE_KEY);
+  } catch {
+    /* ลบไม่ได้ก็ปล่อย */
+  }
+}
+
+export function bouncedRecently(): boolean {
+  try {
+    const at = Number(window.sessionStorage.getItem(BOUNCE_KEY));
+    return Number.isFinite(at) && at > 0 && Date.now() - at < BOUNCE_COOLDOWN_MS;
+  } catch {
+    return false;
+  }
+}
+
 // ===== ผู้ใช้กดออกจากระบบเอง =====
 let signingOut = false;
 

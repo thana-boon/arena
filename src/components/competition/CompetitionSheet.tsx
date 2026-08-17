@@ -76,6 +76,7 @@ export function CompetitionSheet({
     : "";
   const isTeam = meta.type === "team";
   const personCols = personColCount(isTeam);
+  const personColsSign = personColCount(isTeam, true);
 
   return (
     <>
@@ -87,17 +88,17 @@ export function CompetitionSheet({
         timeStr={timeStr}
       />
 
-      {/* ===== 1. ใบรายชื่อ ===== */}
+      {/* ===== 1. ใบรายชื่อ (มีช่องเซ็นชื่อท้ายแถว ใช้เป็นใบรายงานตัวได้) ===== */}
       {doc === "roster" && (
         <table className="table sheet-table">
           <thead>
             <tr>
-              <PersonHeadCells isTeam={isTeam} />
+              <PersonHeadCells isTeam={isTeam} signColumn />
             </tr>
           </thead>
           <tbody>
-            <SheetEntryRows entries={roster} isTeam={isTeam} leadCell={(_e, i) => i + 1} />
-            {!roster.length && <tr><td colSpan={personCols} className="text-center muted">ยังไม่มีผู้ลงทะเบียน</td></tr>}
+            <SheetEntryRows entries={roster} isTeam={isTeam} leadCell={(_e, i) => i + 1} signColumn />
+            {!roster.length && <tr><td colSpan={personColsSign} className="text-center muted">ยังไม่มีผู้ลงทะเบียน</td></tr>}
           </tbody>
         </table>
       )}

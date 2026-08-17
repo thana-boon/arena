@@ -618,6 +618,7 @@ export function ReportSheet({ bundle, docType, eventName }: { bundle: ReportBund
   const scoreDoc = docType === "scoresheet" || docType === "announce";
   const isTeam = meta.type === "team";
   const personCols = personColCount(isTeam);
+  const personColsSign = personColCount(isTeam, true);
 
   return (
     <section className="report-section">
@@ -635,16 +636,17 @@ export function ReportSheet({ bundle, docType, eventName }: { bundle: ReportBund
         </p>
       )}
 
+      {/* ใบรายชื่อมีช่องเซ็นชื่อท้ายแถว — ใช้เป็นใบรายงานตัวหน้าห้องแข่งได้เลย */}
       {docType === "roster" && (
         <table className="table sheet-table">
           <thead>
             <tr>
-              <PersonHeadCells isTeam={isTeam} />
+              <PersonHeadCells isTeam={isTeam} signColumn />
             </tr>
           </thead>
           <tbody>
-            <SheetEntryRows entries={roster} isTeam={isTeam} leadCell={(_e, i) => i + 1} />
-            {!roster.length && <tr><td colSpan={personCols} className="text-center muted">ยังไม่มีผู้ลงทะเบียน</td></tr>}
+            <SheetEntryRows entries={roster} isTeam={isTeam} leadCell={(_e, i) => i + 1} signColumn />
+            {!roster.length && <tr><td colSpan={personColsSign} className="text-center muted">ยังไม่มีผู้ลงทะเบียน</td></tr>}
           </tbody>
         </table>
       )}

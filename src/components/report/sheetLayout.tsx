@@ -80,7 +80,19 @@ export function SheetHeader({
  * หัวคอลัมน์ส่วน "ตัวคน" ที่ทุกใบใช้เหมือนกัน: ลำดับ / ชื่อทีม / ชื่อ-สกุล / ชั้น / เลขที่
  * ใบไหนมีคอลัมน์ต่อท้าย (เกณฑ์คะแนน, เหรียญ) ให้เขียนต่อจากนี้ในตารางของใบนั้น
  */
-export function PersonHeadCells({ isTeam, leadLabel = "ลำดับ" }: { isTeam: boolean; leadLabel?: string }) {
+export function PersonHeadCells({
+  isTeam,
+  leadLabel = "ลำดับ",
+  signColumn = false,
+}: {
+  isTeam: boolean;
+  leadLabel?: string;
+  /**
+   * ช่องว่างให้นักเรียนเซ็นชื่อตอนมารายงานตัว — ใบรายชื่อเท่านั้น
+   * ⚠ ช่องนี้ต้องอยู่ท้ายสุดของตาราง จึงใช้ได้เฉพาะใบที่ไม่มีคอลัมน์ต่อท้าย (ไม่ใช่ใบกรอกคะแนน/ประกาศผล)
+   */
+  signColumn?: boolean;
+}) {
   return (
     <>
       <th className="col-seq">{leadLabel}</th>
@@ -88,13 +100,14 @@ export function PersonHeadCells({ isTeam, leadLabel = "ลำดับ" }: { isT
       <th className="col-name">ชื่อ-สกุล</th>
       <th className="col-class">ชั้น</th>
       <th className="col-seq">เลขที่</th>
+      {signColumn && <th className="col-sign">ลงชื่อ</th>}
     </>
   );
 }
 
 /** จำนวนคอลัมน์ที่ PersonHeadCells กินไป — เอาไว้คิด colSpan ของแถว "ยังไม่มีข้อมูล" */
-export function personColCount(isTeam: boolean): number {
-  return isTeam ? 5 : 4;
+export function personColCount(isTeam: boolean, signColumn = false): number {
+  return (isTeam ? 5 : 4) + (signColumn ? 1 : 0);
 }
 
 /**
@@ -108,6 +121,7 @@ export function SheetEntryRows<T extends SheetEntry>({
   leadCell,
   trailingCells,
   rowHeight,
+  signColumn = false,
 }: {
   entries: T[];
   isTeam: boolean;
@@ -120,6 +134,11 @@ export function SheetEntryRows<T extends SheetEntry>({
   trailingCells?: (entry: T, index: number, rowSpan: number) => ReactNode;
   /** ความสูงขั้นต่ำต่อแถว — ใบกรอกคะแนนต้องมีที่ให้กรรมการเขียน */
   rowHeight?: number;
+  /**
+   * ช่องเซ็นชื่อท้ายแถว (คู่กับ signColumn ของ PersonHeadCells)
+   * เว้นว่างคนละช่อง "ต่อหนึ่งคน" ไม่ใช่ต่อทีม — ทุกคนในทีมต้องเซ็นเองตอนมารายงานตัว
+   */
+  signColumn?: boolean;
 }) {
   return (
     <>
@@ -141,6 +160,7 @@ export function SheetEntryRows<T extends SheetEntry>({
             <td className="col-name">{m?.name ?? "-"}</td>
             <td className="col-class">{m ? classLabel(m) : "-"}</td>
             <td className="col-seq">{m?.classNumber || "-"}</td>
+            {signColumn && <td className="col-sign"></td>}
             {mi === 0 && trailingCells?.(e, ei, members.length)}
           </tr>
         ));

@@ -26,7 +26,7 @@ export default async function ReportPrintPage({
 
   const [event] = eventId ? await db.select().from(events).where(eq(events.id, eventId)) : [];
   // ขอบเขตคุมที่นี่ด้วย ไม่ใช่แค่หน้าเลือก — ครูแก้ ?groups= เองไม่ได้ผล
-  const { yearBe, bundles } = await getReportBundles(session);
+  const { yearBe, bundles, venueNames } = await getReportBundles(session);
   const selected = applyReportFilter(bundles, filter);
 
   if (!event || !selected.length) {
@@ -38,7 +38,7 @@ export default async function ReportPrintPage({
       <PrintControls />
       <div className="report-paper">
         {docType === "venues" ? (
-          <VenueUsageSheet bundles={selected} eventName={event.name} yearBe={yearBe} />
+          <VenueUsageSheet bundles={selected} eventName={event.name} yearBe={yearBe} venueNames={venueNames} />
         ) : docType === "catalog" ? (
           <CatalogSheet
             bundles={selected}

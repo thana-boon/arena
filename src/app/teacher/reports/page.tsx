@@ -18,7 +18,7 @@ export default async function TeacherReportsPage() {
   const eventRows = year
     ? await db.select().from(events).where(eq(events.yearId, year.id)).orderBy(asc(events.name))
     : [];
-  const { yearBe, bundles } = await getReportBundles(session);
+  const { yearBe, bundles, venueNames } = await getReportBundles(session);
 
   // งานที่ไม่มีรายการของครูคนนี้เลย ไม่ต้องโผล่ในตัวเลือก — เลือกไปก็ได้หน้าว่าง
   const visible = eventRows.filter((e) => bundles.some((b) => b.eventId === e.id));
@@ -28,6 +28,7 @@ export default async function TeacherReportsPage() {
       yearBe={yearBe}
       events={visible.map((e) => ({ id: e.id, name: e.name }))}
       bundles={bundles}
+      venueNames={venueNames}
       defaultEventId={setting?.defaultEventId ?? null}
       scopeHint={session.role === "teacher" ? "เห็นเฉพาะรายการในหมวดของตัวเองและรายการที่ตัวเองสร้าง" : null}
     />

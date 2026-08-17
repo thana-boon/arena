@@ -134,9 +134,9 @@ export type ReportBundle = {
  */
 export async function getReportBundles(
   session?: SessionPayload
-): Promise<{ yearBe: number; bundles: ReportBundle[] }> {
+): Promise<{ yearBe: number; bundles: ReportBundle[]; venueNames: string[] }> {
   const { year, setting } = await getActiveYearWithSettings();
-  if (!year) return { yearBe: 0, bundles: [] };
+  if (!year) return { yearBe: 0, bundles: [], venueNames: [] };
 
   const medalPct = {
     gold: setting?.medalGoldPct ?? 80,
@@ -195,7 +195,7 @@ export async function getReportBundles(
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((cv) => venueRows.find((x) => x.id === cv.venueId))
       .filter((v): v is (typeof venueRows)[number] => !!v)
-      .map((v) => (v.building ? `${v.building} · ${v.name}` : v.name));
+      .map(venueLabel);
     const venueName = venueList.join(", ");
     bundles.push(
       await buildBundle(comp, g?.name ?? "-", year.yearBe, medalPct, { venueName, venueList, capacity }, classNumbers)
@@ -210,7 +210,24 @@ export async function getReportBundles(
       minClassLevelIndex(a.levels) - minClassLevelIndex(b.levels) ||
       a.meta.competitionName.localeCompare(b.meta.competitionName, "th")
   );
-  return { yearBe: year.yearBe, bundles };
+
+  // ห้องทั้งหมดที่มีในระบบ (ไม่ใช่เฉพาะห้องที่ถูกใช้) — รายงานสรุปการใช้ห้องต้องขึ้นครบทุกห้อง
+  // เรียงตามอาคาร → ชื่อห้อง, ห้องที่ไม่ได้ระบุอาคารไปอยู่ท้ายสุด
+  const venueNames = [...venueRows]
+    .sort(
+      (a, b) =>
+        Number(!a.building) - Number(!b.building) ||
+        a.building.localeCompare(b.building, "th") ||
+        a.name.localeCompare(b.name, "th")
+    )
+    .map(venueLabel);
+
+  return { yearBe: year.yearBe, bundles, venueNames };
+}
+
+/** ชื่อห้องแบบที่ใช้แสดงผล — "อาคาร · ห้อง" หรือชื่อห้องเปล่า ๆ ถ้าไม่ได้ระบุอาคาร */
+function venueLabel(v: { name: string; building: string }): string {
+  return v.building ? `${v.building} · ${v.name}` : v.name;
 }
 
 /** ตัวกรองของหน้าออกรายงาน — เซ็ตว่าง = ไม่กรอง (เอาทั้งหมด) */

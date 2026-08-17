@@ -1,4 +1,4 @@
-import { formatThaiDate, formatLevels, classBand } from "@/lib/domain";
+import { formatThaiDate, formatLevels, classBand, hhmm } from "@/lib/domain";
 import type { ReportBundle } from "@/lib/reportBundle";
 import { capacityLabel, groupLabel, scheduleLabel, typeLabel } from "@/lib/reportLabels";
 import {
@@ -26,7 +26,7 @@ export const DOC_HINT: Record<DocType, string> = {
   announce: "ผลการแข่งขัน อันดับ และเหรียญ",
   summary: "ตารางรวมทุกรายการ ประเภท ห้อง จำนวนรับ",
   regcount: "ยอดผู้สมัครรายรายการ รวมทั้งงาน และแยกตามระดับชั้น",
-  venues: "รายการแข่งขันแยกตามห้อง/สถานที่",
+  venues: "ห้องทั้งหมด แต่ละห้องใช้แข่งรายการอะไร วันไหน กี่โมงถึงกี่โมง",
   catalog: "ชื่อรายการ ระดับชั้น รายละเอียด — เอาไว้แจกนักเรียน",
 };
 /** จัดกลุ่มปุ่มเลือกเอกสารในหน้าออกรายงาน ให้เห็นชัดว่าอันไหนพิมพ์ทีละรายการ อันไหนเป็นตารางรวม */
@@ -345,9 +345,30 @@ function RegCountByBandPage({
   );
 }
 
-/** จัดกลุ่มรายการตามห้อง — รายการที่ใช้หลายห้องปรากฏใต้ทุกห้องที่ใช้, ไม่ระบุห้องไปกลุ่มท้ายสุด */
-function groupByVenue(bundles: ReportBundle[]): { venueName: string; items: ReportBundle[] }[] {
-  const map = new Map<string, ReportBundle[]>();
+/**
+ * เรียงรายการในห้องหนึ่งตามตารางเวลา (วัน → เวลาเริ่ม → ชื่อ)
+ * รายการที่ยังไม่กำหนดวัน/เวลาไปอยู่ท้ายห้อง — จะได้เห็นชัดว่ายังเหลืออะไรที่ต้องจัดเวลาให้
+ */
+function bySchedule(a: ReportBundle, b: ReportBundle): number {
+  const key = (x: ReportBundle) => [x.meta.eventDate ?? "9999-99-99", x.meta.startTime ?? "99:99"];
+  const [da, ta] = key(a);
+  const [dbb, tb] = key(b);
+  return (
+    da.localeCompare(dbb) ||
+    ta.localeCompare(tb) ||
+    a.meta.competitionName.localeCompare(b.meta.competitionName, "th")
+  );
+}
+
+/**
+ * จัดกลุ่มรายการตามห้อง — ขึ้นครบทุกห้องที่มีในระบบ ห้องที่ยังไม่มีรายการก็ต้องขึ้น (จะได้รู้ว่าห้องไหนยังว่าง)
+ * รายการที่ใช้หลายห้องปรากฏใต้ทุกห้องที่ใช้, รายการที่ยังไม่ระบุห้องไปกลุ่มท้ายสุด
+ */
+function groupByVenue(
+  bundles: ReportBundle[],
+  venueNames: string[]
+): { venueName: string; items: ReportBundle[] }[] {
+  const map = new Map<string, ReportBundle[]>(venueNames.map((v) => [v, []]));
   const noVenue: ReportBundle[] = [];
   for (const b of bundles) {
     if (!b.venueList.length) {
@@ -357,35 +378,44 @@ function groupByVenue(bundles: ReportBundle[]): { venueName: string; items: Repo
     for (const v of b.venueList) {
       const list = map.get(v);
       if (list) list.push(b);
+      // ห้องที่ไม่อยู่ในรายชื่อ (เช่นถูกลบไปแล้วแต่ยังผูกกับรายการอยู่) ต่อท้ายไว้ ไม่ให้ข้อมูลหาย
       else map.set(v, [b]);
     }
   }
-  const out = [...map.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0], "th"))
-    .map(([venueName, items]) => ({ venueName, items }));
-  if (noVenue.length) out.push({ venueName: "", items: noVenue });
+  const out = [...map.entries()].map(([venueName, items]) => ({
+    venueName,
+    items: [...items].sort(bySchedule),
+  }));
+  if (noVenue.length) out.push({ venueName: "", items: [...noVenue].sort(bySchedule) });
   return out;
 }
 
-/** เอกสารสรุปการใช้ห้อง: จัดกลุ่มตามห้อง/สถานที่ ว่าใช้แข่งรายการอะไร ระดับชั้นไหน วัน–เวลาใด */
+/**
+ * เอกสารสรุปการใช้ห้อง: ห้องทั้งหมดในระบบ ว่าห้องไหนใช้แข่งรายการอะไร ระดับชั้นไหน วันไหน กี่โมงถึงกี่โมง
+ * เรียงตามเวลาในแต่ละห้อง อ่านเป็นตารางการใช้ห้องได้เลย
+ */
 export function VenueUsageSheet({
   bundles,
   eventName,
   yearBe,
+  venueNames = [],
 }: {
   bundles: ReportBundle[];
   eventName: string;
   yearBe: number;
+  /** ห้องทั้งหมดที่มีในระบบ — ห้องที่ยังไม่มีรายการก็ขึ้นในเอกสารด้วย */
+  venueNames?: string[];
 }) {
-  const groups = groupByVenue(bundles);
-  const venueCount = groups.filter((g) => g.venueName).length;
+  const groups = groupByVenue(bundles, venueNames);
+  const roomGroups = groups.filter((g) => g.venueName);
+  const usedCount = roomGroups.filter((g) => g.items.length).length;
 
   return (
     <section className="report-section report-web" style={{ breakBefore: "auto" }}>
       <SheetHeader
         docLabel={DOC_LABEL.venues}
         eventName={eventName}
-        note={`ปีการศึกษา ${yearBe} · ใช้ ${venueCount} ห้อง · ${bundles.length} รายการ`}
+        note={`ปีการศึกษา ${yearBe} · ห้องทั้งหมด ${roomGroups.length} ห้อง (มีรายการแข่งขัน ${usedCount} ห้อง) · ${bundles.length} รายการ`}
       />
 
       <div className="table-wrap" style={{ boxShadow: "none" }}>
@@ -396,7 +426,8 @@ export function VenueUsageSheet({
               <th>รายการแข่งขัน</th>
               <th className="col-fit" style={{ width: 140 }}>หมวด</th>
               <th className="col-fit" style={{ width: 110 }}>ระดับชั้น</th>
-              <th className="col-fit" style={{ width: 160 }}>วัน–เวลา</th>
+              <th className="col-fit" style={{ width: 120 }}>วันแข่งขัน</th>
+              <th className="col-fit" style={{ width: 120 }}>เวลา</th>
             </tr>
           </thead>
           <tbody>
@@ -415,21 +446,37 @@ function VenueGroupRows({ group }: { group: { venueName: string; items: ReportBu
   return (
     <>
       <tr className="report-group-row">
-        <td colSpan={5}>
+        <td colSpan={6}>
           {label} ({group.items.length} รายการ)
         </td>
       </tr>
+      {/* ห้องว่างก็ยังมีแถวของตัวเอง — เว้นว่างไว้เฉย ๆ จะดูเหมือนตารางพัง */}
+      {!group.items.length && (
+        <tr>
+          <td colSpan={6} className="text-center muted">
+            — ยังไม่มีรายการแข่งขันในห้องนี้ —
+          </td>
+        </tr>
+      )}
       {group.items.map((b, i) => (
         <tr key={b.id}>
           <td className="col-fit">{i + 1}</td>
           <td>{b.meta.competitionName}</td>
           <td className="col-fit">{groupLabel(b.groupName)}</td>
           <td className="col-fit">{formatLevels(b.levels) || "-"}</td>
-          <td className="col-fit">{scheduleLabel(b) || "-"}</td>
+          <td className="col-fit">{formatThaiDate(b.meta.eventDate) || "-"}</td>
+          <td className="col-fit">{timeRangeLabel(b)}</td>
         </tr>
       ))}
     </>
   );
+}
+
+/** "09:00–12:00 น." — ยังไม่ได้กำหนดเวลาให้ขึ้น "ยังไม่กำหนด" ไม่ใช่ขีดเปล่า ๆ จะได้รู้ว่าต้องมาใส่ */
+function timeRangeLabel(b: ReportBundle): string {
+  const { startTime, endTime } = b.meta;
+  if (!startTime) return "ยังไม่กำหนด";
+  return `${hhmm(startTime)}–${hhmm(endTime)} น.`;
 }
 
 /**

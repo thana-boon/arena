@@ -25,12 +25,15 @@ export function ReportsByEvent({
   yearBe,
   events,
   bundles,
+  venueNames = [],
   defaultEventId = null,
   scopeHint = null,
 }: {
   yearBe: number;
   events: { id: number; name: string }[];
   bundles: ReportBundle[];
+  /** ห้องทั้งหมดในระบบ — ใช้ในเอกสารสรุปการใช้ห้อง (ห้องที่ยังไม่มีรายการก็ต้องขึ้น) */
+  venueNames?: string[];
   /** "งานเริ่มต้น" จากหน้าตั้งค่า — ใช้เป็นงานที่เลือกไว้ให้ตอนเปิดหน้านี้ */
   defaultEventId?: number | null;
   /** ข้อความบอกขอบเขตที่มองเห็น (ฝั่งครูเห็นไม่ครบทุกรายการ ต้องบอกไว้ไม่งั้นนึกว่าข้อมูลหาย) */
@@ -308,7 +311,12 @@ export function ReportsByEvent({
             )}
           </div>
           {docType === "venues" ? (
-            <VenueUsageSheet bundles={selectedBundles} eventName={eventName} yearBe={yearBe} />
+            <VenueUsageSheet
+              bundles={selectedBundles}
+              eventName={eventName}
+              yearBe={yearBe}
+              venueNames={venueNames}
+            />
           ) : docType === "catalog" ? (
             <CatalogSheet
               bundles={selectedBundles}

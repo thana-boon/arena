@@ -14,12 +14,13 @@ export default async function AdminReportsIndexPage() {
   const eventRows = year
     ? await db.select().from(events).where(eq(events.yearId, year.id)).orderBy(asc(events.name))
     : [];
-  const { yearBe, bundles } = await getReportBundles();
+  const { yearBe, bundles, venueNames } = await getReportBundles();
   return (
     <ReportsByEvent
       yearBe={yearBe}
       events={eventRows.map((e) => ({ id: e.id, name: e.name }))}
       bundles={bundles}
+      venueNames={venueNames}
       defaultEventId={setting?.defaultEventId ?? null}
     />
   );

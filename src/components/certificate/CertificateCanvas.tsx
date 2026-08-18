@@ -14,7 +14,7 @@ import {
   type CertLayout,
   type CertRenderData,
 } from "@/lib/certificateLayout";
-import { AWARD_LABEL, rankAwardLabel } from "@/lib/domain";
+import { AWARD_LABEL, certRankLabel } from "@/lib/domain";
 
 /**
  * คอมโพเนนต์เดียวใช้ทั้ง preview (บนจอ) และพิมพ์ (PDF) — ต่างกันแค่ค่า pageWidth
@@ -77,7 +77,8 @@ function fieldValue(kind: BlockKind, d: CertRenderData): string {
     case "event_name": return d.eventName;
     // "activity" (ไม่มีการแข่งขัน) → "เข้าร่วมกิจกรรม" ; rank = 0 เสมอ บล็อกอันดับจึงว่างเปล่า
     case "medal": return AWARD_LABEL[d.medal] ?? "";
-    case "rank": return d.rank ? rankAwardLabel(d.rank) : "";
+    // อันดับ 4 ลงมาไม่พิมพ์ลงใบ — ค่าว่างทำให้ทั้งบล็อก (พร้อม prefix) และโทเคน {rank} หายไปทั้งอัน
+    case "rank": return certRankLabel(d.rank);
     case "date": return d.dateText;
     case "serial": return d.serialNo;
     default: return "";

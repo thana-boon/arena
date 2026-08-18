@@ -37,7 +37,7 @@ import {
   type SampleCompetition,
   type SampleVariant,
 } from "@/lib/certificateLayout";
-import { AWARD_LABEL, rankAwardLabel, type CertAward } from "@/lib/domain";
+import { AWARD_LABEL, certRankLabel, rankAwardLabel, type CertAward } from "@/lib/domain";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const assetUrl = (id: number | null) => (id == null ? null : `${BASE}/api/admin/certificate-assets/${id}`);
@@ -1605,7 +1605,8 @@ function SampleBar({
         <select value={variant.rank} onChange={(e) => onChange({ rank: Number(e.target.value) })}>
           {SAMPLE_RANKS.map((r) => (
             <option key={r} value={r}>
-              {r === 0 ? "ไม่มีอันดับ" : rankAwardLabel(r)}
+              {/* อันดับ 4 ลงมาไม่ขึ้นบนใบจริง — บอกไว้ในตัวเลือกกันคนออกแบบงงว่าทำไมช่องอันดับหาย */}
+              {r === 0 ? "ไม่มีอันดับ" : certRankLabel(r) || `${rankAwardLabel(r)} (ไม่ขึ้นบนใบ)`}
             </option>
           ))}
         </select>

@@ -1,6 +1,6 @@
 import { Icon } from "@/components/Icon";
 import { verifyCertificate } from "@/lib/certificates";
-import { formatThaiDate, MEDAL_LABEL, rankAwardLabel, type Medal } from "@/lib/domain";
+import { certRankLabel, formatThaiDate, MEDAL_LABEL, type Medal } from "@/lib/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ token: 
   }
 
   const revoked = cert.revokedAt != null;
+  const rankText = certRankLabel(cert.rank);
   const rows: [string, string][] = [
     ["เลขทะเบียน", cert.serialNo],
     ["ชื่อ", cert.nameSnapshot],
@@ -31,7 +32,8 @@ export default async function VerifyPage({ params }: { params: Promise<{ token: 
     ["รายการแข่งขัน", cert.competitionNameSnapshot],
     ["งาน", cert.eventNameSnapshot],
     ["รางวัล", MEDAL_LABEL[cert.medal as Medal] ?? cert.medal],
-    ...(cert.rank ? ([["อันดับ", rankAwardLabel(cert.rank)]] as [string, string][]) : []),
+    // อันดับโชว์แค่ 1-3 ให้ตรงกับใบจริง (certRankLabel) — หน้านี้คือหน้าที่คนสแกน QR บนใบมาดู
+    ...(rankText ? ([["อันดับ", rankText]] as [string, string][]) : []),
     ["ปีการศึกษา", String(cert.yearBeSnapshot)],
     ["วันที่ออก", formatThaiDate(cert.issuedAt)],
   ];

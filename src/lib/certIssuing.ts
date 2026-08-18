@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/db";
 import { certificateIssues, events } from "@/db/schema";
-import { asc, eq, inArray, sql } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { listCompetitions, type CompListItem } from "@/lib/listings";
 import { certIssueGate } from "@/lib/domain";
 import { canViewCompetition } from "@/lib/permit";
@@ -35,6 +35,8 @@ export type CertIssueCompRow = {
   groupName: string;
   activeEntries: number;
   issuedCount: number;
+  /** id ของใบที่ออกไปแล้ว (เรียงตามลำดับที่ออก) — ปุ่ม PDF ใช้ยิงไปหน้าพิมพ์ได้เลยโดยไม่ต้องออกใบซ้ำ */
+  issueIds: number[];
   ready: boolean;
   reason: string;
 };
@@ -44,15 +46,25 @@ export type CertIssueEventDetail = {
   rows: CertIssueCompRow[];
 };
 
-/** จำนวนใบที่ออกแล้วต่อรายการแข่งขัน */
-async function issuedCountByComp(compIds: number[]): Promise<Map<number, number>> {
+/**
+ * id ของใบที่ออกแล้ว แยกตามรายการแข่งขัน (เรียงตาม id = ลำดับที่ออกจริง ซึ่งคือลำดับอันดับ)
+ * เอา id มาด้วยไม่ใช่แค่จำนวน เพราะปุ่ม "PDF" ต้องเปิดหน้าพิมพ์ของใบที่ออกไปแล้วได้
+ * โดยไม่ต้องเรียก /api/certificates/issue ซ้ำ (ซึ่งจะไปเพิ่ม reprint_count ทุกครั้งที่แค่อยากดู)
+ */
+async function issuedIdsByComp(compIds: number[]): Promise<Map<number, number[]>> {
   if (!compIds.length) return new Map();
   const rows = await db
-    .select({ competitionId: certificateIssues.competitionId, n: sql<number>`count(*)::int` })
+    .select({ id: certificateIssues.id, competitionId: certificateIssues.competitionId })
     .from(certificateIssues)
     .where(inArray(certificateIssues.competitionId, compIds))
-    .groupBy(certificateIssues.competitionId);
-  return new Map(rows.map((r) => [r.competitionId, r.n]));
+    .orderBy(asc(certificateIssues.id));
+  const map = new Map<number, number[]>();
+  for (const r of rows) {
+    const list = map.get(r.competitionId);
+    if (list) list.push(r.id);
+    else map.set(r.competitionId, [r.id]);
+  }
+  return map;
 }
 
 /** รายการแข่งขันในปีนี้ที่ผู้ใช้คนนี้มีสิทธิ์เห็น */
@@ -79,7 +91,7 @@ export async function listCertIssueEvents(
   const evs = await db.select().from(events).where(eq(events.yearId, yearId)).orderBy(asc(events.name));
   if (!evs.length) return { events: [], orphanCount };
 
-  const issued = await issuedCountByComp(comps.map((c) => c.id));
+  const issued = await issuedIdsByComp(comps.map((c) => c.id));
 
   const cards: CertIssueEventCard[] = [];
   for (const ev of evs) {
@@ -93,7 +105,7 @@ export async function listCertIssueEvents(
       eventDate: ev.eventDate,
       compCount: inEvent.length,
       readyCount: inEvent.filter((c) => certIssueGate(ev, c).ready).length,
-      issuedCount: inEvent.reduce((s, c) => s + (issued.get(c.id) ?? 0), 0),
+      issuedCount: inEvent.reduce((s, c) => s + (issued.get(c.id)?.length ?? 0), 0),
     });
   }
   return { events: cards, orphanCount };
@@ -109,17 +121,19 @@ export async function getCertIssueEvent(
   if (!ev || ev.yearId !== yearId) return null;
 
   const comps = (await viewableCompetitions(session, yearId)).filter((c) => c.eventId === eventId);
-  const issued = await issuedCountByComp(comps.map((c) => c.id));
+  const issued = await issuedIdsByComp(comps.map((c) => c.id));
 
   const rows = comps
     .map((c) => {
       const gate = certIssueGate(ev, c);
+      const issueIds = issued.get(c.id) ?? [];
       return {
         id: c.id,
         name: c.name,
         groupName: c.groupName,
         activeEntries: c.activeEntries,
-        issuedCount: issued.get(c.id) ?? 0,
+        issuedCount: issueIds.length,
+        issueIds,
         ready: gate.ready,
         reason: gate.reason,
       };

@@ -10,7 +10,13 @@ import type { CertIssueCompRow } from "@/lib/certIssuing";
 // window.open ไม่ถูกเติม basePath (/arena) ให้อัตโนมัติเหมือน <Link> — ต้อง prefix เอง
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
-/** ชั้นที่สองของหน้าออกเกียรติบัตร — รายการทั้งหมดในงานที่เลือก */
+/**
+ * ชั้นที่สองของหน้าออกเกียรติบัตร — รายการทั้งหมดในงานที่เลือก
+ *
+ * แยกเป็นสองจังหวะโดยตั้งใจ: "ออกเกียรติบัตร" (จองเลขทะเบียน) กับ "PDF" (เปิดแท็บพิมพ์)
+ * เดิมกดออกแล้วเด้งแท็บพิมพ์ทันที ทั้งช้าและกดพลาดง่าย — และครูที่แค่อยากเปิดดู/พิมพ์ซ้ำ
+ * ต้องยิงออกใบใหม่ทุกครั้ง ตอนนี้ปุ่ม PDF อ่านจาก id ใบที่ออกไปแล้ว ไม่แตะทะเบียนเลย
+ */
 export function CertIssuePanel({
   eventName,
   rows,
@@ -22,10 +28,22 @@ export function CertIssuePanel({
 }) {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [msg, setMsg] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  // id ใบที่เพิ่งออกในจอนี้ — ทับค่าจากเซิร์ฟเวอร์ไว้ก่อน เพราะกว่า router.refresh() จะกลับมา ปุ่ม PDF ต้องกดได้แล้ว
+  const [justIssued, setJustIssued] = useState<Record<number, number[]>>({});
   const confirm = useConfirm();
   const router = useRouter();
 
+  const idsOf = (r: CertIssueCompRow) => justIssued[r.id] ?? r.issueIds;
+
   async function issue(r: CertIssueCompRow) {
+    // ออกใบ = จองเลขทะเบียนของโรงเรียนจริง ๆ ต้องถามยืนยันก่อนเสมอ (ถอนคืนได้ แต่ไม่ควรกดพลาด)
+    const okDo = await confirm({
+      title: "ยืนยันการออกเกียรติบัตร",
+      message: `ออกเกียรติบัตรของ “${r.name}” ให้ผู้เข้าร่วมทุกคน (${r.activeEntries} รายการที่ลงทะเบียน) และจองเลขทะเบียนให้ทุกใบ · ยังไม่เปิดไฟล์ให้พิมพ์ ต้องการพิมพ์ค่อยกดปุ่ม “PDF” ทีหลัง`,
+      confirmText: "ออกเกียรติบัตร",
+    });
+    if (!okDo) return;
+
     setBusyId(r.id);
     setMsg(null);
     const res = await api.post<{ issueIds: number[]; count: number; newCount: number }>(
@@ -39,13 +57,20 @@ export function CertIssuePanel({
     if (!res.data.issueIds.length)
       return setMsg({ type: "error", text: "ไม่มีผู้เข้าแข่งขันให้ออกเกียรติบัตร" });
 
-    // เปิดแท็บใหม่ไปหน้าพิมพ์ (ยกภาระ save PDF ให้ผู้ใช้)
-    window.open(`${BASE}/certificates/print?ids=${res.data.issueIds.join(",")}`, "_blank");
+    setJustIssued((m) => ({ ...m, [r.id]: res.data.issueIds }));
     setMsg({
       type: "success",
-      text: `ออกเกียรติบัตร ${res.data.count} ใบ (ใหม่ ${res.data.newCount} ใบ) — เปิดแท็บสำหรับพิมพ์แล้ว · ถ้าแค่ลองดู กด “ยกเลิกการออก” เพื่อถอนคืนได้`,
+      text: `ออกเกียรติบัตรของ “${r.name}” แล้ว ${res.data.count} ใบ (ใหม่ ${res.data.newCount} ใบ) · กดปุ่ม “PDF” เพื่อเปิดแท็บสำหรับพิมพ์/บันทึกเป็นไฟล์ · ถ้าแค่ลองดู กด “ยกเลิกการออก” เพื่อถอนคืนได้`,
     });
     router.refresh(); // ช่อง "ออกแล้ว" กับปุ่มยกเลิกมาจากฝั่งเซิร์ฟเวอร์ ต้องดึงใหม่
+  }
+
+  /** เปิดแท็บใหม่ไปหน้าพิมพ์ของใบที่ออกไปแล้ว (ยกภาระ save PDF ให้ผู้ใช้ตามเดิม) */
+  function openPdf(r: CertIssueCompRow) {
+    const ids = idsOf(r);
+    if (!ids.length) return setMsg({ type: "error", text: "รายการนี้ยังไม่ได้ออกเกียรติบัตร" });
+    // เรียกตรงจากปุ่ม ไม่ผ่าน await ก่อน — ไม่งั้นตัวกันป๊อปอัปของเบราว์เซอร์จะบล็อกแท็บใหม่
+    window.open(`${BASE}/certificates/print?ids=${ids.join(",")}`, "_blank");
   }
 
   /** ถอนใบทั้งล็อตของรายการนี้ — สำหรับคนที่กดออกเพื่อดูหน้าตาใบเฉย ๆ */
@@ -68,6 +93,11 @@ export function CertIssuePanel({
     setBusyId(null);
     if (!res.ok) return setMsg({ type: "error", text: res.error });
 
+    setJustIssued((m) => {
+      const next = { ...m };
+      delete next[r.id]; // ใบถูกลบไปแล้ว ปุ่ม PDF ต้องหายตาม ไม่ใช่ค้างชี้ id ที่ไม่มีอยู่จริง
+      return next;
+    });
     setMsg({
       type: "success",
       text: `ยกเลิกเกียรติบัตรของ “${r.name}” แล้ว ${res.data.count} ใบ${
@@ -83,7 +113,8 @@ export function CertIssuePanel({
         <div className="page-header" style={{ marginBottom: 0 }}>
           <h1>{eventName}</h1>
           <div className="subtitle">
-            เลือกรายการเพื่อออกเกียรติบัตรให้ผู้เข้าร่วมทุกคน · ระบบจะเปิดแท็บใหม่ให้บันทึกเป็น PDF (Ctrl/⌘+P)
+            เลือกรายการเพื่อออกเกียรติบัตรให้ผู้เข้าร่วมทุกคน · ระบบจะถามยืนยันก่อนออก จากนั้นกดปุ่ม “PDF”
+            เพื่อเปิดแท็บใหม่ให้บันทึกเป็นไฟล์ (Ctrl/⌘+P)
             {" · "}กดออกไปแล้วถอนคืนได้ด้วยปุ่ม “ยกเลิกการออก” (ลองดูหน้าตาใบก่อนได้ ไม่เปลืองเลขทะเบียน)
           </div>
         </div>
@@ -118,36 +149,42 @@ export function CertIssuePanel({
                   <td data-label="หมวด">{r.groupName || <span className="muted">—</span>}</td>
                   <td className="num" data-label="ผู้เข้าร่วม">{r.activeEntries}</td>
                   <td className="num" data-label="ออกแล้ว">
-                    {r.issuedCount > 0 ? `${r.issuedCount} ใบ` : <span className="muted">—</span>}
+                    {idsOf(r).length > 0 ? `${idsOf(r).length} ใบ` : <span className="muted">—</span>}
                   </td>
                   <td className="num td-actions">
                     <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
-                      {r.ready ? (
+                      {/* ออกไปแล้ว: ปุ่มออกกลายเป็น PDF + ยกเลิก — ต้องถอนได้เสมอ แม้รายการจะกลับไปสถานะออกใหม่ไม่ได้ */}
+                      {idsOf(r).length > 0 ? (
+                        <>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={() => openPdf(r)}
+                            disabled={busyId === r.id}
+                            title="เปิดแท็บใหม่สำหรับพิมพ์/บันทึกเป็น PDF"
+                          >
+                            <Icon name="printer" size={16} /> PDF
+                          </button>
+                          <button
+                            className="btn btn-sm btn-ghost"
+                            onClick={() => undo(r)}
+                            disabled={busyId === r.id}
+                            title="ลบใบที่ออกไปแล้วทั้งหมดของรายการนี้ และคืนเลขทะเบียน"
+                          >
+                            <Icon name="close" size={16} />{" "}
+                            {busyId === r.id ? "กำลังทำงาน…" : "ยกเลิกการออก"}
+                          </button>
+                        </>
+                      ) : r.ready ? (
                         <button
                           className="btn btn-sm btn-primary"
                           onClick={() => issue(r)}
                           disabled={busyId === r.id}
                         >
-                          <Icon name="printer" size={16} />{" "}
-                          {busyId === r.id
-                            ? "กำลังทำงาน…"
-                            : r.issuedCount > 0
-                              ? "ออก/พิมพ์ซ้ำ"
-                              : "ออกเกียรติบัตร"}
+                          <Icon name="file" size={16} />{" "}
+                          {busyId === r.id ? "กำลังทำงาน…" : "ออกเกียรติบัตร"}
                         </button>
                       ) : (
                         <span className="badge">{r.reason}</span>
-                      )}
-                      {/* ออกไปแล้วต้องถอนได้เสมอ แม้รายการจะกลับไปสถานะออกใหม่ไม่ได้ (เช่น ยกเลิกประกาศผล) */}
-                      {r.issuedCount > 0 && (
-                        <button
-                          className="btn btn-sm btn-ghost"
-                          onClick={() => undo(r)}
-                          disabled={busyId === r.id}
-                          title="ลบใบที่ออกไปแล้วทั้งหมดของรายการนี้ และคืนเลขทะเบียน"
-                        >
-                          <Icon name="close" size={16} /> ยกเลิกการออก
-                        </button>
                       )}
                     </div>
                   </td>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { CompTypeBadge } from "@/components/CompTypeBadge";
+import { CompResultDialog } from "./CompResultDialog";
 import { db } from "@/db";
 import { competitions, subjectGroups } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -117,9 +118,7 @@ export default async function HomePage() {
                     {c.noContest ? (
                       <div className="text-sm muted mt-4">กิจกรรมนี้ไม่มีการแข่งขัน จึงไม่มีผลประกาศ</div>
                     ) : (
-                      <Link href={`/results#comp-${c.id}`} className="btn btn-ghost btn-sm mt-4">
-                        ดูผลรายการนี้
-                      </Link>
+                      <CompResultDialog compId={c.id} compName={c.name} />
                     )}
                   </div>
                 ))}

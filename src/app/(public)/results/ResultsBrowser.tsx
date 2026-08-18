@@ -2,54 +2,20 @@
 import { useState, useMemo, useEffect } from "react";
 import { Icon } from "@/components/Icon";
 import { CompTypeBadge } from "@/components/CompTypeBadge";
-import type { Medal } from "@/lib/domain";
-
-type Member = { studentCode: string; name: string; classLevel: string; classRoom: string };
-type Result = {
-  entryId: number;
-  teamName: string | null;
-  members: Member[];
-  total: number;
-  percent: number;
-  medal: Medal;
-  medalLabel: string;
-  rank: number;
-};
-type Comp = {
-  id: number;
-  name: string;
-  type: "individual" | "team";
-  groupId: number | null;
-  levels: string[];
-  criteria: { id: number; name: string; max: number }[];
-  fullScore: number;
-  results: Result[];
-};
-
-const medalClass: Record<Medal, string> = {
-  gold: "medal-gold",
-  silver: "medal-silver",
-  bronze: "medal-bronze",
-  none: "muted",
-};
-const medalBadge: Record<Medal, string> = {
-  gold: "badge-gold",
-  silver: "badge-purple",
-  bronze: "badge-warning",
-  none: "badge",
-};
+import { CompResultTable } from "@/components/CompResultTable";
+import type { PublicCompResult } from "@/lib/domain";
 
 export function ResultsBrowser({
   groups,
   competitions,
 }: {
   groups: { id: number; name: string }[];
-  competitions: Comp[];
+  competitions: PublicCompResult[];
 }) {
   const [q, setQ] = useState("");
   const [groupId, setGroupId] = useState<number | "all">("all");
 
-  // มาจากลิงก์ "ดูผลรายการนี้" ที่หน้าแรก (/results#comp-123)
+  // มาจากลิงก์ "เปิดในหน้าผลทั้งหมด" หรือลิงก์เก่าที่ส่งต่อกันไว้ (/results#comp-123)
   // หน้านี้เป็น dynamic + มี loading.tsx คั่น ตอนที่เบราว์เซอร์เลื่อนตาม hash การ์ดยังไม่มีในหน้า
   // เลยค้างอยู่บนสุด — จึงต้องเลื่อนเองอีกรอบหลังการ์ดขึ้นจริง
   useEffect(() => {
@@ -113,41 +79,7 @@ export function ResultsBrowser({
               <div className="text-sm muted mb-4">
                 ระดับ {c.levels.join(", ") || "-"} · คะแนนเต็ม {c.fullScore}
               </div>
-              {!c.results.length ? (
-                <div className="alert alert-info">ยังไม่มีการประกาศผลของรายการนี้</div>
-              ) : (
-                <div className="table-wrap table-cards">
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th style={{ width: 60 }}>อันดับ</th>
-                        <th>{c.type === "team" ? "ทีม / สมาชิก" : "ผู้เข้าแข่งขัน"}</th>
-                        <th className="num">คะแนน</th>
-                        <th className="num">ร้อยละ</th>
-                        <th>เหรียญ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {c.results.map((r) => (
-                        <tr key={r.entryId}>
-                          <td className={`${medalClass[r.medal]} hide-sm`} style={{ fontWeight: 700 }}>{r.rank}</td>
-                          {/* มือถือ: อันดับย้ายมานำหน้าชื่อ (คอลัมน์ซ้ายถูกซ่อน) */}
-                          <td className="td-title">
-                            <span className={`only-sm ${medalClass[r.medal]}`}>อันดับ {r.rank} · </span>
-                            {c.type === "team" && r.teamName && <div style={{ fontWeight: 600 }}>{r.teamName}</div>}
-                            <div className="text-sm" style={{ fontWeight: 400 }}>
-                              {r.members.map((m) => `${m.name} (${m.classLevel}/${m.classRoom})`).join(", ")}
-                            </div>
-                          </td>
-                          <td className="num" data-label="คะแนน">{r.total.toFixed(2)}</td>
-                          <td className="num" data-label="ร้อยละ">{r.percent.toFixed(1)}%</td>
-                          <td data-label="เหรียญ"><span className={`badge ${medalBadge[r.medal]}`}>{r.medalLabel}</span></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <CompResultTable comp={c} />
             </div>
           ))}
         </div>

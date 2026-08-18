@@ -1216,6 +1216,63 @@ p {
   gap: var(--space-2);
   margin-top: var(--space-6);
 }
+
+/* กล่องดูผลรายการเดียว (กดจากหน้าแรก) — กว้างกว่ากล่องยืนยัน เพราะมีตารางผลอยู่ข้างใน
+   สูงไม่เกินจอ แล้วให้ "เฉพาะเนื้อใน" เลื่อน หัวกล่องกับปุ่มปิดจึงอยู่ให้เห็นตลอด */
+.modal-wide {
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  max-height: min(80vh, 720px);
+}
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.modal-head > div:first-child {
+  min-width: 0;
+}
+.modal-head .modal-title {
+  margin-bottom: 2px;
+}
+.modal-close {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--skdw-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--skdw-muted);
+  cursor: pointer;
+}
+.modal-close:hover {
+  background: var(--skdw-bg);
+  color: var(--skdw-purple);
+}
+.modal-body {
+  overflow-y: auto;
+  /* กันเงา/ขอบตารางโดนตัดตอนเลื่อน */
+  margin: 0 calc(var(--space-2) * -1);
+  padding: 0 var(--space-2);
+}
+.modal-wide .modal-actions {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--skdw-border);
+}
+@media (max-width: 768px) {
+  /* มือถือ: ให้กล่องเกือบเต็มจอ ตารางผลจะได้ไม่ถูกบีบจนอ่านไม่ออก */
+  .modal-wide {
+    max-height: 88vh;
+    padding: var(--space-4);
+  }
+}
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

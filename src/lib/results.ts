@@ -1,8 +1,18 @@
 import "server-only";
 import { db } from "@/db";
+import { getDefaultEvent } from "@/lib/queries";
 import { competitions, criteria, entries, entryMembers, scores, competitionCapacity } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { decideMedal, scorePercent, type Medal, parseJsonArray, UNLIMITED_CAPACITY, isUnlimited } from "@/lib/domain";
+import {
+  decideMedal,
+  scorePercent,
+  type Medal,
+  type PublicCompResult,
+  parseJsonArray,
+  MEDAL_LABEL,
+  UNLIMITED_CAPACITY,
+  isUnlimited,
+} from "@/lib/domain";
 
 export type EntryResult = {
   entryId: number;
@@ -108,6 +118,67 @@ export async function computeCompetitionResults(
 
 export function competitionAllowedLevels(comp: typeof competitions.$inferSelect): string[] {
   return parseJsonArray(comp.allowedClassLevels);
+}
+
+/**
+ * ขอบเขตของ "ผลที่ประกาศต่อสาธารณะได้" — ปีที่เปิดอยู่ + งานเริ่มต้นที่ admin ตั้งไว้
+ * เผยแพร่แล้วเท่านั้น และตัดรายการที่ไม่มีการแข่งขันออก (ไม่มีผล/อันดับให้ประกาศ)
+ * ทั้งหน้า /results และ API ที่กล่องดูผลของหน้าแรกเรียก ต้องใช้กฎชุดนี้ชุดเดียวกัน
+ * ส่ง compId มา = ขอเฉพาะรายการนั้น (ได้ [] ถ้ารายการนั้นไม่เข้าเกณฑ์ประกาศ)
+ */
+export async function getPublicResultScope(compId?: number) {
+  const { year, setting, event } = await getDefaultEvent();
+  const medalPct = {
+    gold: setting?.medalGoldPct ?? 80,
+    silver: setting?.medalSilverPct ?? 70,
+    bronze: setting?.medalBronzePct ?? 60,
+  };
+  if (!year) return { year: null, setting, event, medalPct, comps: [] };
+  const conds = [
+    eq(competitions.yearId, year.id),
+    eq(competitions.isPublished, true),
+    eq(competitions.noContest, false),
+  ];
+  if (setting?.defaultEventId != null) conds.push(eq(competitions.eventId, setting.defaultEventId));
+  if (compId != null) conds.push(eq(competitions.id, compId));
+  const comps = await db.select().from(competitions).where(and(...conds));
+  return { year, setting, event, medalPct, comps };
+}
+
+/**
+ * ผลของ 1 รายการสำหรับหน้าสาธารณะ (ใช้ทั้งหน้า /results และ API ที่กล่องดูผลของหน้าแรกเรียก)
+ * คืน null เมื่อยังคำนวณผลไม่ได้ — ผู้เรียกตัดรายการนั้นทิ้งไปเลย
+ */
+export async function getPublicCompResult(
+  comp: typeof competitions.$inferSelect,
+  medalPct: { gold: number; silver: number; bronze: number }
+): Promise<PublicCompResult | null> {
+  const r = await computeCompetitionResults(comp.id, medalPct);
+  if (!r) return null;
+  return {
+    id: comp.id,
+    name: comp.name,
+    type: comp.type === "team" ? "team" : "individual",
+    groupId: comp.subjectGroupId,
+    levels: competitionAllowedLevels(comp),
+    criteria: r.criteria.map((cr) => ({ id: cr.id, name: cr.name, max: Number(cr.maxScore) })),
+    fullScore: r.fullScore,
+    results: r.results.map((e) => ({
+      entryId: e.entryId,
+      teamName: e.teamName,
+      members: e.members.map((m) => ({
+        studentCode: m.studentCode,
+        name: m.name,
+        classLevel: m.classLevel,
+        classRoom: m.classRoom,
+      })),
+      total: e.total,
+      percent: e.percent,
+      medal: e.medal,
+      medalLabel: MEDAL_LABEL[e.medal],
+      rank: e.rank,
+    })),
+  };
 }
 
 /** สรุปจำนวนที่นั่ง (รวมทุกระดับ) ของรายการ */

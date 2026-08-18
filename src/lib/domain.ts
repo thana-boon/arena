@@ -59,6 +59,31 @@ export const MEDAL_BADGE_CLASS: Record<Medal, string> = {
 };
 
 /**
+ * ผลของ 1 รายการในรูปแบบที่ "หน้าสาธารณะ" ใช้ — หน้าผลรวม (/results) กับกล่องดูผลที่หน้าแรก
+ * ใช้ตัวเดียวกัน จะได้ไม่มีทางแสดงคนละแบบ (อยู่ใน domain เพราะฝั่ง client ต้องอ้างอิงด้วย)
+ * เก็บเฉพาะข้อมูลที่ประกาศได้ — ไม่มีคะแนนรายเกณฑ์รายคน/รหัสอ้างอิงภายใน
+ */
+export type PublicCompResult = {
+  id: number;
+  name: string;
+  type: "individual" | "team";
+  groupId: number | null;
+  levels: string[];
+  criteria: { id: number; name: string; max: number }[];
+  fullScore: number;
+  results: {
+    entryId: number;
+    teamName: string | null;
+    members: { studentCode: string; name: string; classLevel: string; classRoom: string }[];
+    total: number;
+    percent: number;
+    medal: Medal;
+    medalLabel: string;
+    rank: number;
+  }[];
+};
+
+/**
  * ค่าที่เก็บใน certificate_issues.medal ได้
  * "activity" = รายการที่ไม่มีการแข่งขัน (competitions.no_contest) — ไม่ใช่ผลของการตัดสิน
  * จึงแยกจาก Medal ไม่ให้ decideMedal/การจัดอันดับต้องรู้จักค่านี้

@@ -1,16 +1,14 @@
 import { Icon } from "@/components/Icon";
 import { db } from "@/db";
-import { competitions, subjectGroups } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
-import { getDefaultEvent } from "@/lib/queries";
-import { computeCompetitionResults, competitionAllowedLevels } from "@/lib/results";
-import { MEDAL_LABEL } from "@/lib/domain";
+import { subjectGroups } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { getPublicResultScope, getPublicCompResult } from "@/lib/results";
 import { ResultsBrowser } from "./ResultsBrowser";
 
 export const dynamic = "force-dynamic";
 
 export default async function ResultsPage() {
-  const { year, setting, event } = await getDefaultEvent();
+  const { year, event, medalPct, comps } = await getPublicResultScope();
   if (!year) {
     return (
       <div className="empty-state card">
@@ -19,50 +17,12 @@ export default async function ResultsPage() {
       </div>
     );
   }
-  const medalPct = {
-    gold: setting?.medalGoldPct ?? 80,
-    silver: setting?.medalSilverPct ?? 70,
-    bronze: setting?.medalBronzePct ?? 60,
-  };
 
   const groups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
-  // ประกาศผลเฉพาะ "งานเริ่มต้น" ที่ admin เลือกไว้ในหน้าตั้งค่า (ถ้ายังไม่ได้เลือก จะแสดงทุกงานของปีนั้น)
-  // รายการที่ "ไม่มีการแข่งขัน" ไม่มีผล/อันดับให้ประกาศ — ตัดออกจากหน้าผลการแข่งขันสาธารณะ
-  const compConds = [
-    eq(competitions.yearId, year.id),
-    eq(competitions.isPublished, true),
-    eq(competitions.noContest, false),
-  ];
-  if (setting?.defaultEventId != null) compConds.push(eq(competitions.eventId, setting.defaultEventId));
-  const comps = await db
-    .select()
-    .from(competitions)
-    .where(and(...compConds));
-
   const data = [];
   for (const c of comps) {
-    const r = await computeCompetitionResults(c.id, medalPct);
-    if (r) {
-      data.push({
-        id: c.id,
-        name: c.name,
-        type: c.type as "individual" | "team",
-        groupId: c.subjectGroupId,
-        levels: competitionAllowedLevels(c),
-        criteria: r.criteria.map((cr) => ({ id: cr.id, name: cr.name, max: Number(cr.maxScore) })),
-        fullScore: r.fullScore,
-        results: r.results.map((e) => ({
-          entryId: e.entryId,
-          teamName: e.teamName,
-          members: e.members,
-          total: e.total,
-          percent: e.percent,
-          medal: e.medal,
-          medalLabel: MEDAL_LABEL[e.medal],
-          rank: e.rank,
-        })),
-      });
-    }
+    const r = await getPublicCompResult(c, medalPct);
+    if (r) data.push(r);
   }
 
   return (

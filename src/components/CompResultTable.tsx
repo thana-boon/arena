@@ -34,7 +34,8 @@ export function CompResultTable({ comp }: { comp: PublicCompResult }) {
               <td className={`${medalClass[r.medal]} hide-sm`} style={{ fontWeight: 700 }}>{r.rank}</td>
               {/* มือถือ: อันดับย้ายมานำหน้าชื่อ (คอลัมน์ซ้ายถูกซ่อน) */}
               <td className="td-title">
-                <span className={`only-sm ${medalClass[r.medal]}`}>อันดับ {r.rank} · </span>
+                {/* มือถือ: อันดับขึ้นบรรทัดของตัวเอง จึงไม่ต้องมีตัวคั่น "·" ห้อยท้าย */}
+                <span className={`only-sm ${medalClass[r.medal]}`}>อันดับ {r.rank}</span>
                 {comp.type === "team" && r.teamName && <div style={{ fontWeight: 600 }}>{r.teamName}</div>}
                 <div className="text-sm" style={{ fontWeight: 400 }}>
                   {r.members.map((m) => `${m.name} (${m.classLevel}/${m.classRoom})`).join(", ")}

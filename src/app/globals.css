@@ -1224,7 +1224,16 @@ p {
   max-width: min(1180px, 96vw);
   display: flex;
   flex-direction: column;
+  /* dvh = ความสูงที่มองเห็นจริงบนมือถือ (หักแถบที่อยู่/แถบล่าง) — vh สูงเกินจอเสมอบน iOS Safari
+     ถ้าใช้ vh ล้วน แถวปุ่ม "ปิด" จะไปอยู่ใต้แถบล่างของเบราว์เซอร์ กดไม่โดน */
   max-height: min(90vh, 960px);
+  max-height: min(90dvh, 960px);
+}
+/* จัดกึ่งกลางตาม "จอที่เห็นจริง" ด้วย — ไม่งั้นกล่องถูกวางกลางจอเสมือนที่สูงกว่า แล้วก้นกล่องจมใต้แถบล่าง */
+.modal-overlay.overlay-wide {
+  bottom: auto;
+  height: 100vh;
+  height: 100dvh;
 }
 .modal-head {
   display: flex;
@@ -1258,6 +1267,8 @@ p {
 }
 .modal-body {
   overflow-y: auto;
+  /* เลื่อนจนสุดในกล่องแล้ว ไม่ให้ไหลต่อไปเลื่อนหน้าด้านหลัง (บน iOS การล็อก body ไม่พอ) */
+  overscroll-behavior: contain;
   /* กันเงา/ขอบตารางโดนตัดตอนเลื่อน */
   margin: 0 calc(var(--space-2) * -1);
   padding: 0 var(--space-2);
@@ -1287,7 +1298,12 @@ p {
   .modal-wide {
     max-width: 100%;
     max-height: 92vh;
+    max-height: 92dvh;
     padding: var(--space-4);
+  }
+  /* ป้ายเหรียญในโหมดการ์ด — อย่าตัดบรรทัดกลางคำว่า "เหรียญทองแดง" */
+  .table-cards .badge {
+    white-space: nowrap;
   }
   .modal-overlay.overlay-wide {
     padding: var(--space-2);

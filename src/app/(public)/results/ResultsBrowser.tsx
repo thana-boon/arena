@@ -8,9 +8,13 @@ import type { PublicCompResult } from "@/lib/domain";
 export function ResultsBrowser({
   groups,
   competitions,
+  eventName,
+  yearBe,
 }: {
   groups: { id: number; name: string }[];
   competitions: PublicCompResult[];
+  eventName?: string | null;
+  yearBe?: number | null;
 }) {
   const [q, setQ] = useState("");
   const [groupId, setGroupId] = useState<number | "all">("all");
@@ -79,7 +83,7 @@ export function ResultsBrowser({
               <div className="text-sm muted mb-4">
                 ระดับ {c.levels.join(", ") || "-"} · คะแนนเต็ม {c.fullScore}
               </div>
-              <CompResultTable comp={c} />
+              <CompResultTable comp={c} eventName={eventName} yearBe={yearBe} />
             </div>
           ))}
         </div>

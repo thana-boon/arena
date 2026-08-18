@@ -12,7 +12,17 @@ import type { PublicCompResult } from "@/lib/domain";
  * ปิดแล้วยังอยู่ตรงหมวดที่ไล่ค้างไว้ · ผลดึงตอนกดครั้งแรกครั้งเดียว แล้วจำไว้ในหน้า
  * (หน้าแรกไม่คำนวณผลของทุกรายการล่วงหน้า — หน้านี้คนเข้าเยอะและไม่มีแคช)
  */
-export function CompResultDialog({ compId, compName }: { compId: number; compName: string }) {
+export function CompResultDialog({
+  compId,
+  compName,
+  eventName,
+  yearBe,
+}: {
+  compId: number;
+  compName: string;
+  eventName?: string | null;
+  yearBe?: number | null;
+}) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<PublicCompResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -92,7 +102,9 @@ export function CompResultDialog({ compId, compName }: { compId: number; compNam
               </button>
             </div>
           )}
-          {!loading && !error && data && <CompResultTable comp={data} />}
+          {!loading && !error && data && (
+            <CompResultTable comp={data} eventName={eventName} yearBe={yearBe} />
+          )}
         </div>
 
         <div className="modal-actions">

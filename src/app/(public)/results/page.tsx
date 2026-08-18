@@ -33,7 +33,12 @@ export default async function ResultsPage() {
           {event ? `${event.name} · ` : ""}ปีการศึกษา {year.yearBe}
         </div>
       </div>
-      <ResultsBrowser groups={groups.map((g) => ({ id: g.id, name: g.name }))} competitions={data} />
+      <ResultsBrowser
+        groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+        competitions={data}
+        eventName={event?.name ?? null}
+        yearBe={year.yearBe}
+      />
     </div>
   );
 }

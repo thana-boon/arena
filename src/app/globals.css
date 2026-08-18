@@ -4046,3 +4046,126 @@ p {
     justify-content: center;
   }
 }
+
+/* ============================================================
+   โพเดียม + ลายเซ็น ในตารางผลการแข่งขัน (หน้าแรก / หน้า /results)
+   นักเรียนแคปการ์ดผลไปลงสตอรี่กันเยอะ หน้านี้จึงต้อง "อ่านออกในภาพนิ่ง" ด้วย
+   หลักคือเน้นสีเฉพาะ 3 อันดับแรก ที่เหลือปล่อยขาวสะอาด สายตาจะได้มีที่พักไม่รก
+   ============================================================ */
+
+/* สีประจำอันดับ — ทอง / ม่วงแบรนด์ / ส้มเข้ม (ผ่านคอนทราสต์บนพื้นขาวทั้งสามสี) */
+.podium-1 { --podium: #c8901a; --podium-bg: #fffdf3; }
+.podium-2 { --podium: var(--skdw-purple); --podium-bg: #faf8fd; }
+.podium-3 { --podium: var(--color-warning); --podium-bg: #fffaf4; }
+
+/* เลขอันดับในวงกลม — ตัวเลขเปล่า ๆ เล็กเกินกว่าจะเป็นจุดนำสายตาในภาพที่ถูกแคป */
+.rank-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 9px;
+  border-radius: var(--radius-full);
+  background: var(--skdw-bg);
+  border: 1px solid var(--skdw-border);
+  color: var(--skdw-muted);
+  font-family: var(--font-en-sans);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-md);
+  font-weight: 700;
+  line-height: 1;
+}
+.podium .rank-pill {
+  background: var(--podium);
+  border-color: var(--podium);
+  color: #fff;
+}
+.rank-cell {
+  padding-right: var(--space-2) !important;
+}
+/* แถบสีซ้ายของแถวโพเดียม — border-collapse ทำให้ใส่ border-left ไม่ติด จึงใช้ inset shadow แทน */
+.table .podium td:first-child {
+  box-shadow: inset 4px 0 0 var(--podium);
+}
+.table .podium td,
+.table .podium:hover td {
+  background: var(--podium-bg);
+}
+
+/* ลายเซ็นท้ายผล — แถบบนที่มีชื่อระบบมักถูก crop ทิ้งตอนแคป ชื่อแบรนด์จึงต้องอยู่ในตัวการ์ด */
+.result-signature {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--skdw-border);
+  font-size: var(--text-sm);
+  color: var(--skdw-muted);
+}
+.result-signature .rs-brand {
+  font-family: var(--font-en-sans);
+  font-weight: 700;
+  color: var(--skdw-purple);
+}
+/* ทองสดใช้บนพื้นขาวไม่ได้ (คอนทราสต์ตก) — ใช้ทองเข้มเฉพาะบนพื้นสว่าง */
+.result-signature .rs-k,
+.result-signature .rs-arena {
+  color: var(--skdw-gold-ink);
+}
+.result-signature .rs-sep {
+  margin: 0 6px;
+  color: var(--skdw-border);
+}
+.result-signature .rs-meta {
+  margin-left: auto;
+}
+/* โลโก้ในลายเซ็นต้องหยุดนิ่ง — หน้า /results มีการ์ดหลายสิบใบ ถ้าขยับทุกใบจะกวนตา
+   และเส้นสีขาวของโลโก้เดิม (ออกแบบไว้สำหรับแถบม่วงเข้ม) จะจมหายบนพื้นขาว */
+.result-signature .brand-logo .bl-ring {
+  stroke: rgba(91, 45, 142, 0.3);
+}
+.result-signature .brand-logo .bl-arrow {
+  stroke: var(--skdw-purple);
+}
+.result-signature .brand-logo .bl-ring-outer {
+  stroke: var(--skdw-gold-dark);
+}
+.result-signature .brand-logo .bl-dot {
+  fill: var(--skdw-gold-dark);
+}
+.result-signature .brand-logo .bl-ring-outer,
+.result-signature .brand-logo .bl-dot,
+.result-signature .brand-logo .bl-arrow {
+  animation: none;
+  transform: none;
+}
+
+@media screen and (max-width: 768px) {
+  /* โหมดการ์ด: แถบสีเป็นขอบซ้ายของการ์ดจริง ๆ + พื้นการ์ดอ่อน ๆ ตามอันดับ */
+  .table-cards .podium {
+    border-left: 4px solid var(--podium);
+    background: var(--podium-bg);
+  }
+  /* แถวอันดับเหนือชื่อทีม — วงกลมเลขอันดับกับคำว่า "อันดับ N" อยู่บรรทัดเดียวกัน */
+  .rank-line.only-sm {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+  .rank-word {
+    font-size: var(--text-md);
+    font-weight: 700;
+    color: var(--skdw-muted);
+  }
+  .podium .rank-word {
+    color: var(--podium);
+  }
+  .result-signature .rs-meta {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+}

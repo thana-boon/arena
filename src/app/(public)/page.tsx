@@ -118,7 +118,12 @@ export default async function HomePage() {
                     {c.noContest ? (
                       <div className="text-sm muted mt-4">กิจกรรมนี้ไม่มีการแข่งขัน จึงไม่มีผลประกาศ</div>
                     ) : (
-                      <CompResultDialog compId={c.id} compName={c.name} />
+                      <CompResultDialog
+                        compId={c.id}
+                        compName={c.name}
+                        eventName={event?.name ?? null}
+                        yearBe={year?.yearBe ?? null}
+                      />
                     )}
                   </div>
                 ))}

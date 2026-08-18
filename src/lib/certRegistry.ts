@@ -8,7 +8,7 @@ import {
   entryMembers,
   events,
 } from "@/db/schema";
-import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, isNotNull, or, sql } from "drizzle-orm";
 import { certIssueGate, type CertAward } from "@/lib/domain";
 
 /**
@@ -104,7 +104,18 @@ export async function searchRegistry(q: string): Promise<RegistryRow[]> {
         eq(certificateIssues.studentCode, entryMembers.studentCode)
       )
     )
-    .where(or(ilike(entryMembers.studentCode, pattern), ilike(entryMembers.nameSnapshot, pattern)))
+    .where(
+      and(
+        or(ilike(entryMembers.studentCode, pattern), ilike(entryMembers.nameSnapshot, pattern)),
+        // ถอนการสมัครแล้วและไม่เคยได้ใบ = ไม่ต้องขึ้นทะเบียน
+        // ตอนนี้การถอนลบแถวทิ้งจริงแล้ว (registration.ts → deleteEntry) ด่านนี้จึงเหลือไว้กัน
+        // แถวเก่าสมัยที่ยังเป็น soft delete ซึ่งทำให้เด็กที่สมัคร→ถอน→สมัครใหม่ขึ้นรายการละหลายแถว
+        // (ล้างของเก่าได้ด้วย drizzle/purge_withdrawn.mjs)
+        // ที่ถอนแล้วแต่เคยออกใบยังต้องเห็น: ใบนั้นอยู่ในมือนักเรียนจริง ต้องพิมพ์ซ้ำ/ตรวจสอบได้
+        // (กรองใน SQL ไม่ใช่หลังดึงมา — ไม่งั้นแถวที่ถอนไปแล้วกินโควตา MAX_ROWS ทิ้งเปล่า ๆ)
+        or(eq(entries.status, "active"), isNotNull(certificateIssues.id))
+      )
+    )
     .orderBy(desc(academicYears.yearBe), asc(competitions.name))
     .limit(MAX_ROWS);
 

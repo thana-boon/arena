@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { getSession } from "@/lib/auth/session";
 import { ApiAuthError } from "@/lib/auth/guards";
-import { withdrawEntry, RegistrationError } from "@/lib/registration";
+import { deleteEntry, RegistrationError } from "@/lib/registration";
 import { withdrawGuard } from "@/lib/permit";
 import { logAudit } from "@/lib/audit";
 
@@ -37,8 +37,14 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     if (!guard.allowed) return fail(guard.message, 403);
 
     try {
-      await withdrawEntry(id);
-      await logAudit(session.code, "withdraw_entry", { entryId: id, competitionId: entry.competitionId });
+      const del = await deleteEntry(id);
+      // ลบทิ้งจริง — audit log คือที่เดียวที่เหลือบอกได้ว่าใครถูกถอนออกจากรายการไหน จึงต้องเก็บชื่อไปด้วย
+      await logAudit(session.code, "withdraw_entry", {
+        entryId: id,
+        competitionId: del.competitionId,
+        members: del.members,
+        keptCertificates: del.keptCertificates,
+      });
       return ok();
     } catch (e) {
       if (e instanceof RegistrationError) return fail(e.message, e.status);

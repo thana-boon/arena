@@ -1,6 +1,16 @@
 import "server-only";
 import { db } from "@/db";
-import { competitions, competitionCapacity, entries, entryMembers, events, subjectGroups } from "@/db/schema";
+import {
+  certificateIssues,
+  competitions,
+  competitionCapacity,
+  entries,
+  entryMembers,
+  entrySubstitutions,
+  events,
+  scores,
+  subjectGroups,
+} from "@/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { parseJsonArray, registrationWindow } from "@/lib/domain";
@@ -254,31 +264,69 @@ export async function registerEntry(args: RegisterArgs): Promise<RegisterResult>
   return { entryId, competitionName: comp.name, afterClose };
 }
 
-/** ยกเลิกการลงทะเบียน (คืน counter ใน transaction เดียว) */
-export async function withdrawEntry(entryId: number): Promise<void> {
-  await db.transaction(async (tx) => {
+export type DeletedEntry = {
+  competitionId: number;
+  /** ใครถูกลบออกไปบ้าง — เก็บลง audit log เพราะหลังลบแล้วไม่เหลือแถวไหนบอกได้อีก */
+  members: { studentCode: string; name: string }[];
+  /** ใบที่ออกไปแล้วและยังเก็บไว้ (ไม่ถูกลบตาม entry) */
+  keptCertificates: number;
+};
+
+/**
+ * ยกเลิกการลงทะเบียน — ลบทิ้งจริง ไม่ใช่ทำเครื่องหมายว่าถอนแล้ว
+ *
+ * เดิมเป็น soft delete (entries.status = 'withdrawn') แล้วทุกหน้าจอค่อยกรอง status='active' ทิ้ง
+ * ผลคือแถวที่ไม่มีใครได้ใช้ค้างในฐานตลอดกาล แล้วไปโผล่ที่เดียวคือ "ทะเบียนเกียรติบัตร"
+ * ซึ่งตั้งใจไม่กรองอะไรเลย — เด็กที่สมัคร→ถอน→สมัครใหม่จึงขึ้นรายการละหลายแถวจนอ่านไม่ออก
+ * เลิกเก็บดีกว่า เพราะไม่มีหน้าไหนในระบบใช้ประโยชน์จากแถวที่ถอนแล้วเลยสักหน้าเดียว
+ *
+ * ⚠ certificate_issues ไม่ถูกลบตามไปด้วยเด็ดขาด — ใบที่ออกไปแล้วอยู่ในมือนักเรียนจริง
+ * และเผาเลขทะเบียนของโรงเรียนไปแล้ว ทะเบียนเก็บ snapshot ไว้ครบจึงยังค้นเจอและพิมพ์ซ้ำได้
+ * แม้ entry ต้นทางจะหายไป (certRegistry ส่วน "orphans" รับเคสนี้อยู่)
+ * การลบใบเป็นคนละคำสั่ง อยู่ที่หน้าออกเกียรติบัตร ซึ่งถอยเลขทะเบียนคืนให้ด้วย
+ *
+ * ⚠ สคีมานี้ไม่มี FK/ON DELETE CASCADE เลย ลูกทุกตัวจึงต้องลบเองให้ครบใน transaction เดียว
+ * ลืมตัวไหนไว้ = แถวกำพร้าที่ไม่มีทางลบได้อีก (entry_id ชี้ไปยัง id ที่ serial จะเวียนมาใช้ซ้ำไม่ได้)
+ */
+export async function deleteEntry(entryId: number): Promise<DeletedEntry> {
+  return db.transaction(async (tx) => {
     const entry = (await tx.select().from(entries).where(eq(entries.id, entryId)).limit(1))[0];
     if (!entry) throw new RegistrationError("ไม่พบการลงทะเบียน", 404);
-    if (entry.status === "withdrawn") return;
 
     const members = await tx.select().from(entryMembers).where(eq(entryMembers.entryId, entryId));
     const comp = (await tx.select().from(competitions).where(eq(competitions.id, entry.competitionId)).limit(1))[0];
     const capLevel =
       comp?.type === "team" || comp?.capacityMode === "combined" ? null : members[0]?.classLevelSnapshot ?? null;
+    const certs = await tx
+      .select({ id: certificateIssues.id })
+      .from(certificateIssues)
+      .where(eq(certificateIssues.entryId, entryId));
 
-    await tx.update(entries).set({ status: "withdrawn" }).where(eq(entries.id, entryId));
+    await tx.delete(scores).where(eq(scores.entryId, entryId));
+    await tx.delete(entrySubstitutions).where(eq(entrySubstitutions.entryId, entryId));
+    await tx.delete(entryMembers).where(eq(entryMembers.entryId, entryId));
+    await tx.delete(entries).where(eq(entries.id, entryId));
 
-    // ลด counter (ไม่ต่ำกว่า 0)
-    await tx
-      .update(competitionCapacity)
-      .set({ registeredCount: sql`GREATEST(${competitionCapacity.registeredCount} - 1, 0)` })
-      .where(
-        capLevel === null
-          ? eq(competitionCapacity.competitionId, entry.competitionId)
-          : and(
-              eq(competitionCapacity.competitionId, entry.competitionId),
-              eq(competitionCapacity.classLevel, capLevel)
-            )
-      );
+    // ลด counter (ไม่ต่ำกว่า 0) — เฉพาะแถวที่ยัง active อยู่
+    // แถวเก่าที่ถูก "ถอน" ไว้สมัยยังเป็น soft delete หักออกจาก counter ไปแล้วรอบหนึ่ง หักซ้ำไม่ได้
+    if (entry.status === "active") {
+      await tx
+        .update(competitionCapacity)
+        .set({ registeredCount: sql`GREATEST(${competitionCapacity.registeredCount} - 1, 0)` })
+        .where(
+          capLevel === null
+            ? eq(competitionCapacity.competitionId, entry.competitionId)
+            : and(
+                eq(competitionCapacity.competitionId, entry.competitionId),
+                eq(competitionCapacity.classLevel, capLevel)
+              )
+        );
+    }
+
+    return {
+      competitionId: entry.competitionId,
+      members: members.map((m) => ({ studentCode: m.studentCode, name: m.nameSnapshot })),
+      keptCertificates: certs.length,
+    };
   });
 }

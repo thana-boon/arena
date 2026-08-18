@@ -131,7 +131,14 @@ function SearchMode({
   function pick(s: PickedStudent) {
     if (!canAdd) return;
     onPick(s);
-    inputRef.current?.focus(); // เพิ่มต่อได้ทันที (แถวที่เพิ่มแล้วจะหายเองจาก excludeCodes)
+    // ล้างคำค้นและผลลัพธ์ทิ้ง เพื่อพิมพ์ชื่อคนต่อไปได้ทันที (++reqId กันผลค้นที่ยังค้างอยู่เด้งกลับมา)
+    reqId.current++;
+    setQ("");
+    setResults(null);
+    setBusy(false);
+    setErr("");
+    setActive(0);
+    inputRef.current?.focus();
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {

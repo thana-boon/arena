@@ -1217,13 +1217,14 @@ p {
   margin-top: var(--space-6);
 }
 
-/* กล่องดูผลรายการเดียว (กดจากหน้าแรก) — กว้างกว่ากล่องยืนยัน เพราะมีตารางผลอยู่ข้างใน
+/* กล่องดูผลรายการเดียว (กดจากหน้าแรก) — กว้างกว่ากล่องยืนยันมาก เพราะมีตารางผลอยู่ข้างใน
+   กว้างเกือบเต็มจอเพื่อให้อ่านตารางจบในครั้งเดียว ไม่ต้องเลื่อนซ้าย-ขวา
    สูงไม่เกินจอ แล้วให้ "เฉพาะเนื้อใน" เลื่อน หัวกล่องกับปุ่มปิดจึงอยู่ให้เห็นตลอด */
 .modal-wide {
-  max-width: 760px;
+  max-width: min(1180px, 96vw);
   display: flex;
   flex-direction: column;
-  max-height: min(80vh, 720px);
+  max-height: min(90vh, 960px);
 }
 .modal-head {
   display: flex;
@@ -1261,16 +1262,35 @@ p {
   margin: 0 calc(var(--space-2) * -1);
   padding: 0 var(--space-2);
 }
+/* ตารางในกล่อง: บีบระยะห่างในช่อง + ให้หัวตารางตัดบรรทัดได้ คอลัมน์ตัวเลขแคบเท่าที่จำเป็น
+   เพื่อให้คอลัมน์ชื่อ (ยาวสุด) ได้ที่ที่เหลือทั้งหมด — ตารางจึงพอดีความกว้างโดยไม่ต้องเลื่อนแนวนอน */
+.modal-body .table th,
+.modal-body .table td {
+  padding: 8px 10px;
+}
+.modal-body .table th {
+  white-space: normal;
+}
+.modal-body .table .num,
+.modal-body .table td:last-child,
+.modal-body .table th:last-child {
+  width: 1%;
+  white-space: nowrap;
+}
 .modal-wide .modal-actions {
   margin-top: var(--space-4);
   padding-top: var(--space-4);
   border-top: 1px solid var(--skdw-border);
 }
 @media (max-width: 768px) {
-  /* มือถือ: ให้กล่องเกือบเต็มจอ ตารางผลจะได้ไม่ถูกบีบจนอ่านไม่ออก */
+  /* มือถือ: ให้กล่องเกือบเต็มจอ (แถวผลกลายเป็นการ์ดอยู่แล้ว จึงไม่มีการเลื่อนซ้าย-ขวา) */
   .modal-wide {
-    max-height: 88vh;
+    max-width: 100%;
+    max-height: 92vh;
     padding: var(--space-4);
+  }
+  .modal-overlay.overlay-wide {
+    padding: var(--space-2);
   }
 }
 @keyframes fadeIn {

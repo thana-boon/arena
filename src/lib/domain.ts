@@ -592,6 +592,19 @@ export function substitutionSummary(
   };
 }
 
+/**
+ * สถานะเกียรติบัตรของการสมัคร 1 รายการ (หน้า "การสมัครรายห้อง")
+ * issueId != null = ออกใบแล้ว กด PDF ได้เลย · blockReason = "" แปลว่าออกได้แล้วแต่ครูเจ้าของรายการยังไม่กดออก
+ */
+export type RoomCert = {
+  issueId: number | null;
+  serialNo: string | null;
+  award: CertAward | null;
+  rank: number;
+  /** เหตุผลที่ยังไม่มีใบให้พิมพ์ ("" = ออกได้แล้ว รอครูเจ้าของรายการกดออก) — ว่างเสมอเมื่อ issueId != null */
+  blockReason: string;
+};
+
 /** นักเรียน 1 คน + รายการที่สมัครไว้ (หน้า "การสมัครรายห้อง") */
 export type RoomStudent = {
   studentCode: string;
@@ -606,6 +619,7 @@ export type RoomStudent = {
     teamName: string | null;
     eventDate: string | null;
     eventId: number | null; // งาน (Event) ที่รายการนี้สังกัด — ใช้กรองหน้า "การสมัครรายห้อง"
+    cert: RoomCert;
   }[];
 };
 

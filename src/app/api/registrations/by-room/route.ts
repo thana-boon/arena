@@ -1,5 +1,13 @@
 import { db } from "@/db";
-import { competitions, competitionCapacity, entries, entryMembers, events, subjectGroups } from "@/db/schema";
+import {
+  certificateIssues,
+  competitions,
+  competitionCapacity,
+  entries,
+  entryMembers,
+  events,
+  subjectGroups,
+} from "@/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
@@ -7,11 +15,20 @@ import { canRegisterHiddenCompetition } from "@/lib/permit";
 import { getActiveYear } from "@/lib/queries";
 import { listStudentsInRoom, studentFullName } from "@/lib/external/student-api";
 import { fetchTeacherHomerooms } from "@/lib/external/teacher-api";
-import { parseJsonArray, registrationWindow, type RoomComp, type RoomStudent } from "@/lib/domain";
+import {
+  certIssueGate,
+  parseJsonArray,
+  registrationWindow,
+  type CertAward,
+  type RoomCert,
+  type RoomComp,
+  type RoomStudent,
+} from "@/lib/domain";
 
 /**
  * GET: นักเรียนทั้งห้อง + รายการแข่งขันที่แต่ละคนสมัครไว้ (ปีการศึกษาปัจจุบัน)
  * + รายการแข่งขันที่เปิดรับระดับชั้นนี้ (ให้ครู/แอดมินกดสมัครแทนนักเรียน)
+ * + สถานะเกียรติบัตรของแต่ละการสมัคร (ครูประจำชั้นพิมพ์ใบทั้งห้องแจกเองได้)
  *
  * สิทธิ์: admin ดูได้ทุกห้อง — ครู/recorder ดูได้เฉพาะห้องที่ตัวเองเป็นครูประจำชั้น (จาก SchoolOS)
  */
@@ -55,23 +72,45 @@ export async function GET(req: Request) {
 
     const codes = students.map((s) => s.studentCode);
 
+    // งานทั้งหมดของปีนี้ — ใช้ทั้งเช็คว่าเกียรติบัตรออกได้หรือยัง และช่วงเปิดรับสมัครด้านล่าง
+    const eventRows = await db.select().from(events).where(eq(events.yearId, year.id));
+    const eventById = new Map(eventRows.map((e) => [e.id, e]));
+
     // การสมัครที่ยัง active ของนักเรียนกลุ่มนี้ ในปีปัจจุบัน
+    // join เกียรติบัตรมาด้วย (เงื่อนไขตรงกับ unique index cert_issue_target_uniq → ได้ไม่เกิน 1 ใบต่อแถว)
     const rows = codes.length
       ? await db
           .select({
             studentCode: entryMembers.studentCode,
+            absent: entryMembers.absent,
             entryId: entries.id,
             teamName: entries.teamName,
             competitionId: competitions.id,
             competitionName: competitions.name,
             eventDate: competitions.eventDate,
             eventId: competitions.eventId,
+            noContest: competitions.noContest,
+            isPublished: competitions.isPublished,
+            attendanceCheckedAt: competitions.attendanceCheckedAt,
             groupName: subjectGroups.name,
+            issueId: certificateIssues.id,
+            serialNo: certificateIssues.serialNo,
+            medal: certificateIssues.medal,
+            rank: certificateIssues.rank,
+            revokedAt: certificateIssues.revokedAt,
           })
           .from(entryMembers)
           .innerJoin(entries, eq(entryMembers.entryId, entries.id))
           .innerJoin(competitions, eq(entries.competitionId, competitions.id))
           .leftJoin(subjectGroups, eq(competitions.subjectGroupId, subjectGroups.id))
+          .leftJoin(
+            certificateIssues,
+            and(
+              eq(certificateIssues.competitionId, competitions.id),
+              eq(certificateIssues.entryId, entries.id),
+              eq(certificateIssues.studentCode, entryMembers.studentCode)
+            )
+          )
           .where(
             and(
               inArray(entryMembers.studentCode, codes),
@@ -91,6 +130,7 @@ export async function GET(req: Request) {
         teamName: r.teamName,
         eventDate: r.eventDate,
         eventId: r.eventId,
+        cert: certOf(r, r.eventId == null ? null : eventById.get(r.eventId) ?? null),
       });
     }
 
@@ -112,8 +152,6 @@ export async function GET(req: Request) {
       return true;
     });
 
-    const eventRows = await db.select().from(events).where(eq(events.yearId, year.id));
-    const eventById = new Map(eventRows.map((e) => [e.id, e]));
     const now = new Date();
     const eventOpen = (id: number | null) =>
       registrationWindow(id == null ? null : eventById.get(id), now).open;
@@ -154,4 +192,49 @@ export async function GET(req: Request) {
 
     return ok({ students, yearBe: year.yearBe, competitions: roomComps });
   });
+}
+
+/**
+ * แปลงแถวการสมัคร 1 แถว เป็นสถานะเกียรติบัตรที่ครูประจำชั้นเข้าใจได้
+ *
+ * เงื่อนไขระดับงาน/รายการ ใช้ certIssueGate ตัวเดียวกับหน้า "ออกเกียรติบัตร" และทะเบียนเกียรติบัตร
+ * (ถ้าตอบไม่ตรงกัน ครูประจำชั้นจะเห็นว่า "ยังไม่ได้ออก" ทั้งที่ครูเจ้าของรายการเห็นว่าออกไม่ได้)
+ * ส่วนที่เพิ่มเองคือเงื่อนไขรายคน ซึ่ง gate ไม่รู้จัก: ไม่มาแข่ง / ใบถูกยกเลิก
+ */
+function certOf(
+  r: {
+    absent: boolean;
+    noContest: boolean;
+    isPublished: boolean;
+    attendanceCheckedAt: Date | null;
+    issueId: number | null;
+    serialNo: string | null;
+    medal: string | null;
+    rank: number | null;
+    revokedAt: Date | null;
+  },
+  ev: { kind: string; status: string } | null
+): RoomCert {
+  const none = { issueId: null, serialNo: null, award: null, rank: 0 };
+  // ใบถูกยกเลิกไปแล้ว = ไม่มีอะไรให้พิมพ์ (QR ของใบนั้นตรวจสอบไม่ผ่านแล้ว)
+  if (r.issueId != null && r.revokedAt != null) return { ...none, blockReason: "เกียรติบัตรถูกยกเลิก" };
+  if (r.issueId != null)
+    return {
+      issueId: r.issueId,
+      serialNo: r.serialNo,
+      award: (r.medal as CertAward | null) ?? null,
+      rank: r.rank ?? 0,
+      blockReason: "",
+    };
+
+  const gate = certIssueGate(ev, {
+    noContest: r.noContest,
+    isPublished: r.isPublished,
+    attendanceChecked: r.attendanceCheckedAt != null,
+  });
+  if (!gate.ready) return { ...none, blockReason: gate.reason };
+  // ขาออกใบข้ามคนที่ไม่ได้มาเสมอ — ถ้าไม่บอกไว้ ครูจะรอใบที่ไม่มีวันมา
+  if (r.absent)
+    return { ...none, blockReason: r.noContest ? "เช็คชื่อแล้วว่าไม่ได้มาร่วม" : "ไม่มาแข่งขัน" };
+  return { ...none, blockReason: "" };
 }

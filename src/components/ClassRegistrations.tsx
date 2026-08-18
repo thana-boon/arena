@@ -7,11 +7,14 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import { StudentPicker, type PickedStudent } from "@/components/StudentPicker";
 import { CompTypeBadge, teamSizeLabel } from "@/components/CompTypeBadge";
 import {
+  AWARD_LABEL,
   CLASS_LEVELS,
+  MEDAL_BADGE_CLASS,
   formatThaiDate,
   formatSeats,
   seatsFull,
   hhmm,
+  type CertAward,
   type RoomComp,
   type RoomOverviewRow,
   type RoomStudent,
@@ -20,6 +23,21 @@ import { useClassRooms } from "@/lib/useClassRooms";
 
 type Resp = { students: RoomStudent[]; yearBe: number | null; competitions: RoomComp[] };
 type Overview = { rooms: RoomOverviewRow[]; total: number; registered: number; yearBe: number };
+
+// window.open ไม่ถูกเติม basePath (/arena) ให้อัตโนมัติเหมือน <Link> — ต้อง prefix เอง
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
+/**
+ * เปิดหน้าพิมพ์เกียรติบัตรในแท็บใหม่ (แท็บนั้นเด้งหน้าต่างพิมพ์เอง เลือก "บันทึกเป็น PDF" ได้)
+ * ต้องเรียกตรงจากปุ่ม ไม่ผ่าน await ก่อน ไม่งั้นตัวกันป๊อปอัปของเบราว์เซอร์จะบล็อกแท็บใหม่
+ */
+const openPrint = (ids: number[]) => {
+  if (ids.length) window.open(`${BASE}/certificates/print?ids=${ids.join(",")}`, "_blank");
+};
+
+/** ป้ายรางวัลบนใบ — "เข้าร่วมกิจกรรม" ไม่ใช่เหรียญ จึงใช้ badge เปล่า */
+const awardClass = (award: CertAward | null) =>
+  `badge ${award && award !== "activity" ? MEDAL_BADGE_CLASS[award] ?? "" : ""}`.trim();
 
 export type EventOption = { id: number; name: string };
 export type Homeroom = { classLevel: string; classRoom: string };
@@ -164,6 +182,26 @@ export function ClassRegistrations({
   }));
   const registeredCount = students.filter((s) => s.registrations.length > 0).length;
   const registeredPct = students.length ? Math.round((registeredCount / students.length) * 100) : 0;
+
+  /* ---------- เกียรติบัตรของทั้งห้อง ----------
+     ครูประจำชั้นพิมพ์ใบของห้องตัวเองแจกเด็กได้เอง ไม่ต้องรอครูเจ้าของรายการส่งไฟล์มาให้
+     (ใบถูก "ออก" โดยครูเจ้าของรายการที่หน้าออกเกียรติบัตรเท่านั้น ที่นี่แค่พิมพ์ของที่มีอยู่แล้ว)
+     เรียง id ตามลำดับในตาราง = ตามเลขที่ในห้อง เพื่อให้ไฟล์ PDF เรียงพร้อมแจกได้เลย */
+  const certIds: number[] = [];
+  const certStudents = new Set<string>();
+  const certEvents = new Set<number | null>();
+  let certPending = 0; // ออกได้แล้วแต่ครูเจ้าของรายการยังไม่ได้กดออก
+  let certRegs = 0; // การสมัครทั้งหมดที่นับเข้าเรื่องเกียรติบัตร
+  for (const s of students) {
+    for (const r of s.registrations) {
+      certRegs++;
+      if (r.cert.issueId != null) {
+        certIds.push(r.cert.issueId);
+        certStudents.add(s.studentCode);
+        certEvents.add(r.eventId);
+      } else if (!r.cert.blockReason) certPending++;
+    }
+  }
 
   return (
     <div className="stack">
@@ -354,6 +392,46 @@ export function ClassRegistrations({
               <span className="text-sm" style={{ fontWeight: 600, minWidth: 42, textAlign: "right" }}>{registeredPct}%</span>
             </div>
           )}
+
+          {/* เกียรติบัตรของห้องนี้ — โผล่เมื่อมีการสมัครแล้วเท่านั้น (ช่วงรับสมัครยังไม่มีอะไรให้พิมพ์) */}
+          {certRegs > 0 && (
+            <div className="cert-room-bar mb-4">
+              <div className="text-sm">
+                {certIds.length > 0 ? (
+                  <>
+                    <b>เกียรติบัตรของห้อง {level}/{room}</b> · ออกแล้ว {certIds.length} ใบ ({certStudents.size} คน)
+                    {certPending > 0 && (
+                      <span className="muted"> · อีก {certPending} รายการยังไม่ได้ออก (ครูผู้รับผิดชอบรายการต้องกดออกก่อน)</span>
+                    )}
+                    {/* แนวกระดาษของไฟล์พิมพ์ตั้งได้ทั้งไฟล์เดียว ไม่ใช่รายหน้า — ใบข้ามงานที่ใช้แม่แบบคนละแนวจะเพี้ยน */}
+                    {certEvents.size > 1 && (
+                      <div className="muted text-xs mt-2">
+                        ใบของห้องนี้มาจากหลายงาน — ถ้าแต่ละงานใช้แม่แบบคนละแนว (แนวนอน/แนวตั้ง)
+                        ให้เลือก “งาน” ด้านบนก่อนพิมพ์ แล้วพิมพ์ทีละงาน
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <span className="muted">
+                    ยังไม่มีเกียรติบัตรของห้องนี้
+                    {certPending > 0
+                      ? ` · ${certPending} รายการพร้อมออกแล้ว รอครูผู้รับผิดชอบรายการกดออก`
+                      : " · รอประกาศผล/เช็คชื่อของแต่ละรายการก่อน"}
+                  </span>
+                )}
+              </div>
+              {certIds.length > 0 && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => openPrint(certIds)}
+                  title="เปิดแท็บใหม่รวมเกียรติบัตรทุกใบของห้องนี้ เรียงตามลำดับในตาราง (Ctrl/⌘+P เพื่อบันทึกเป็น PDF)"
+                >
+                  <Icon name="printer" size={15} /> PDF เกียรติบัตรทั้งห้อง ({certIds.length})
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="table-wrap table-cards">
             <table className="table">
               <thead>
@@ -403,7 +481,27 @@ export function ClassRegistrations({
                                   {r.competitionName}
                                   {r.teamName && <span className="muted"> · ทีม {r.teamName}</span>}
                                   {r.eventDate && <span className="muted"> · {formatThaiDate(r.eventDate)}</span>}
+                                  {r.cert.issueId != null && (
+                                    <>
+                                      {" "}
+                                      <span className={awardClass(r.cert.award)}>
+                                        {r.cert.award ? AWARD_LABEL[r.cert.award] : "เกียรติบัตร"}
+                                      </span>
+                                    </>
+                                  )}
                                 </span>
+                                {/* ใบของคนเดียว — ไว้พิมพ์ซ้ำให้เด็กที่ทำหาย โดยไม่ต้องพิมพ์ทั้งห้องใหม่ */}
+                                {r.cert.issueId != null && (
+                                  <button
+                                    className="btn btn-ghost btn-sm"
+                                    style={{ padding: "0 6px" }}
+                                    title={`เปิด/บันทึกเกียรติบัตรใบนี้เป็น PDF${r.cert.serialNo ? ` (เลขทะเบียน ${r.cert.serialNo})` : ""}`}
+                                    aria-label={`PDF เกียรติบัตร ${r.competitionName} ของ ${s.name}`}
+                                    onClick={() => openPrint([r.cert.issueId!])}
+                                  >
+                                    <Icon name="printer" size={14} />
+                                  </button>
+                                )}
                                 {canCancel && (
                                   <button
                                     className="btn btn-ghost btn-sm"

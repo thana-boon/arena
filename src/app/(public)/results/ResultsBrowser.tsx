@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Icon } from "@/components/Icon";
 import { CompTypeBadge } from "@/components/CompTypeBadge";
 import type { Medal } from "@/lib/domain";
@@ -49,6 +49,25 @@ export function ResultsBrowser({
   const [q, setQ] = useState("");
   const [groupId, setGroupId] = useState<number | "all">("all");
 
+  // มาจากลิงก์ "ดูผลรายการนี้" ที่หน้าแรก (/results#comp-123)
+  // หน้านี้เป็น dynamic + มี loading.tsx คั่น ตอนที่เบราว์เซอร์เลื่อนตาม hash การ์ดยังไม่มีในหน้า
+  // เลยค้างอยู่บนสุด — จึงต้องเลื่อนเองอีกรอบหลังการ์ดขึ้นจริง
+  useEffect(() => {
+    const jumpToHash = () => {
+      const id = window.location.hash.slice(1);
+      const el = id ? document.getElementById(id) : null;
+      if (!el) return;
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+        el.classList.add("is-target");
+      });
+    };
+    jumpToHash();
+    window.addEventListener("hashchange", jumpToHash);
+    return () => window.removeEventListener("hashchange", jumpToHash);
+  }, []);
+
   const filtered = useMemo(() => {
     return competitions.filter((c) => {
       if (groupId !== "all" && c.groupId !== groupId) return false;
@@ -86,7 +105,7 @@ export function ResultsBrowser({
       ) : (
         <div className="stack">
           {filtered.map((c) => (
-            <div className="card" key={c.id} id={`comp-${c.id}`}>
+            <div className="card comp-result-card" key={c.id} id={`comp-${c.id}`}>
               <div className="row between mb-2">
                 <h3 style={{ margin: 0 }}>{c.name}</h3>
                 <CompTypeBadge type={c.type} size="sm" />

@@ -2084,6 +2084,23 @@ p {
 .medal-silver { color: var(--skdw-purple); font-weight: 700; }
 .medal-bronze { color: var(--color-warning); font-weight: 700; }
 
+/* การ์ดผลรายเดี่ยวที่ถูกลิงก์มาจากหน้าแรก (/results#comp-123)
+   scroll-margin-top เผื่อความสูงแถบบน sticky ไม่ให้หัวการ์ดโดนบัง */
+.comp-result-card {
+  scroll-margin-top: 84px;
+}
+/* กะพริบขอบสั้น ๆ ให้รู้ว่า "ใบนี้แหละที่กดมา" */
+.comp-result-card.is-target {
+  animation: targetFlash 2s ease-out both;
+}
+@keyframes targetFlash {
+  0%, 40% { box-shadow: 0 0 0 3px var(--skdw-purple); }
+  100% { box-shadow: var(--shadow-sm); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .comp-result-card.is-target { animation: none; }
+}
+
 /* ---------- Print ---------- */
 @media print {
   @page {

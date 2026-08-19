@@ -3543,6 +3543,22 @@ p {
     gap: 10px;
   }
 }
+/* แถบเครื่องมือเหนือใบ — ปุ่มพิมพ์กับคำใบ้ให้ซูม
+   sticky: ครูที่เปิดทีละหลายสิบใบต้องกดพิมพ์ได้โดยไม่ต้องเลื่อนกลับขึ้นบนสุด
+   ไม่ติดไปกับกระดาษ (ซ่อนใน @media print ด้านล่าง) */
+.cert-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  align-self: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 14px;
+  padding: 8px;
+  background: rgba(229, 231, 235, 0.94);
+}
 /* คำใบ้ให้ผู้ปกครองรู้ว่าซูมเข้าไปอ่านได้ — เห็นเฉพาะตอนที่ใบถูกย่อ ไม่ติดไปกับกระดาษ
    ซ่อนเมื่อจอทั้งกว้างและสูงพอ (จอคอมเห็นใบเต็มขนาดอยู่แล้ว ไม่ต้องบอกให้ซูม) */
 .cert-zoom-hint {
@@ -3575,6 +3591,9 @@ p {
     gap: 0;
     background: #fff;
     min-height: 0;
+  }
+  .cert-toolbar {
+    display: none;
   }
   .cert-page {
     box-shadow: none;

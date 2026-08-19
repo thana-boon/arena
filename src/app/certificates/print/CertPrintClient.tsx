@@ -1,12 +1,17 @@
 "use client";
 import { useEffect } from "react";
+import { Icon } from "@/components/Icon";
 import { fitCertTexts } from "@/lib/certFit";
 
 /**
- * งานฝั่งเบราว์เซอร์ของหน้าเกียรติบัตร ทำสามอย่างตามลำดับนี้เท่านั้น
- *   1. รอฟอนต์ไทยโหลดจริง แล้วย่อข้อความที่ล้นกรอบให้พอดี (fitCertTexts)
+ * แถบเครื่องมือ + งานจัดหน้าฝั่งเบราว์เซอร์ของหน้าเกียรติบัตร
+ *
+ * หน้านี้ "ไม่เด้งหน้าต่างพิมพ์เอง" — ผู้ปกครองส่วนใหญ่เปิดมาเพื่อดูหรือแคปหน้าจอเฉย ๆ
+ * การเด้งกล่องพิมพ์ใส่ทันทีที่เปิดทำให้งงว่าต้องกดอะไร ใครจะพิมพ์/บันทึก PDF กดปุ่มบนแถบเอา
+ *
+ * หลังฟอนต์ไทยโหลดเสร็จจะจัดหน้าสองชั้นตามลำดับนี้เท่านั้น
+ *   1. ย่อข้อความที่ล้นกรอบในใบให้พอดี (fitCertTexts)
  *   2. ย่อ "ทั้งใบ" ให้พอดีจอ ทั้งกว้างและสูง (fitToScreen) — เฉพาะบนจอ ไม่แตะตอนพิมพ์
- *   3. เปิดหน้าต่างพิมพ์
  *
  * ลำดับสำคัญ: fitCertTexts วัดความกว้างตัวอักษรจาก getBoundingClientRect
  * ถ้าย่อทั้งใบไปก่อน ค่าที่วัดได้จะเป็นพิกเซลหลังย่อ (บนมือถือเหลือ ~1 ใน 3)
@@ -15,7 +20,7 @@ import { fitCertTexts } from "@/lib/certFit";
 export function CertPrintClient() {
   useEffect(() => {
     let cancelled = false;
-    let printed = false;
+    let fitted = false;
 
     /**
      * A4 บนจอกว้าง 297mm ≈ 1123px — มือถือกว้าง ~390px จึงเห็นแค่มุมซ้ายบนแล้วต้องเลื่อนหาเอง
@@ -39,12 +44,12 @@ export function CertPrintClient() {
         const cs = getComputedStyle(root);
         const availW = root.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
         if (availW <= 0) continue;
-        // สูงที่เหลือให้ใบ = ความสูงจอ ลบขอบบน-ล่าง ลบบรรทัดคำใบ้กับช่องไฟของมัน
-        const hint = root.querySelector<HTMLElement>(".cert-zoom-hint");
-        const hintH = hint ? hint.getBoundingClientRect().height : 0; // display:none → 0 เอง
-        const gap = hintH ? parseFloat(cs.rowGap) || 0 : 0;
+        // สูงที่เหลือให้ใบ = ความสูงจอ ลบขอบบน-ล่าง ลบแถบเครื่องมือกับช่องไฟของมัน
+        const bar = root.querySelector<HTMLElement>(".cert-toolbar");
+        const barH = bar ? bar.getBoundingClientRect().height : 0;
+        const gap = barH ? parseFloat(cs.rowGap) || 0 : 0;
         const viewH = document.documentElement.clientHeight || window.innerHeight;
-        const availH = viewH - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - hintH - gap;
+        const availH = viewH - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - barH - gap;
         // ไม่ขยายเกินขนาดจริง (จอใหญ่เห็นเท่าเดิม) — ย่อได้อย่างเดียว
         // กันเล็กจนอ่านไม่ออกด้วย 0.15 เผื่อจอเตี้ยผิดปกติ (ซูมเข้าดูเองได้ ดีกว่าโดนตัด)
         const s = Math.max(0.15, Math.min(1, availW / w, availH > 0 ? availH / h : Infinity));
@@ -54,20 +59,17 @@ export function CertPrintClient() {
       }
     };
 
-    const go = () => {
-      if (cancelled || printed) return;
-      printed = true;
+    const layout = () => {
+      if (cancelled || fitted) return;
+      fitted = true;
       fitCertTexts(document);
       fitToScreen();
-      // ให้เบราว์เซอร์วาดผลการย่ออีกหนึ่งเฟรมก่อน ไม่งั้นภาพที่ส่งเข้าเครื่องพิมพ์เป็นของก่อนย่อ
-      requestAnimationFrame(() => {
-        if (!cancelled) window.print();
-      });
     };
 
-    const cap = window.setTimeout(go, 3000);
+    // เพดานกันค้างถ้าฟอนต์โหลดไม่ขึ้น + หน่วงขั้นต่ำเผื่อรูปพื้นหลัง
+    const cap = window.setTimeout(layout, 3000);
     const minWait = new Promise<void>((r) => window.setTimeout(r, 300));
-    Promise.all([document.fonts?.ready, minWait]).then(go, go);
+    Promise.all([document.fonts?.ready, minWait]).then(layout, layout);
 
     // หมุนจอ/เปลี่ยนขนาดหน้าต่างแล้วต้องพอดีใหม่ (ข้อความในใบไม่ต้องย่อซ้ำ ขนาดใบเป็น mm คงที่)
     // วัดซ้ำอีกทีที่ 300ms ด้วย: Safari บนมือถือยิง resize ตั้งแต่ยังหมุนไม่สุด
@@ -92,5 +94,14 @@ export function CertPrintClient() {
       window.removeEventListener("orientationchange", onResize);
     };
   }, []);
-  return null;
+
+  return (
+    <div className="cert-toolbar">
+      {/* กล่องพิมพ์ของทุกเบราว์เซอร์มีตัวเลือก "บันทึกเป็น PDF" อยู่ในตัว จึงเป็นปุ่มเดียวจบทั้งสองงาน */}
+      <button className="btn btn-primary btn-sm" onClick={() => window.print()}>
+        <Icon name="printer" size={16} /> พิมพ์ / บันทึกเป็น PDF
+      </button>
+      <span className="cert-zoom-hint">ย่อให้เห็นเต็มใบแล้ว — ซูมเข้าเพื่ออ่านรายละเอียด</span>
+    </div>
+  );
 }

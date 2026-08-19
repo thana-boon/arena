@@ -19,7 +19,7 @@ type Row = {
   revoked: boolean;
 };
 
-/** เปิดหน้าพิมพ์ในแท็บใหม่ — แท็บนั้นเด้งหน้าต่างพิมพ์เอง (เลือก "บันทึกเป็น PDF" ได้) */
+/** เปิดใบในแท็บใหม่ — ดู/แคปหน้าจอได้เลย ถ้าจะพิมพ์หรือบันทึก PDF กดปุ่มบนแถบในแท็บนั้น */
 const openPrint = (ids: number[]) => {
   if (ids.length) window.open(`${BASE}/certificates/print?ids=${ids.join(",")}`, "_blank");
 };
@@ -49,7 +49,7 @@ export function MyCertificates({ rows }: { rows: Row[] }) {
       {printable.length > 1 && (
         <div className="row" style={{ justifyContent: "flex-end" }}>
           <button className="btn btn-secondary btn-sm" onClick={() => openPrint(printable)}>
-            <Icon name="download" size={16} /> บันทึกทุกใบเป็น PDF ({printable.length})
+            <Icon name="file" size={16} /> เปิดดูทุกใบ ({printable.length})
           </button>
         </div>
       )}
@@ -82,7 +82,7 @@ export function MyCertificates({ rows }: { rows: Row[] }) {
                     <span className="badge">พิมพ์ไม่ได้</span>
                   ) : (
                     <button className="btn btn-sm btn-primary" onClick={() => openPrint([r.id])}>
-                      <Icon name="download" size={16} /> เปิด / บันทึก PDF
+                      <Icon name="file" size={16} /> เปิดดูเกียรติบัตร
                     </button>
                   )}
                 </div>

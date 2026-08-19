@@ -143,7 +143,7 @@ export function CompResultTable({
                 {/* ลายเซ็นจิ๋วประจำการ์ด — เห็นเฉพาะโหมดการ์ด (มือถือ) ซึ่งเป็นมุมที่ถูกแคปทีละใบ
                     ใช้ข้อความล้วน + จุดวงกลมที่วาดด้วย CSS จึงไม่เพิ่ม SVG ให้ทุกแถว */}
                 <td className="td-sign only-sm">
-                  <span className="rs-mini">SuKhon Arena · SchoolOS</span>
+                  <span className="rs-mini">Sukhon Arena - SchoolOS by CodeSense Team</span>
                 </td>
               </tr>
             ))}

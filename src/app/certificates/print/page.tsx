@@ -6,7 +6,7 @@ import { CertificateCanvas } from "@/components/certificate/CertificateCanvas";
 import { formatThaiDate } from "@/lib/domain";
 import type { CertAward } from "@/lib/domain";
 import QRCode from "qrcode";
-import { PrintTrigger } from "./PrintTrigger";
+import { CertPrintClient } from "./CertPrintClient";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +53,8 @@ export default async function CertificatePrintPage({
   return (
     <div className="cert-print-root">
       <style>{`@media print { @page { size: A4 ${firstOrientation}; margin: 0; } }`}</style>
-      <PrintTrigger />
+      <CertPrintClient />
+      <div className="cert-zoom-hint">ย่อให้เห็นเต็มใบแล้ว — ใช้สองนิ้วซูมเข้าเพื่ออ่านรายละเอียด</div>
       {issues.map((iss) => {
         const tpl = templates.get(iss.templateId);
         if (!tpl) return null;

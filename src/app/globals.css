@@ -3519,6 +3519,40 @@ p {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
   background: #fff;
 }
+/* บนจอ: ย่อทั้งใบให้พอดีความกว้างจอ (A4 แนวนอน 297mm ≈ 1123px กว้างกว่ามือถือเกือบสามเท่า
+   ผู้ปกครองที่เปิดจากมือถือจึงเห็นแค่มุมซ้ายบนแล้วต้องเลื่อนหาเอง)
+   --cert-w/--cert-h/--cert-s มาจาก CertPrintClient หลังย่อข้อความในใบเสร็จแล้ว
+   ยังไม่มีค่า (ก่อน JS ทำงาน/ปิด JS) = ขนาดเต็มเหมือนเดิมทุกประการ
+   ทั้งก้อนอยู่ใน @media screen — ตอนพิมพ์กระดาษยังเป็น A4 เต็มใบเสมอ */
+@media screen {
+  .cert-page {
+    width: var(--cert-w, auto);
+    height: var(--cert-h, auto);
+  }
+  .cert-page > * {
+    transform: scale(var(--cert-s, 1));
+    transform-origin: top left;
+  }
+}
+/* มือถือ: บีบขอบให้แคบลง ใบจะได้ใหญ่ที่สุดเท่าที่จอมี */
+@media screen and (max-width: 768px) {
+  .cert-print-root {
+    padding: 10px;
+    gap: 10px;
+  }
+}
+/* คำใบ้ให้ผู้ปกครองรู้ว่าซูมเข้าไปอ่านได้ — เห็นเฉพาะบนจอเล็ก ไม่ติดไปกับกระดาษ */
+.cert-zoom-hint {
+  color: #4b5563;
+  font-size: 13px;
+  text-align: center;
+  line-height: 1.6;
+}
+@media print, (min-width: 769px) {
+  .cert-zoom-hint {
+    display: none;
+  }
+}
 @media print {
   /* สีบนเกียรติบัตรต้องพิมพ์ตามที่ออกแบบไว้เป๊ะ ๆ
      ค่าเริ่มต้นของเบราว์เซอร์คือ print-color-adjust: economy — มันมีสิทธิ์ไล่สีอ่อนให้เข้มขึ้นเอง

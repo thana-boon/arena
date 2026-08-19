@@ -13,7 +13,7 @@ import {
 } from "@/lib/certificates";
 import { CertificateCanvas } from "@/components/certificate/CertificateCanvas";
 import QRCode from "qrcode";
-import { PrintTrigger } from "../PrintTrigger";
+import { CertPrintClient } from "../CertPrintClient";
 
 export const dynamic = "force-dynamic";
 
@@ -73,7 +73,7 @@ export default async function CertificateSamplePrintPage({
   return (
     <div className="cert-print-root">
       <style>{`@media print { @page { size: A4 ${orientation}; margin: 0; } }`}</style>
-      <PrintTrigger />
+      <CertPrintClient />
       <div className={`cert-page cert-page-${orientation}`}>
         <CertificateCanvas
           template={tpl}

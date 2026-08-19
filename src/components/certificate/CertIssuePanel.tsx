@@ -21,10 +21,13 @@ export function CertIssuePanel({
   eventName,
   rows,
   backHref,
+  canUndo,
 }: {
   eventName: string;
   rows: CertIssueCompRow[];
   backHref: string;
+  /** ปุ่ม "ยกเลิกการออก" ให้เฉพาะ admin — ครูออกใบเองได้ แต่การถอนคืนต้องผ่าน admin (ดู undo()) */
+  canUndo: boolean;
 }) {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [msg, setMsg] = useState<{ type: "error" | "success"; text: string } | null>(null);
@@ -36,7 +39,7 @@ export function CertIssuePanel({
   const idsOf = (r: CertIssueCompRow) => justIssued[r.id] ?? r.issueIds;
 
   async function issue(r: CertIssueCompRow) {
-    // ออกใบ = จองเลขทะเบียนของโรงเรียนจริง ๆ ต้องถามยืนยันก่อนเสมอ (ถอนคืนได้ แต่ไม่ควรกดพลาด)
+    // ออกใบ = จองเลขทะเบียนของโรงเรียนจริง ๆ ต้องถามยืนยันก่อนเสมอ (ถอนคืนได้เฉพาะ admin)
     const okDo = await confirm({
       title: "ยืนยันการออกเกียรติบัตร",
       message: `ออกเกียรติบัตรของ “${r.name}” ให้ผู้เข้าร่วมทุกคน (${r.activeEntries} รายการที่ลงทะเบียน) และจองเลขทะเบียนให้ทุกใบ · ยังไม่เปิดไฟล์ให้พิมพ์ ต้องการพิมพ์ค่อยกดปุ่ม “PDF” ทีหลัง`,
@@ -60,7 +63,11 @@ export function CertIssuePanel({
     setJustIssued((m) => ({ ...m, [r.id]: res.data.issueIds }));
     setMsg({
       type: "success",
-      text: `ออกเกียรติบัตรของ “${r.name}” แล้ว ${res.data.count} ใบ (ใหม่ ${res.data.newCount} ใบ) · กดปุ่ม “PDF” เพื่อเปิดแท็บสำหรับพิมพ์/บันทึกเป็นไฟล์ · ถ้าแค่ลองดู กด “ยกเลิกการออก” เพื่อถอนคืนได้`,
+      text:
+        `ออกเกียรติบัตรของ “${r.name}” แล้ว ${res.data.count} ใบ (ใหม่ ${res.data.newCount} ใบ) · กดปุ่ม “PDF” เพื่อเปิดแท็บสำหรับพิมพ์/บันทึกเป็นไฟล์` +
+        (canUndo
+          ? " · ถ้าแค่ลองดู กด “ยกเลิกการออก” เพื่อถอนคืนได้"
+          : " · ออกไปแล้วถอนคืนเองไม่ได้ ถ้าออกผิดต้องแจ้งผู้ดูแลระบบ"),
     });
     router.refresh(); // ช่อง "ออกแล้ว" กับปุ่มยกเลิกมาจากฝั่งเซิร์ฟเวอร์ ต้องดึงใหม่
   }
@@ -73,7 +80,11 @@ export function CertIssuePanel({
     window.open(`${BASE}/certificates/print?ids=${ids.join(",")}`, "_blank");
   }
 
-  /** ถอนใบทั้งล็อตของรายการนี้ — สำหรับคนที่กดออกเพื่อดูหน้าตาใบเฉย ๆ */
+  /**
+   * ถอนใบทั้งล็อตของรายการนี้ — เฉพาะ admin (ฝั่ง API ก็บังคับ role เดียวกัน)
+   * เดิมครูถอนเองได้ แต่การถอนลบใบทิ้งจริงและทำให้ QR บนใบที่แจกไปแล้วตรวจไม่ผ่าน
+   * จึงเป็นงานที่ต้องมีคนกลางตัดสินใจ ไม่ใช่ปุ่มที่กดพลาดข้าง ๆ ปุ่ม PDF ได้
+   */
   async function undo(r: CertIssueCompRow) {
     const okDo = await confirm({
       title: "ยกเลิกการออกเกียรติบัตร",
@@ -115,7 +126,10 @@ export function CertIssuePanel({
           <div className="subtitle">
             เลือกรายการเพื่อออกเกียรติบัตรให้ผู้เข้าร่วมทุกคน · ระบบจะถามยืนยันก่อนออก จากนั้นกดปุ่ม “PDF”
             เพื่อเปิดแท็บใหม่ให้บันทึกเป็นไฟล์ (Ctrl/⌘+P)
-            {" · "}กดออกไปแล้วถอนคืนได้ด้วยปุ่ม “ยกเลิกการออก” (ลองดูหน้าตาใบก่อนได้ ไม่เปลืองเลขทะเบียน)
+            {" · "}
+            {canUndo
+              ? "กดออกไปแล้วถอนคืนได้ด้วยปุ่ม “ยกเลิกการออก” (ลองดูหน้าตาใบก่อนได้ ไม่เปลืองเลขทะเบียน)"
+              : "ออกไปแล้วถอนคืนเองไม่ได้ (เลขทะเบียนถูกจองทันที) — ถ้าออกผิดต้องแจ้งผู้ดูแลระบบให้ยกเลิกให้"}
           </div>
         </div>
         <Link href={backHref} className="btn btn-sm">
@@ -153,7 +167,7 @@ export function CertIssuePanel({
                   </td>
                   <td className="num td-actions">
                     <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
-                      {/* ออกไปแล้ว: ปุ่มออกกลายเป็น PDF + ยกเลิก — ต้องถอนได้เสมอ แม้รายการจะกลับไปสถานะออกใหม่ไม่ได้ */}
+                      {/* ออกไปแล้ว: ปุ่มออกกลายเป็น PDF (+ ยกเลิก เฉพาะ admin) แม้รายการจะกลับไปสถานะออกใหม่ไม่ได้ */}
                       {idsOf(r).length > 0 ? (
                         <>
                           <button
@@ -164,15 +178,17 @@ export function CertIssuePanel({
                           >
                             <Icon name="printer" size={16} /> PDF
                           </button>
-                          <button
-                            className="btn btn-sm btn-ghost"
-                            onClick={() => undo(r)}
-                            disabled={busyId === r.id}
-                            title="ลบใบที่ออกไปแล้วทั้งหมดของรายการนี้ และคืนเลขทะเบียน"
-                          >
-                            <Icon name="close" size={16} />{" "}
-                            {busyId === r.id ? "กำลังทำงาน…" : "ยกเลิกการออก"}
-                          </button>
+                          {canUndo && (
+                            <button
+                              className="btn btn-sm btn-ghost"
+                              onClick={() => undo(r)}
+                              disabled={busyId === r.id}
+                              title="ลบใบที่ออกไปแล้วทั้งหมดของรายการนี้ และคืนเลขทะเบียน"
+                            >
+                              <Icon name="close" size={16} />{" "}
+                              {busyId === r.id ? "กำลังทำงาน…" : "ยกเลิกการออก"}
+                            </button>
+                          )}
                         </>
                       ) : r.ready ? (
                         <button

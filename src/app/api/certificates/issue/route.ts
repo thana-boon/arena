@@ -169,11 +169,13 @@ export async function POST(req: Request) {
  * ยกเลิกการออกเกียรติบัตรของรายการหนึ่ง — ถอนใบทั้งล็อตให้เหมือนไม่เคยกดออก
  * (คืนเลขทะเบียนที่จองไว้ + ปลดล็อกงานถ้าไม่เหลือใบเลย — รายละเอียดที่ undoIssuesForCompetition)
  *
- * สิทธิ์เท่ากับขาออกใบ ถอนได้ทีละรายการเท่านั้น เพราะเลขทะเบียนถอยคืนได้เฉพาะตอนถอนยกล็อต
+ * เฉพาะ admin เท่านั้น (ต่างจากขาออกใบที่ครูเจ้าของหมวดกดเองได้): การถอนลบใบที่แจกไปแล้วทิ้งจริง
+ * และทำให้ QR บนใบที่พิมพ์ไปแล้วตรวจไม่ผ่าน — ผลกระทบไปไกลกว่าห้องของครูคนเดียว
+ * ถอนได้ทีละรายการเท่านั้น เพราะเลขทะเบียนถอยคืนได้เฉพาะตอนถอนยกล็อต
  */
 export async function DELETE(req: Request) {
   return handle(async () => {
-    const s = await apiRequireRole("teacher", "recorder", "admin");
+    const s = await apiRequireRole("admin");
     const { competitionId } = certUndoInput.parse(await req.json());
 
     const { comp, allowed } = await findAllowedCompetition(s, competitionId);

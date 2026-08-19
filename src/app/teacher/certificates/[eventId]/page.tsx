@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireStaff } from "@/lib/auth/guards";
+import { isAdmin } from "@/lib/auth/session";
 import { getActiveYear } from "@/lib/queries";
 import { getCertIssueEvent } from "@/lib/certIssuing";
 import { CertIssuePanel } from "@/components/certificate/CertIssuePanel";
@@ -23,6 +24,7 @@ export default async function TeacherCertificatesEventPage({
       eventName={detail.event.name}
       rows={detail.rows}
       backHref="/teacher/certificates"
+      canUndo={isAdmin(session.role)}
     />
   );
 }

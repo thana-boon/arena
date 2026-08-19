@@ -19,6 +19,11 @@ export default async function AdminCertIssueEventPage({
   if (!detail) notFound();
 
   return (
-    <CertIssuePanel eventName={detail.event.name} rows={detail.rows} backHref="/admin/cert-issue" />
+    <CertIssuePanel
+      eventName={detail.event.name}
+      rows={detail.rows}
+      backHref="/admin/cert-issue"
+      canUndo
+    />
   );
 }

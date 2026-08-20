@@ -4,14 +4,16 @@ import { useState } from "react";
 import { api } from "@/lib/client";
 import { ssoExitUrl, clearSsoCache } from "@/lib/sso";
 import { beginSignOut, markKickedOut } from "@/lib/auth/clientState";
+import { Icon } from "@/components/Icon";
 
 /**
  * @param sso session ปัจจุบันผูกกับ SSO ของแพลตฟอร์มอยู่ไหม (มาจาก session.sso)
  *   true  = ออกจากระบบทั้งแพลตฟอร์มพร้อมกัน แล้วไปจบที่หน้าแรกของ SchoolOS
  *   false = admin local ที่ไม่มีตัวตนบน SchoolOS — ล้างเฉพาะ session ของ arena แล้วพากลับ
  *           หน้าแรกของ SchoolOS เหมือนกัน (ไม่ไปเตะ SSO ของคนอื่นที่อาจค้างอยู่บนเครื่องเดียวกัน)
+ * @param variant "menu" = แถวในเมนูผู้ใช้ (มีไอคอน เต็มความกว้าง) · ค่าปกติ = ปุ่มเล็กแบบเดิม
  */
-export function LogoutButton({ sso = false }: { sso?: boolean }) {
+export function LogoutButton({ sso = false, variant = "button" }: { sso?: boolean; variant?: "button" | "menu" }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -39,6 +41,15 @@ export function LogoutButton({ sso = false }: { sso?: boolean }) {
     if (sso) markKickedOut();
     router.push("/login");
     router.refresh();
+  }
+
+  if (variant === "menu") {
+    return (
+      <button type="button" className="um-item" role="menuitem" onClick={logout} disabled={loading}>
+        <Icon name="logout" size={18} />
+        <span>{loading ? "กำลังออกจากระบบ..." : "ออกจากระบบ"}</span>
+      </button>
+    );
   }
 
   return (

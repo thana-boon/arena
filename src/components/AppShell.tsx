@@ -5,6 +5,7 @@ import { RouteTransition } from "./RouteTransition";
 import { BrandLogo } from "./BrandLogo";
 import { Wordmark } from "./Wordmark";
 import { Avatar } from "./Avatar";
+import { UserMenu } from "./UserMenu";
 import { SessionTimeout } from "./SessionTimeout";
 import { SessionGuard } from "./SessionGuard";
 import { AnnouncementBanner } from "./AnnouncementBanner";
@@ -66,11 +67,15 @@ export async function AppShell({
           <Link href="/" className="tb-brand"><Wordmark /></Link>
           <div className="spacer" />
           <div className="tb-user">
-            <span className="role-chip">{ROLE_LABEL[session.role]}</span>
-            <Avatar initial={initial} hasPhoto={hasPhoto} owner={session.code} className="avatar-sm" />
-            {/* บนมือถือเหลือแค่รูปโปรไฟล์ — ชื่อ/บทบาท/ปุ่มออก ไปอยู่ในแผ่นเมนูล่างแทน */}
-            <span className="nowrap hide-sm">{session.name}</span>
-            <span className="hide-sm"><LogoutButton sso={session.sso ?? false} /></span>
+            {/* กดรูปโปรไฟล์ = เมนูผู้ใช้ (ชื่อ/บทบาท + ออกจากระบบ) ใช้ได้เหมือนกันทั้งมือถือและจอใหญ่ */}
+            <UserMenu
+              name={session.name}
+              roleLabel={ROLE_LABEL[session.role]}
+              initial={initial}
+              hasPhoto={hasPhoto}
+              code={session.code}
+              sso={session.sso ?? false}
+            />
           </div>
         </header>
         <main className="main-content">

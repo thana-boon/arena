@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
-import { CompTypeBadge } from "@/components/CompTypeBadge";
-import { CompResultDialog } from "./CompResultDialog";
+import { CompetitionBrowser, type PublicCompSection } from "./CompetitionBrowser";
 import { db } from "@/db";
 import { competitions, subjectGroups } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -33,7 +32,7 @@ export default async function HomePage() {
 
   // จัดเป็นชุดตามหมวด แล้วในหมวดไล่ระดับชั้นจากเล็กไปโต (เตรียมอนุบาล → อ. → ป. → ม.) → ชื่อรายการ
   // คนทั่วไปกวาดตาหารายการจากหมวดก่อน แล้วค่อยไล่ชั้น ไม่ได้ไล่ตามลำดับที่สร้าง
-  const sections = [
+  const grouped = [
     ...comps
       .reduce((map, c) => {
         const gid = c.subjectGroupId ?? -1;
@@ -44,14 +43,33 @@ export default async function HomePage() {
       }, new Map<number, { id: number; name: string; sortOrder: number; items: typeof comps }>())
       .values(),
   ];
-  for (const s of sections) {
+  for (const s of grouped) {
     s.items.sort(
       (a, b) =>
         minClassLevelIndex(competitionAllowedLevels(a)) - minClassLevelIndex(competitionAllowedLevels(b)) ||
         a.name.localeCompare(b.name, "th")
     );
   }
-  sections.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "th"));
+  grouped.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "th"));
+
+  // จัดข้อความให้เสร็จตั้งแต่ฝั่ง server — ฝั่งเบราว์เซอร์เหลือแค่กรองกับพับ/กาง
+  const sections: PublicCompSection[] = grouped.map((s) => ({
+    id: s.id,
+    name: s.name,
+    items: s.items.map((c) => ({
+      id: c.id,
+      name: c.name,
+      groupName: s.name,
+      type: c.type === "team" ? ("team" as const) : ("individual" as const),
+      teamSizeMin: c.teamSizeMin,
+      teamSizeMax: c.teamSizeMax,
+      levels: formatLevels(competitionAllowedLevels(c)),
+      dateText: c.eventDate
+        ? `${formatThaiDate(c.eventDate)} ${c.startTime?.slice(0, 5) ?? ""}${c.endTime ? `–${c.endTime.slice(0, 5)}` : ""}`.trim()
+        : null,
+      noContest: Boolean(c.noContest),
+    })),
+  }));
 
   return (
     <div className="stack">
@@ -85,51 +103,8 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <h2 className="section-title">รายการแข่งขันในงานนี้ ({comps.length} รายการ)</h2>
-          {sections.map((s) => (
-            <section key={s.id} className="stack" style={{ gap: "var(--space-3)" }}>
-              <div className="group-head">
-                <Icon name="book" size={16} />
-                <h2>{s.name}</h2>
-                <span className="n">{s.items.length} รายการ</span>
-              </div>
-              <div className="grid-3 stagger">
-                {s.items.map((c) => (
-                  <div key={c.id} className="card">
-                    <div className="row between mb-2">
-                      <span className="badge badge-purple">{groupName(c.subjectGroupId)}</span>
-                      <CompTypeBadge
-                        type={c.type === "team" ? "team" : "individual"}
-                        teamSizeMin={c.teamSizeMin}
-                        teamSizeMax={c.teamSizeMax}
-                        size="sm"
-                      />
-                    </div>
-                    <h3 style={{ fontSize: "var(--text-lg)" }}>{c.name}</h3>
-                    <div className="text-sm muted">
-                      ระดับชั้น: {formatLevels(competitionAllowedLevels(c)) || "-"}
-                    </div>
-                    {c.eventDate && (
-                      <div className="text-sm muted">
-                        วันแข่ง: {formatThaiDate(c.eventDate)} {c.startTime?.slice(0, 5)}–{c.endTime?.slice(0, 5)}
-                      </div>
-                    )}
-                    {/* รายการที่ "ไม่มีการแข่งขัน" ไม่มีผลให้ดู — หน้า /results ก็ตัดออกอยู่แล้ว */}
-                    {c.noContest ? (
-                      <div className="text-sm muted mt-4">กิจกรรมนี้ไม่มีการแข่งขัน จึงไม่มีผลประกาศ</div>
-                    ) : (
-                      <CompResultDialog
-                        compId={c.id}
-                        compName={c.name}
-                        eventName={event?.name ?? null}
-                        yearBe={year?.yearBe ?? null}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          ))}
+          <h2 className="section-title">รายการแข่งขันในงานนี้</h2>
+          <CompetitionBrowser sections={sections} eventName={event?.name ?? null} yearBe={year?.yearBe ?? null} />
         </>
       )}
     </div>

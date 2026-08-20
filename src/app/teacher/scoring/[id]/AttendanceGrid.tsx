@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/client";
 import { Icon } from "@/components/Icon";
+import { useToast } from "@/components/Toast";
 import type { RosterEntry } from "@/lib/roster";
 
 /**
@@ -27,6 +28,7 @@ export function AttendanceGrid({
   checkedAtText: string | null;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const rows = roster.flatMap((e) => e.members.map((m) => ({ ...m, teamName: e.teamName })));
 
   // ยังไม่เคยเช็คชื่อ = ยังไม่มีใครถูกยืนยันว่ามา → เริ่มจากไม่ติ๊กทั้งหมด
@@ -36,7 +38,6 @@ export function AttendanceGrid({
     () => new Set(checkedAtText ? rows.filter((m) => !m.absent).map((m) => m.memberId) : [])
   );
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ type: string; text: string } | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(checkedAtText);
 
   const toggle = (memberId: number, on: boolean) =>
@@ -47,22 +48,22 @@ export function AttendanceGrid({
       return next;
     });
 
+  // ผลการบันทึกไปออกที่ toast (มุมจอ) ไม่ใช่แถบบนสุดของหน้า — ปุ่มบันทึกอยู่ท้ายรายชื่อยาว ๆ
+  // ครูกดแล้วไม่ได้เลื่อนขึ้นไปดู จึงไม่เห็นว่าบันทึกสำเร็จหรือพัง
   async function save() {
     setBusy(true);
-    setMsg(null);
     const res = await api.post(`/api/competitions/${competitionId}/attendance`, {
       presentMemberIds: [...present],
     });
     setBusy(false);
-    if (!res.ok) return setMsg({ type: "error", text: res.error });
+    if (!res.ok) return toast(res.error, "error");
     const missing = rows.length - present.size;
     setSavedAt("เมื่อสักครู่");
-    setMsg({
-      type: "success",
-      text: missing
+    toast(
+      missing
         ? `บันทึกการเช็คชื่อแล้ว · เข้าร่วม ${present.size} คน · ไม่มาร่วม ${missing} คน (จะไม่ได้รับเกียรติบัตร)`
-        : `บันทึกการเช็คชื่อแล้ว · เข้าร่วมครบทั้ง ${present.size} คน`,
-    });
+        : `บันทึกการเช็คชื่อแล้ว · เข้าร่วมครบทั้ง ${present.size} คน`
+    );
     router.refresh();
   }
 
@@ -77,8 +78,6 @@ export function AttendanceGrid({
 
   return (
     <div className="stack">
-      {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
-
       <div className="alert alert-info">
         รายการนี้ไม่มีการแข่งขัน จึงไม่มีคะแนน — ติ๊ก “เข้าร่วม” ให้คนที่มาร่วมกิจกรรมจริง
         <br />

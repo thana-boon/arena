@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "@/lib/client";
 import { Icon } from "@/components/Icon";
 import { useConfirm } from "@/components/ConfirmDialog";
@@ -35,6 +35,27 @@ export function CertIssuePanel({
   const [justIssued, setJustIssued] = useState<Record<number, number[]>>({});
   const confirm = useConfirm();
   const router = useRouter();
+
+  // ตัวกรองของหน้านี้ — งานใหญ่มีเป็นร้อยรายการ เลื่อนหาทีละแถวไม่ไหว
+  const [q, setQ] = useState("");
+  const [group, setGroup] = useState("all");
+
+  // หมวดมาจากแถวที่ผู้ใช้คนนี้เห็นอยู่แล้ว (getCertIssueEvent กรองด้วย canViewCompetition มาก่อน)
+  // แอดมินจึงได้ทุกหมวดโดยอัตโนมัติ ส่วนครูเหลือหมวดเดียวแล้วช่องจะล็อกให้เอง — ไม่ต้องเช็ค role ซ้ำตรงนี้
+  const groups = useMemo(
+    () => [...new Set(rows.map((r) => r.groupName || ""))].sort((a, b) => a.localeCompare(b, "th")),
+    [rows]
+  );
+  const countIn = (g: string) => rows.filter((r) => (r.groupName || "") === g).length;
+
+  const visible = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter(
+      (r) =>
+        (group === "all" || (r.groupName || "") === group) &&
+        (!needle || r.name.toLowerCase().includes(needle))
+    );
+  }, [rows, q, group]);
 
   const idsOf = (r: CertIssueCompRow) => justIssued[r.id] ?? r.issueIds;
 
@@ -145,70 +166,121 @@ export function CertIssuePanel({
           <p>ยังไม่มีรายการในงานนี้ที่อยู่ในความดูแลของท่าน</p>
         </div>
       ) : (
-        <div className="table-wrap table-cards">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>รายการแข่งขัน</th>
-                <th>หมวด</th>
-                <th className="num">ผู้เข้าร่วม</th>
-                <th className="num">ออกแล้ว</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td className="td-title">{r.name}</td>
-                  <td data-label="หมวด">{r.groupName || <span className="muted">—</span>}</td>
-                  <td className="num" data-label="ผู้เข้าร่วม">{r.activeEntries}</td>
-                  <td className="num" data-label="ออกแล้ว">
-                    {idsOf(r).length > 0 ? `${idsOf(r).length} ใบ` : <span className="muted">—</span>}
-                  </td>
-                  <td className="num td-actions">
-                    <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
-                      {/* ออกไปแล้ว: ปุ่มออกกลายเป็น PDF (+ ยกเลิก เฉพาะ admin) แม้รายการจะกลับไปสถานะออกใหม่ไม่ได้ */}
-                      {idsOf(r).length > 0 ? (
-                        <>
-                          <button
-                            className="btn btn-sm btn-primary"
-                            onClick={() => openPdf(r)}
-                            disabled={busyId === r.id}
-                            title="เปิดแท็บใหม่สำหรับพิมพ์/บันทึกเป็น PDF"
-                          >
-                            <Icon name="printer" size={16} /> PDF
-                          </button>
-                          {canUndo && (
+        <>
+          {/* filter-bar = บนมือถือช่องที่ล็อกความกว้างไว้จะยืดเต็มจอให้เอง */}
+          <div className="filter-bar">
+            <input
+              className="form-input"
+              style={{ maxWidth: 280 }}
+              placeholder="พิมพ์ชื่อรายการเพื่อค้นหา"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              aria-label="ค้นหาชื่อรายการ"
+            />
+            {/* มีหมวดเดียว = ครูที่ดูแลหมวดตัวเอง — คงช่องไว้ให้เห็นว่าถูกล็อกที่หมวดไหน แต่กดเปลี่ยนไม่ได้ */}
+            <select
+              className="form-select"
+              style={{ maxWidth: 260 }}
+              value={group}
+              onChange={(e) => setGroup(e.target.value)}
+              disabled={groups.length < 2}
+              aria-label="กรองตามหมวด"
+              title={groups.length < 2 ? "ท่านดูแลหมวดเดียว จึงล็อกไว้ที่หมวดของท่าน" : undefined}
+            >
+              {groups.length > 1 ? (
+                <>
+                  <option value="all">ทุกหมวด ({rows.length})</option>
+                  {groups.map((g) => (
+                    <option key={g} value={g}>
+                      {g || "ไม่ระบุหมวด"} ({countIn(g)})
+                    </option>
+                  ))}
+                </>
+              ) : (
+                <option value="all">
+                  {groups[0] || "ไม่ระบุหมวด"} ({rows.length})
+                </option>
+              )}
+            </select>
+            {visible.length !== rows.length && (
+              <span className="text-sm muted">
+                พบ {visible.length} จาก {rows.length} รายการ
+              </span>
+            )}
+          </div>
+
+          {!visible.length ? (
+            <div className="empty-state card">
+              <Icon name="search" size={44} className="empty-ico" />
+              <p>ไม่พบรายการที่ค้นหา</p>
+            </div>
+          ) : (
+            <div className="table-wrap table-cards">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>รายการแข่งขัน</th>
+                    <th>หมวด</th>
+                    <th className="num">ผู้เข้าร่วม</th>
+                    <th className="num">ออกแล้ว</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map((r) => (
+                    <tr key={r.id}>
+                      <td className="td-title">{r.name}</td>
+                      <td data-label="หมวด">{r.groupName || <span className="muted">—</span>}</td>
+                      <td className="num" data-label="ผู้เข้าร่วม">{r.activeEntries}</td>
+                      <td className="num" data-label="ออกแล้ว">
+                        {idsOf(r).length > 0 ? `${idsOf(r).length} ใบ` : <span className="muted">—</span>}
+                      </td>
+                      <td className="num td-actions">
+                        <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
+                          {/* ออกไปแล้ว: ปุ่มออกกลายเป็น PDF (+ ยกเลิก เฉพาะ admin) แม้รายการจะกลับไปสถานะออกใหม่ไม่ได้ */}
+                          {idsOf(r).length > 0 ? (
+                            <>
+                              <button
+                                className="btn btn-sm btn-primary"
+                                onClick={() => openPdf(r)}
+                                disabled={busyId === r.id}
+                                title="เปิดแท็บใหม่สำหรับพิมพ์/บันทึกเป็น PDF"
+                              >
+                                <Icon name="printer" size={16} /> PDF
+                              </button>
+                              {canUndo && (
+                                <button
+                                  className="btn btn-sm btn-ghost"
+                                  onClick={() => undo(r)}
+                                  disabled={busyId === r.id}
+                                  title="ลบใบที่ออกไปแล้วทั้งหมดของรายการนี้ และคืนเลขทะเบียน"
+                                >
+                                  <Icon name="close" size={16} />{" "}
+                                  {busyId === r.id ? "กำลังทำงาน…" : "ยกเลิกการออก"}
+                                </button>
+                              )}
+                            </>
+                          ) : r.ready ? (
                             <button
-                              className="btn btn-sm btn-ghost"
-                              onClick={() => undo(r)}
+                              className="btn btn-sm btn-primary"
+                              onClick={() => issue(r)}
                               disabled={busyId === r.id}
-                              title="ลบใบที่ออกไปแล้วทั้งหมดของรายการนี้ และคืนเลขทะเบียน"
                             >
-                              <Icon name="close" size={16} />{" "}
-                              {busyId === r.id ? "กำลังทำงาน…" : "ยกเลิกการออก"}
+                              <Icon name="file" size={16} />{" "}
+                              {busyId === r.id ? "กำลังทำงาน…" : "ออกเกียรติบัตร"}
                             </button>
+                          ) : (
+                            <span className="badge">{r.reason}</span>
                           )}
-                        </>
-                      ) : r.ready ? (
-                        <button
-                          className="btn btn-sm btn-primary"
-                          onClick={() => issue(r)}
-                          disabled={busyId === r.id}
-                        >
-                          <Icon name="file" size={16} />{" "}
-                          {busyId === r.id ? "กำลังทำงาน…" : "ออกเกียรติบัตร"}
-                        </button>
-                      ) : (
-                        <span className="badge">{r.reason}</span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

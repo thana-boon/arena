@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { BackToSchoolOS } from "@/components/BackToSchoolOS";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
@@ -31,6 +32,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <Providers>{children}</Providers>
+        {/* วางนอก Providers เพราะหน้า login ที่ยังไม่มี session ก็ต้องกลับ portal ได้ */}
+        <BackToSchoolOS />
       </body>
     </html>
   );

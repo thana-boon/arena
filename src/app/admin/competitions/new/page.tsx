@@ -25,6 +25,7 @@ export default async function AdminNewCompetition() {
       <CompetitionForm
         events={eventList.map((e) => ({ id: e.id, name: e.name, kind: e.kind, eventDate: e.eventDate }))}
         groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+        allGroups={groups.map((g) => ({ id: g.id, name: g.name }))}
         slots={slots.map((s) => ({ id: s.id, label: s.label, startTime: s.startTime, endTime: s.endTime }))}
         venues={venues.map((v) => ({ id: v.id, name: v.name, building: v.building }))}
         returnTo="/admin/competitions"
@@ -38,6 +39,7 @@ export default async function AdminNewCompetition() {
                 ? eventList[0].id
                 : "") as number | "",
           subjectGroupId: "",
+          coSubjectGroupIds: [],
           type: "individual",
           noContest: false,
           visibleToStudents: true,

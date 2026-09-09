@@ -23,6 +23,7 @@ const TABLES = [
   "competitions",
   "competition_capacity",
   "competition_venues",
+  "competition_subject_groups",
   "criteria",
   "entries",
   "entry_members",

@@ -2,10 +2,11 @@ import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { db } from "@/db";
 import { competitions, criteria, events, subjectGroups } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { parseJsonArray, formatThaiDate, formatSeats, registrationWindow } from "@/lib/domain";
 import { canScore, canViewCompetition, canEditCompetition, competitionManageGuard } from "@/lib/permit";
 import { getRoster, getCapacityRows } from "@/lib/roster";
+import { getCoGroupIds } from "@/lib/competitionGroups";
 import type { SessionPayload } from "@/lib/auth/session";
 import { RosterManager } from "@/app/teacher/competitions/[id]/RosterManager";
 
@@ -26,8 +27,18 @@ export async function CompetitionDetailBody({
 }) {
   const comp = (await db.select().from(competitions).where(eq(competitions.id, id)).limit(1))[0];
   if (!comp) return <div className="alert alert-error">ไม่พบรายการแข่งขัน</div>;
-  const group = comp.subjectGroupId == null ? undefined : (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0];
-  if (!canViewCompetition(session, comp.createdBy, group?.catalogNo))
+  // หมวดของรายการ: หมวดหลัก (เจ้าของ) + หมวดร่วม — สิทธิ์ทุกปุ่มในหน้านี้ยึด "หมวดใดหมวดหนึ่ง"
+  const coGroupIds = await getCoGroupIds(id);
+  const allGroupIds = [...(comp.subjectGroupId == null ? [] : [comp.subjectGroupId]), ...coGroupIds];
+  const groupRows = allGroupIds.length
+    ? await db.select().from(subjectGroups).where(inArray(subjectGroups.id, allGroupIds))
+    : [];
+  const group = groupRows.find((g) => g.id === comp.subjectGroupId);
+  const groupNos = allGroupIds
+    .map((gid) => groupRows.find((g) => g.id === gid)?.catalogNo ?? null)
+    .filter((n): n is number => n != null);
+  const coGroupNames = coGroupIds.map((gid) => groupRows.find((g) => g.id === gid)?.name ?? "-");
+  if (!canViewCompetition(session, comp.createdBy, groupNos))
     return <div className="alert alert-error">คุณไม่มีสิทธิ์เข้าถึงรายการนี้</div>;
 
   const crits = await db.select().from(criteria).where(eq(criteria.competitionId, id));
@@ -45,7 +56,7 @@ export async function CompetitionDetailBody({
   const regClosedReason = registrationWindow(event).reason;
   // ปุ่มแก้ไข: ต้องเป็นคนที่แก้ได้ และยังอยู่ในช่วงที่งานเปิดให้แก้ (admin ผ่านทั้งสองข้อเสมอ)
   const canEdit =
-    canEditCompetition(session, comp.createdBy, group?.catalogNo) &&
+    canEditCompetition(session, comp.createdBy, groupNos) &&
     competitionManageGuard(session, event).allowed;
 
   return (
@@ -57,7 +68,7 @@ export async function CompetitionDetailBody({
         <div className="page-header" style={{ marginBottom: 0 }}>
           <h1>{comp.name}</h1>
           <div className="subtitle">
-            {group?.name} ·{" "}
+            {[group?.name, ...coGroupNames].filter(Boolean).join(" + ")} ·{" "}
             {comp.type === "team"
               ? `ทีม ${comp.teamSizeMin}-${comp.teamSizeMax} คน (${comp.allowCrossClass ? "ข้ามห้องได้" : "ห้ามข้ามห้อง"})`
               : "เดี่ยว"}
@@ -69,7 +80,7 @@ export async function CompetitionDetailBody({
           <Link href={`${basePath}/${id}/reports`} className="btn btn-ghost"><Icon name="printer" size={18} /> เอกสาร</Link>
           {canEdit && <Link href={`${basePath}/${id}/edit`} className="btn btn-secondary">แก้ไข</Link>}
           {/* ไม่มีการแข่งขัน = ไม่มีคะแนนให้กรอก แต่ยังต้องเช็คชื่อว่าใครมาร่วม (ปลายทางเดียวกัน) */}
-          {canScore(session, comp.createdBy, group?.catalogNo) && (
+          {canScore(session, comp.createdBy, groupNos) && (
             <Link href={`${scoreBasePath}/${id}`} className="btn btn-primary">
               {comp.noContest ? "เช็คชื่อผู้เข้าร่วม" : "บันทึกผล"}
             </Link>

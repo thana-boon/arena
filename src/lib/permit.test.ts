@@ -33,6 +33,19 @@ test("admin แก้ได้ทุกรายการ · recorder ได้�
   assert.equal(canEditCompetition({ role: "student", code: "s1", subjectGroupId: 4 }, "s1", 4), false);
 });
 
+// รายการที่หลายกลุ่มสาระทำร่วมกัน: ส่งเลขหมวดมาเป็นชุด (หมวดหลัก + หมวดร่วม)
+// ครูในหมวดใดหมวดหนึ่งต้องได้สิทธิ์เท่ากัน ไม่งั้นฟีเจอร์ "หมวดร่วม" ไม่มีความหมาย
+
+test("ครูในหมวดร่วมแก้รายการได้เหมือนครูหมวดเจ้าของ", () => {
+  assert.equal(canEditCompetition(teacher("t1", 5), "t2", [4, 5]), true);
+  assert.equal(canEditCompetition(teacher("t1", 4), "t2", [4, 5]), true);
+});
+
+test("ครูนอกทุกหมวดของรายการยังแก้ไม่ได้ · ชุดหมวดว่างไม่นับว่าตรงกัน", () => {
+  assert.equal(canEditCompetition(teacher("t1", 9), "t2", [4, 5]), false);
+  assert.equal(canEditCompetition(teacher("t1", 4), "t2", []), false);
+});
+
 // ===== เลื่อนวัน/เวลาแข่งขันได้ไหม =====
 // เวลาที่นักเรียนลงไว้ผ่านการตรวจ "ไม่ชนกับรายการอื่น" มาแล้ว ถ้าเลื่อนทีหลังจะไม่มีใครตรวจซ้ำ
 

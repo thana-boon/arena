@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { competitions, competitionCapacity, competitionVenues, criteria, entries, entryMembers, scores, subjectGroups, timeSlots, events } from "@/db/schema";
+import { competitions, competitionCapacity, competitionSubjectGroups, competitionVenues, criteria, entries, entryMembers, scores, timeSlots, events } from "@/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { canEditCompetition, competitionManageGuard, scheduleChangeGuard } from "@/lib/permit";
 import { UNLIMITED_CAPACITY, isUnlimited } from "@/lib/domain";
 import { findVenueConflicts } from "@/lib/venues";
+import { competitionCatalogNos, validGroupIdsInYear, writeCoGroups } from "@/lib/competitionGroups";
 
 async function hasEntries(compId: number): Promise<boolean> {
   const rows = await db.select({ id: entries.id }).from(entries).where(eq(entries.competitionId, compId)).limit(1);
@@ -25,21 +26,7 @@ async function hasActiveEntries(compId: number): Promise<boolean> {
   return rows.length > 0;
 }
 
-/**
- * เลขหมวด (subject_group_catalog.group_no) ของรายการ — ใช้ตัดสินว่าครูอยู่หมวดเดียวกับรายการไหม
- * รายการผูกกับ subjectGroups.id (PK รายปี) แต่ session ของครูถือเลขหมวด จึงต้องแปลงก่อนเทียบ
- */
-async function groupCatalogNo(subjectGroupId: number | null): Promise<number | null> {
-  if (subjectGroupId == null) return null;
-  const g = (
-    await db
-      .select({ catalogNo: subjectGroups.catalogNo })
-      .from(subjectGroups)
-      .where(eq(subjectGroups.id, subjectGroupId))
-      .limit(1)
-  )[0];
-  return g?.catalogNo ?? null;
-}
+
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -114,7 +101,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const compRows = await db.select().from(competitions).where(eq(competitions.id, id)).limit(1);
     const comp = compRows[0];
     if (!comp) return fail("ไม่พบรายการแข่งขัน", 404);
-    if (!canEditCompetition(s, comp.createdBy, await groupCatalogNo(comp.subjectGroupId)))
+    if (!canEditCompetition(s, comp.createdBy, await competitionCatalogNos(comp.id, comp.subjectGroupId)))
       return fail("ไม่มีสิทธิ์แก้ไขรายการนี้", 403);
 
     const body = competitionInput.parse(await req.json());
@@ -143,6 +130,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       !(await isGroupAllowed(s, comp.yearId, body.subjectGroupId))
     )
       return fail("เลือกได้เฉพาะหมวดวิชาของท่านเท่านั้น", 403);
+
+    // หมวดร่วม — เอาเฉพาะหมวดที่มีจริงในปีของรายการนี้ และตัดหมวดหลักออก
+    const coGroupIds = (await validGroupIdsInYear(comp.yearId, body.coSubjectGroupIds)).filter(
+      (g) => g !== (body.subjectGroupId ?? null)
+    );
 
     // ช่วงเวลาต้องเป็น slot ของปีเดียวกับรายการ — คัดลอกเวลาเริ่ม/สิ้นสุดจาก slot
     const slot = (
@@ -212,6 +204,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         })
         .where(eq(competitions.id, id));
 
+      // หมวดร่วมเปลี่ยนได้เสมอ (เป็นเรื่องสิทธิ์/การมองเห็น ไม่กระทบข้อมูลที่ลงไว้แล้ว)
+      await writeCoGroups(tx, id, body.subjectGroupId ?? null, coGroupIds);
+
       // สถานที่เปลี่ยนได้เสมอ (แม้มีคนลงแล้ว) → rebuild join rows
       await tx.delete(competitionVenues).where(eq(competitionVenues.competitionId, id));
       if (venueIds.length) {
@@ -277,7 +272,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     const compRows = await db.select().from(competitions).where(eq(competitions.id, id)).limit(1);
     const comp = compRows[0];
     if (!comp) return fail("ไม่พบรายการแข่งขัน", 404);
-    if (!canEditCompetition(s, comp.createdBy, await groupCatalogNo(comp.subjectGroupId)))
+    if (!canEditCompetition(s, comp.createdBy, await competitionCatalogNos(comp.id, comp.subjectGroupId)))
       return fail("ไม่มีสิทธิ์ลบรายการนี้", 403);
 
     // นอกช่วงที่งานเปิดให้จัดการรายการ ครูลบรายการไม่ได้ (admin ลบได้เสมอ)
@@ -294,6 +289,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
       await tx.delete(criteria).where(eq(criteria.competitionId, id));
       await tx.delete(competitionCapacity).where(eq(competitionCapacity.competitionId, id));
       await tx.delete(competitionVenues).where(eq(competitionVenues.competitionId, id));
+      await tx.delete(competitionSubjectGroups).where(eq(competitionSubjectGroups.competitionId, id));
       await tx.delete(competitions).where(eq(competitions.id, id));
     });
     await logAudit(s.code, "delete_competition", { competitionId: id });

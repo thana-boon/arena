@@ -9,12 +9,12 @@ import {
   entrySubstitutions,
   events,
   scores,
-  subjectGroups,
 } from "@/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { parseJsonArray, registrationWindow } from "@/lib/domain";
 import { canRegisterHiddenCompetition } from "@/lib/permit";
+import { competitionCatalogNos } from "@/lib/competitionGroups";
 import type { Role } from "@/lib/auth/session";
 
 export class RegistrationError extends Error {
@@ -97,18 +97,10 @@ export async function registerEntry(args: RegisterArgs): Promise<RegisterResult>
   // ต้องคัดตัวก่อน · เหลือเฉพาะครูที่ดูแลรายการนั้น (เจ้าของ/หมวดเดียวกัน) กับ recorder/admin
   // บังคับกับ override ด้วย (admin ผ่านเงื่อนไขนี้อยู่แล้ว จึงไม่กระทบการ override ของ admin)
   if (!comp.visibleToStudents) {
-    const group =
-      comp.subjectGroupId == null
-        ? null
-        : (
-            await db
-              .select({ catalogNo: subjectGroups.catalogNo })
-              .from(subjectGroups)
-              .where(eq(subjectGroups.id, comp.subjectGroupId))
-              .limit(1)
-          )[0] ?? null;
+    // เลขหมวดทั้งหมด (หลัก + ร่วม) — ครูในหมวดร่วมนับเป็นครูผู้ดูแลรายการนี้ด้วย
+    const groupNos = await competitionCatalogNos(comp.id, comp.subjectGroupId);
     const actor = { role: args.byRole, code: args.byCode, subjectGroupId: args.bySubjectGroupId };
-    if (!canRegisterHiddenCompetition(actor, comp.createdBy, group?.catalogNo ?? null))
+    if (!canRegisterHiddenCompetition(actor, comp.createdBy, groupNos))
       throw new RegistrationError(
         args.byRole === "student"
           ? "รายการนี้ไม่เปิดให้นักเรียนสมัครเอง"

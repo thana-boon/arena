@@ -88,7 +88,7 @@ export function CompetitionsTable({
   // "ใคร" (เจ้าของรายการ/ครูในหมวดเดียวกัน) ตัดสินด้วยกฎกลางร่วมกับฝั่ง server
   // "ตอนนี้ถึงเวลาไหม" ใช้ compEditReason ที่ SSR คิดมาแล้ว — admin ข้ามช่วงเวลาได้ตลอด
   const canEdit = (c: CompListItem) =>
-    canEditCompetition({ role, code: myCode, subjectGroupId: mySubjectGroupId }, c.createdBy, c.groupCatalogNo) &&
+    canEditCompetition({ role, code: myCode, subjectGroupId: mySubjectGroupId }, c.createdBy, c.groupCatalogNos) &&
     (role === "admin" || !c.compEditReason);
 
   // รายการหลังกรองตามงาน — ใช้เป็นฐานของปุ่มกรองหมวดด้วย
@@ -225,7 +225,10 @@ export function CompetitionsTable({
                     </div>
                   )}
                 </td>
-                <td className="text-sm" data-label="หมวด">{c.groupName}</td>
+                {/* หมวดหลัก + หมวดร่วม (ถ้ามี) — ปุ่มกรองยังจัดกลุ่มตามหมวดหลักเสมอ */}
+                <td className="text-sm" data-label="หมวด">
+                  {[c.groupName, ...c.coGroupNames].filter(Boolean).join(" + ")}
+                </td>
                 <td data-label="ประเภท">
                   <span>
                     <span className="badge">{c.type === "team" ? "ทีม" : "เดี่ยว"}</span>

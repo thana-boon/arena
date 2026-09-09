@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { db } from "@/db";
-import { competitions, criteria, scores, subjectGroups } from "@/db/schema";
+import { competitions, criteria, scores } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { getRoster } from "@/lib/roster";
 import { canScore } from "@/lib/permit";
+import { competitionCatalogNos } from "@/lib/competitionGroups";
 import { formatThaiDateTime } from "@/lib/domain";
 import type { SessionPayload } from "@/lib/auth/session";
 import { ScoringGrid } from "@/app/teacher/scoring/[id]/ScoringGrid";
@@ -42,8 +43,9 @@ export async function ScoringBody({
   const { setting } = await getActiveYearWithSettings();
   const comp = (await db.select().from(competitions).where(eq(competitions.id, id)).limit(1))[0];
   if (!comp) return withBack(<div className="alert alert-error">ไม่พบรายการแข่งขัน</div>);
-  const group = comp.subjectGroupId == null ? undefined : (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0];
-  if (!canScore(session, comp.createdBy, group?.catalogNo))
+  // เลขหมวดทั้งหมด (หลัก + ร่วม) — ครูในหมวดร่วมบันทึกคะแนน/เช็คชื่อรายการนี้ได้เหมือนหมวดเจ้าของ
+  const groupNos = await competitionCatalogNos(comp.id, comp.subjectGroupId);
+  if (!canScore(session, comp.createdBy, groupNos))
     return withBack(<div className="alert alert-error">บันทึกคะแนนได้เฉพาะรายการในหมวดของท่าน</div>);
   // ไม่มีการแข่งขัน = ไม่มีคะแนนให้กรอก เหลือแค่ "มาร่วมกิจกรรมจริงไหม" → เช็คชื่อรายคน
   if (comp.noContest) {

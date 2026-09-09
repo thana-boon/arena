@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { db } from "@/db";
-import { competitions, entries, entryMembers, subjectGroups } from "@/db/schema";
+import { competitions, entries, entryMembers } from "@/db/schema";
 import { eq, and, inArray, notInArray } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
 import { canScore } from "@/lib/permit";
+import { competitionCatalogNos } from "@/lib/competitionGroups";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -32,8 +33,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const compId = Number((await params).id);
     const comp = (await db.select().from(competitions).where(eq(competitions.id, compId)).limit(1))[0];
     if (!comp) return fail("ไม่พบรายการแข่งขัน", 404);
-    const group = comp.subjectGroupId == null ? undefined : (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0];
-    if (!canScore(s, comp.createdBy, group?.catalogNo)) return fail("เช็คชื่อได้เฉพาะรายการในหมวดของท่าน", 403);
+    // เลขหมวดทั้งหมดของรายการ (หมวดหลัก + หมวดร่วม) — ครูในหมวดร่วมมีสิทธิ์เท่าหมวดเจ้าของ
+    const groupNos = await competitionCatalogNos(comp.id, comp.subjectGroupId);
+    if (!canScore(s, comp.createdBy, groupNos)) return fail("เช็คชื่อได้เฉพาะรายการในหมวดของท่าน", 403);
     if (!comp.noContest) return fail("รายการนี้มีการแข่งขัน — ใช้หน้าบันทึกผลเพื่อกรอกคะแนน");
 
     const body = schema.parse(await req.json());

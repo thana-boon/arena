@@ -18,6 +18,8 @@ export type CompFormInitial = {
   description: string;
   eventId: number | "";
   subjectGroupId: number | "";
+  /** กลุ่มสาระร่วม — หมวดอื่นที่ทำรายการนี้ด้วยกัน (ไม่รวมหมวดหลักข้างบน) */
+  coSubjectGroupIds: number[];
   type: "individual" | "team";
   /** ไม่มีการแข่งขัน — ลงทะเบียนรายชื่อ + ออกเกียรติบัตรอย่างเดียว (ไม่มีคะแนน/อันดับ/รางวัล) */
   noContest: boolean;
@@ -45,6 +47,7 @@ export type CompFormInitial = {
 export function CompetitionForm({
   events,
   groups,
+  allGroups,
   slots,
   venues,
   initial,
@@ -55,6 +58,12 @@ export function CompetitionForm({
 }: {
   events: { id: number; name: string; kind: string; eventDate: string | null }[];
   groups: { id: number; name: string }[];
+  /**
+   * หมวดทั้งหมดในปีนี้ — ใช้เป็นตัวเลือก "กลุ่มสาระร่วม" (ไม่ใช่หมวดหลัก)
+   * ครูทั่วไปเลือกหมวดหลักได้เฉพาะหมวดตัวเอง แต่ชวนหมวดอื่นมาทำร่วมกันได้ จึงต้องเห็นครบ
+   * ไม่ส่งมา = ใช้ groups (เท่าที่เลือกหมวดหลักได้)
+   */
+  allGroups?: { id: number; name: string }[];
   slots: SlotOption[];
   venues: VenueOption[];
   initial: CompFormInitial;
@@ -103,6 +112,18 @@ export function CompetitionForm({
   function set<K extends keyof CompFormInitial>(k: K, v: CompFormInitial[K]) {
     setF((p) => ({ ...p, [k]: v }));
   }
+  // ตัวเลือกหมวดร่วม = ทุกหมวดในปีนี้ ยกเว้นหมวดหลักที่เลือกไว้ (หมวดหลักไม่ใช่ "หมวดร่วม")
+  const coGroupOptions = (allGroups ?? groups).filter((g) => g.id !== Number(f.subjectGroupId));
+
+  function toggleCoGroup(id: number) {
+    setF((p) => ({
+      ...p,
+      coSubjectGroupIds: p.coSubjectGroupIds.includes(id)
+        ? p.coSubjectGroupIds.filter((g) => g !== id)
+        : [...p.coSubjectGroupIds, id],
+    }));
+  }
+
   function toggleLevel(lv: string) {
     setF((p) => {
       const has = p.allowedClassLevels.includes(lv);
@@ -173,6 +194,8 @@ export function CompetitionForm({
       description: f.description,
       eventId: Number(f.eventId),
       subjectGroupId: f.subjectGroupId === "" ? null : Number(f.subjectGroupId),
+      // หมวดร่วม — ตัดหมวดหลักออก (เซิร์ฟเวอร์ตัดซ้ำอีกชั้น)
+      coSubjectGroupIds: f.coSubjectGroupIds.filter((g) => g !== Number(f.subjectGroupId)),
       type: f.type,
       noContest: f.noContest,
       visibleToStudents: f.visibleToStudents,
@@ -294,6 +317,30 @@ export function CompetitionForm({
               </select>
               {lockSubjectGroup && <span className="form-hint">สร้างได้เฉพาะหมวดของท่าน</span>}
             </div>
+          </div>
+
+          {/* กลุ่มสาระร่วม — รายการที่หลายหมวดจัดด้วยกัน ครูของหมวดร่วมจะเห็น/แก้/บันทึกผลได้เหมือนหมวดหลัก */}
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">กลุ่มสาระร่วม (ไม่บังคับ)</label>
+            {coGroupOptions.length ? (
+              <div className="chip-wrap">
+                {coGroupOptions.map((g) => {
+                  const on = f.coSubjectGroupIds.includes(g.id);
+                  return (
+                    <label key={g.id} className={`level-chip${on ? " on" : ""}`}>
+                      <input type="checkbox" checked={on} onChange={() => toggleCoGroup(g.id)} />
+                      <span>{g.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="form-hint">ยังไม่มีหมวดอื่นให้เลือก</div>
+            )}
+            <span className="form-hint">
+              เลือกได้หลายหมวด สำหรับรายการที่ทำงานร่วมกันมากกว่า 1 กลุ่มสาระ —
+              ครูในหมวดร่วมจะเห็นรายการนี้ แก้ไข และบันทึกผลได้เหมือนหมวดหลัก
+            </span>
           </div>
 
           <div className="form-group" style={{ marginBottom: 0 }}>

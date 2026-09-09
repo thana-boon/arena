@@ -7,12 +7,12 @@ import {
   entryMembers,
   entrySubstitutions,
   events,
-  subjectGroups,
 } from "@/db/schema";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { parseJsonArray, type CompType } from "@/lib/domain";
 import { canSubstitute, substitutionGuard } from "@/lib/permit";
+import { competitionCatalogNos } from "@/lib/competitionGroups";
 import type { MemberInput } from "@/lib/registration";
 import type { SessionPayload } from "@/lib/auth/session";
 
@@ -86,17 +86,8 @@ export async function substituteMember(args: SubstituteArgs): Promise<Substitute
     throw new SubstitutionError("รายการนี้ไม่ได้อยู่ในปีการศึกษาปัจจุบัน");
 
   // ===== ใคร =====
-  const group =
-    comp.subjectGroupId == null
-      ? null
-      : (
-          await db
-            .select({ catalogNo: subjectGroups.catalogNo })
-            .from(subjectGroups)
-            .where(eq(subjectGroups.id, comp.subjectGroupId))
-            .limit(1)
-        )[0] ?? null;
-  if (!canSubstitute(actor, comp.createdBy, group?.catalogNo ?? null))
+  // เลขหมวดทั้งหมด (หลัก + ร่วม) — ครูในหมวดร่วมเปลี่ยนตัวได้เหมือนหมวดเจ้าของ
+  if (!canSubstitute(actor, comp.createdBy, await competitionCatalogNos(comp.id, comp.subjectGroupId)))
     throw new SubstitutionError("เปลี่ยนตัวได้เฉพาะรายการในหมวดของท่าน", 403);
 
   // ===== ตอนนี้ถึงเวลาไหม (admin ข้ามได้) =====

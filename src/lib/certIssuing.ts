@@ -73,7 +73,7 @@ async function viewableCompetitions(
   yearId: number
 ): Promise<CompListItem[]> {
   const all = await listCompetitions(yearId);
-  return all.filter((c) => canViewCompetition(session, c.createdBy, c.groupCatalogNo));
+  return all.filter((c) => canViewCompetition(session, c.createdBy, c.groupCatalogNos));
 }
 
 /**

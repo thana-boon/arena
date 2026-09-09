@@ -41,7 +41,7 @@ export type PublishRow = {
  */
 export async function listPublishBoard(session: SessionPayload, yearId: number): Promise<PublishRow[]> {
   const all = await listCompetitions(yearId);
-  const comps = all.filter((c) => !c.noContest && canScore(session, c.createdBy, c.groupCatalogNo));
+  const comps = all.filter((c) => !c.noContest && canScore(session, c.createdBy, c.groupCatalogNos));
   if (!comps.length) return [];
 
   const ids = comps.map((c) => c.id);

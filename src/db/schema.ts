@@ -183,6 +183,25 @@ export const competitionVenues = pgTable(
   ]
 );
 
+// ===== หมวดร่วมของรายการแข่งขัน (many-to-many) =====
+// รายการหนึ่งทำงานร่วมกันได้หลายกลุ่มสาระ — ตารางนี้เก็บเฉพาะ "หมวดร่วม" (หมวดที่เพิ่มเข้ามา)
+// ส่วนหมวดหลัก (เจ้าของรายการ) ยังอยู่ที่ competitions.subject_group_id เหมือนเดิม
+// เพราะการจัดกลุ่ม/เรียง/ชื่อหมวดบนเกียรติบัตรต้องตอบให้ได้ว่า "หมวดไหนคือเจ้าของ" หมวดเดียว
+// ไม่มีแถว = รายการหมวดเดียวแบบเดิม (ข้อมูลเก่าจึงไม่ต้อง backfill)
+export const competitionSubjectGroups = pgTable(
+  "competition_subject_groups",
+  {
+    id: serial("id").primaryKey(),
+    competitionId: integer("competition_id").notNull(),
+    subjectGroupId: integer("subject_group_id").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [
+    uniqueIndex("comp_sgroup_uniq").on(t.competitionId, t.subjectGroupId),
+    index("comp_sgroup_group_idx").on(t.subjectGroupId),
+  ]
+);
+
 // ===== ความจุที่นั่ง =====
 // เดี่ยว: 1 แถวต่อระดับชั้น (class_level ระบุ)
 // ทีม: 1 แถว (class_level = null)
@@ -543,6 +562,7 @@ export const certificateCounters = pgTable("certificate_counters", {
 export type AcademicYear = typeof academicYears.$inferSelect;
 export type Setting = typeof settings.$inferSelect;
 export type SubjectGroup = typeof subjectGroups.$inferSelect;
+export type CompetitionSubjectGroup = typeof competitionSubjectGroups.$inferSelect;
 export type TimeSlot = typeof timeSlots.$inferSelect;
 export type Venue = typeof venues.$inferSelect;
 export type SubjectGroupCatalog = typeof subjectGroupCatalog.$inferSelect;

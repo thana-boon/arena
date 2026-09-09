@@ -6,6 +6,7 @@ import { computeCompetitionResults } from "@/lib/results";
 import { getRoster } from "@/lib/roster";
 import { resolveClassNumbers, withClassNumbers } from "@/lib/classNumbers";
 import { canViewCompetition } from "@/lib/permit";
+import { competitionCatalogNos } from "@/lib/competitionGroups";
 import { MEDAL_LABEL } from "@/lib/domain";
 import type { SessionPayload } from "@/lib/auth/session";
 import type { SheetData } from "@/components/competition/CompetitionSheet";
@@ -27,7 +28,7 @@ export async function loadCompetitionSheet(
       : (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0];
   // ชื่องานบนหัวกระดาษ = ชื่อ "งาน" ที่ตั้งไว้ในหน้าตั้งค่า (ไม่ใช่ข้อความตายตัว)
   const event = comp.eventId == null ? undefined : (await db.select().from(events).where(eq(events.id, comp.eventId)).limit(1))[0];
-  if (!canViewCompetition(session, comp.createdBy, group?.catalogNo))
+  if (!canViewCompetition(session, comp.createdBy, await competitionCatalogNos(comp.id, comp.subjectGroupId)))
     return { ok: false, error: "คุณไม่มีสิทธิ์เข้าถึงรายการนี้" };
 
   const medalPct = {

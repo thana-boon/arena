@@ -12,6 +12,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
 import { canRegisterHiddenCompetition } from "@/lib/permit";
+import { getCoGroupIdsByCompetition } from "@/lib/competitionGroups";
 import { getActiveYear } from "@/lib/queries";
 import { listStudentsInRoom, studentFullName } from "@/lib/external/student-api";
 import { fetchTeacherHomerooms } from "@/lib/external/teacher-api";
@@ -143,12 +144,19 @@ export async function GET(req: Request) {
     // ไม่มีหมวด/หาไม่เจอ → ไว้ท้ายสุดของ dropdown
     const groupSort = (id: number | null) => groupOf(id)?.sortOrder ?? 9999;
 
+    // เลขหมวดทั้งหมดของแต่ละรายการ (หลัก + ร่วม) — ครูในหมวดร่วมลงชื่อให้รายการที่ซ่อนได้ด้วย
+    const coGroupIds = await getCoGroupIdsByCompetition(compsThisYear.map((c) => c.id));
+    const catalogNosOf = (c: { id: number; subjectGroupId: number | null }) =>
+      [c.subjectGroupId, ...(coGroupIds.get(c.id) ?? [])]
+        .map((gid) => groupOf(gid ?? null)?.catalogNo ?? null)
+        .filter((n): n is number => n != null);
+
     const eligible = compsThisYear.filter((c) => {
       if (!parseJsonArray(c.allowedClassLevels).includes(classLevel)) return false;
       // รายการที่ซ่อนจากนักเรียนไม่ใช่ของให้ครูประจำชั้นหยิบไปสมัครแทน — ตัดออกตั้งแต่ในลิสต์
       // จะได้ไม่เลือกไปแล้วโดน server ปฏิเสธทีหลัง (server ก็บังคับซ้ำอีกชั้นใน registerEntry)
       if (!c.visibleToStudents)
-        return canRegisterHiddenCompetition(session, c.createdBy, groupOf(c.subjectGroupId)?.catalogNo ?? null);
+        return canRegisterHiddenCompetition(session, c.createdBy, catalogNosOf(c));
       return true;
     });
 

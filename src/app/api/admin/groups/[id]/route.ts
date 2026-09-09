@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { db } from "@/db";
-import { subjectGroups, competitions } from "@/db/schema";
+import { subjectGroups, competitions, competitionSubjectGroups } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
@@ -23,6 +23,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     const id = Number((await params).id);
     const used = await db.select().from(competitions).where(eq(competitions.subjectGroupId, id)).limit(1);
     if (used.length) return fail("ลบไม่ได้ เพราะมีรายการแข่งขันใช้หมวดวิชานี้อยู่");
+    // ถูกใช้เป็น "หมวดร่วม" ก็ลบไม่ได้เช่นกัน — ไม่งั้นแถวใน competition_subject_groups กลายเป็นข้อมูลกำพร้า
+    const usedAsCo = await db
+      .select()
+      .from(competitionSubjectGroups)
+      .where(eq(competitionSubjectGroups.subjectGroupId, id))
+      .limit(1);
+    if (usedAsCo.length) return fail("ลบไม่ได้ เพราะมีรายการแข่งขันเลือกหมวดวิชานี้เป็นกลุ่มสาระร่วมอยู่");
     await db.delete(subjectGroups).where(eq(subjectGroups.id, id));
     return ok();
   });

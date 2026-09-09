@@ -292,8 +292,47 @@ export async function sosPhoto(photoPath: string): Promise<Response> {
   });
 }
 
-/** ปีการศึกษาปัจจุบัน — SchoolOS ไม่มี endpoint list ปี จึงอ่านจาก field academicYear ของ /students */
+/** ปีการศึกษาปัจจุบัน — อ่านจาก field academicYear ที่ติดมากับ /students (ไม่ต้องใช้ scope years:read) */
 export async function sosCurrentAcademicYear(): Promise<{ id: number; year: string } | null> {
   const { academicYear } = await sosListStudents({ pageSize: 1 });
   return academicYear ?? null;
+}
+
+export type SosAcademicYear = { id: number; year: string; isActive: boolean };
+
+/**
+ * ปีการศึกษา "ทุกปี" จาก /academic-years
+ *
+ * คืน null เมื่อ key ยังไม่มี scope years:read (403) หรือ SchoolOS รุ่นเก่าที่ยังไม่มี endpoint นี้ (404)
+ * — ผู้เรียกจะได้ถอยไปใช้ปีปัจจุบันปีเดียวแทน ไม่ใช่ล้มทั้งหน้า
+ *
+ * รูป response ต่างรุ่นกันได้ (array เปล่า ๆ / {data:[]} / {years:[]}) และชื่อฟิลด์ก็เช่นกัน
+ * จึงอ่านแบบยืดหยุ่นไว้ ดีกว่าให้หน้าปีการศึกษาว่างเปล่าเพราะชื่อคีย์ไม่ตรง
+ */
+export async function sosAcademicYears(): Promise<SosAcademicYear[] | null> {
+  const res = await sos("/academic-years?pageSize=200");
+  if (res.status === 403 || res.status === 404) return null;
+  if (!res.ok) throw new Error(`SchoolOS academic-years error: ${res.status}`);
+
+  const body: unknown = await res.json();
+  const rows: unknown[] = Array.isArray(body)
+    ? body
+    : Array.isArray((body as { data?: unknown[] })?.data)
+      ? (body as { data: unknown[] }).data
+      : Array.isArray((body as { years?: unknown[] })?.years)
+        ? (body as { years: unknown[] }).years
+        : [];
+
+  const out: SosAcademicYear[] = [];
+  for (const r of rows) {
+    const o = r as Record<string, unknown>;
+    const year = String(o.year ?? o.yearBe ?? o.year_be ?? o.name ?? o.title ?? "").trim();
+    if (!/^\d{4}$/.test(year)) continue; // แถวที่อ่านปีไม่ออก ข้ามไปดีกว่าเดา
+    out.push({
+      id: Number(o.id) || 0,
+      year,
+      isActive: Boolean(o.isActive ?? o.is_active ?? o.isCurrent ?? o.current ?? false),
+    });
+  }
+  return out;
 }

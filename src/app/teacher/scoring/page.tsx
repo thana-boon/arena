@@ -13,7 +13,7 @@ export default async function ScoringList() {
   const all = year ? await listCompetitions(year.id) : [];
   // ครูทั่วไปบันทึกได้เฉพาะรายการในหมวดตัวเอง; admin/recorder เห็นครบทุกรายการ
   // รายการที่ "ไม่มีการแข่งขัน" ก็ขึ้นด้วย — ไม่มีคะแนนให้กรอก แต่ต้องเช็คชื่อผู้เข้าร่วม
-  const comps = all.filter((c) => canScore(session, c.createdBy, c.groupCatalogNo));
+  const comps = all.filter((c) => canScore(session, c.createdBy, c.groupCatalogNos));
 
   return (
     <div className="stack">

@@ -14,6 +14,9 @@ export const competitionInput = z
     eventId: z.number().int().positive("กรุณาเลือกงาน"),
     // หมวดสาระ — ไม่บังคับ (งานที่ไม่ใช่วิชาการไม่ต้องเลือก)
     subjectGroupId: z.number().int().positive().nullable().optional(),
+    // หมวดร่วม — กลุ่มสาระอื่นที่ทำรายการนี้ด้วยกัน (นอกเหนือจากหมวดหลักข้างบน)
+    // ครูในหมวดร่วมได้สิทธิ์เท่าครูหมวดเจ้าของ ; เซิร์ฟเวอร์ตัดหมวดหลัก/ตัวซ้ำออกให้เอง
+    coSubjectGroupIds: z.array(z.number().int().positive()).optional().default([]),
     type: z.enum(["individual", "team"]),
     // ไม่มีการแข่งขัน — ลงทะเบียนรายชื่อ + ออกเกียรติบัตรอย่างเดียว (ไม่มีคะแนน/อันดับ/รางวัล)
     noContest: z.boolean().optional().default(false),

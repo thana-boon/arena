@@ -1,9 +1,10 @@
 import { db } from "@/db";
-import { competitions, subjectGroups } from "@/db/schema";
+import { competitions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
 import { canViewCompetition } from "@/lib/permit";
+import { competitionCatalogNos } from "@/lib/competitionGroups";
 import { certIssueInput, certUndoInput } from "@/lib/validation";
 import { getYearWithSettings } from "@/lib/queries";
 import { computeCompetitionResults } from "@/lib/results";
@@ -30,10 +31,9 @@ async function findAllowedCompetition(s: SessionPayload, competitionId: number) 
   )[0];
   if (!comp) return { comp: null, allowed: false };
 
-  const group = comp.subjectGroupId == null ? undefined : (
-    await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1)
-  )[0];
-  return { comp, allowed: canViewCompetition(s, comp.createdBy, group?.catalogNo) };
+  // เลขหมวดทั้งหมด (หลัก + ร่วม) — ครูในหมวดร่วมออก/ถอนใบของรายการนี้ได้เหมือนหมวดเจ้าของ
+  const groupNos = await competitionCatalogNos(comp.id, comp.subjectGroupId);
+  return { comp, allowed: canViewCompetition(s, comp.createdBy, groupNos) };
 }
 
 /**

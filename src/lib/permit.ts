@@ -17,6 +17,18 @@ import {
 export type Actor = { role: Role; code: string; subjectGroupId?: number };
 
 /**
+ * เลขหมวดของรายการแข่งขัน — ส่งได้ทั้งเลขเดียวหรือหลายเลข
+ * รายการหนึ่งอยู่ได้หลายกลุ่มสาระ (หมวดหลัก + หมวดร่วม) ครูในหมวดใดหมวดหนึ่งก็ถือว่าเป็นหมวดตัวเอง
+ */
+export type GroupCatalogNos = number | number[] | null | undefined;
+
+/** ครูคนนี้อยู่ในหมวดใดหมวดหนึ่งของรายการไหม */
+function inGroup(actor: Actor, nos: GroupCatalogNos): boolean {
+  if (actor.subjectGroupId == null || nos == null) return false;
+  return Array.isArray(nos) ? nos.includes(actor.subjectGroupId) : nos === actor.subjectGroupId;
+}
+
+/**
  * ใครแก้/ลบรายการได้: admin ทุกรายการ · ครู = รายการที่ตัวเองสร้าง หรือรายการในหมวดเดียวกับตัวเอง
  *
  * เดิมดูแค่ "ใครเป็นคนสร้าง" ครูจึงเห็นรายการของเพื่อนร่วมหมวด (canViewCompetition ให้เห็นอยู่แล้ว)
@@ -30,16 +42,12 @@ export type Actor = { role: Role; code: string; subjectGroupId?: number };
 export function canEditCompetition(
   actor: Actor,
   createdByCode: string,
-  groupCatalogNo: number | null | undefined
+  groupCatalogNo: GroupCatalogNos
 ): boolean {
   if (actor.role === "admin") return true;
   if (actor.role === "student") return false;
   if (actor.code === createdByCode) return true;
-  return (
-    actor.subjectGroupId != null &&
-    groupCatalogNo != null &&
-    actor.subjectGroupId === groupCatalogNo
-  );
+  return inGroup(actor, groupCatalogNo);
 }
 
 /**
@@ -156,7 +164,7 @@ export function substitutionGuard(
 export function canSubstitute(
   session: SessionPayload,
   createdByCode: string,
-  groupCatalogNo: number | null | undefined
+  groupCatalogNo: GroupCatalogNos
 ): boolean {
   if (session.role === "student") return false;
   return canViewCompetition(session, createdByCode, groupCatalogNo);
@@ -174,15 +182,11 @@ export function canSubstitute(
 export function canViewCompetition(
   actor: Actor,
   createdByCode: string,
-  groupCatalogNo: number | null | undefined
+  groupCatalogNo: GroupCatalogNos
 ): boolean {
   if (actor.role === "admin" || actor.role === "recorder") return true;
   if (actor.code === createdByCode) return true;
-  return (
-    actor.subjectGroupId != null &&
-    groupCatalogNo != null &&
-    actor.subjectGroupId === groupCatalogNo
-  );
+  return inGroup(actor, groupCatalogNo);
 }
 
 /**
@@ -198,7 +202,7 @@ export function canViewCompetition(
 export function canRegisterHiddenCompetition(
   actor: Actor,
   createdByCode: string,
-  groupCatalogNo: number | null | undefined
+  groupCatalogNo: GroupCatalogNos
 ): boolean {
   if (actor.role === "student") return false;
   return canViewCompetition(actor, createdByCode, groupCatalogNo);
@@ -213,7 +217,7 @@ export function canRegisterHiddenCompetition(
 export function canScore(
   session: SessionPayload,
   createdByCode: string,
-  groupCatalogNo: number | null | undefined
+  groupCatalogNo: GroupCatalogNos
 ): boolean {
   if (session.role === "student") return false;
   return canViewCompetition(session, createdByCode, groupCatalogNo);

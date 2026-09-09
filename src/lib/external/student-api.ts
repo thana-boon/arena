@@ -3,6 +3,7 @@ import {
   sosVerify,
   sosListStudents,
   sosCurrentAcademicYear,
+  sosAcademicYears,
   type SosStudent,
 } from "@/lib/external/schoolos";
 
@@ -232,7 +233,6 @@ export async function listAllStudents(status?: "studying" | "all"): Promise<Stud
 }
 
 // ===== ปีการศึกษา =====
-// SchoolOS ไม่มี endpoint "list ปีทั้งหมด" — ดึงได้เฉพาะปีปัจจุบัน (จาก field academicYear ของ /students)
 export type ApiAcademicYear = {
   id: number;
   year_be: number;
@@ -240,16 +240,41 @@ export type ApiAcademicYear = {
   is_active?: number;
 };
 
+/**
+ * ปีการศึกษาทั้งหมดที่ SchoolOS รู้จัก + ปีปัจจุบัน
+ *
+ * ทางหลักคือ /academic-years (ต้องมี scope years:read ที่ API Manager ของ SchoolOS)
+ * ถ้า key ยังไม่มีสิทธิ์นั้น จะได้ปีปัจจุบันปีเดียวจาก field academicYear ของ /students แทน
+ * — หน้า "ปีการศึกษา" จะนำเข้าได้แค่ปีปัจจุบัน ซึ่งเป็นพฤติกรรมเดิมก่อนมี endpoint นี้
+ */
 export async function fetchAcademicYears(): Promise<{
   current: { id: number; year_be: number; title: string } | null;
   years: ApiAcademicYear[];
 }> {
   const ay = await sosCurrentAcademicYear();
-  if (!ay) return { current: null, years: [] };
-  const year_be = Number(ay.year);
-  const title = `ปีการศึกษา ${ay.year}`;
+  const current = ay
+    ? { id: ay.id, year_be: Number(ay.year), title: `ปีการศึกษา ${ay.year}` }
+    : null;
+
+  const all = await sosAcademicYears().catch(() => null);
+  if (all?.length) {
+    return {
+      current,
+      years: all
+        .map((y) => ({
+          id: y.id,
+          year_be: Number(y.year),
+          title: `ปีการศึกษา ${y.year}`,
+          // ปีปัจจุบันจาก /students เชื่อถือได้กว่าธง isActive ของแต่ละแถว จึงให้มันชนะ
+          is_active: current ? (Number(y.year) === current.year_be ? 1 : 0) : y.isActive ? 1 : 0,
+        }))
+        .sort((a, b) => b.year_be - a.year_be),
+    };
+  }
+
+  if (!current) return { current: null, years: [] };
   return {
-    current: { id: ay.id, year_be, title },
-    years: [{ id: ay.id, year_be, title, is_active: 1 }],
+    current,
+    years: [{ id: current.id, year_be: current.year_be, title: current.title, is_active: 1 }],
   };
 }

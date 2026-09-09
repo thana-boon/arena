@@ -13,6 +13,7 @@ import {
 import { eq, and, inArray } from "drizzle-orm";
 import { getActiveYearWithSettings } from "@/lib/queries";
 import { canViewCompetition } from "@/lib/permit";
+import { getCoGroupIdsByCompetition } from "@/lib/competitionGroups";
 import type { SessionPayload } from "@/lib/auth/session";
 import { computeCompetitionResults } from "@/lib/results";
 import { getRoster } from "@/lib/roster";
@@ -149,10 +150,14 @@ export async function getReportBundles(
   const groupOf = (id: number | null) => (id == null ? undefined : groups.find((g) => g.id === id));
 
   // กรองก่อนคำนวณ ไม่ใช่ตอนแสดงผล — ครูจะได้ไม่ต้องรอ roster/คะแนนของหมวดที่ตัวเองไม่ได้เห็น
+  // เลขหมวดทั้งหมดของแต่ละรายการ (หลัก + ร่วม) — ครูในหมวดร่วมต้องเห็นรายการนั้นในรายงานด้วย
+  const coGroupIds = await getCoGroupIdsByCompetition(allComps.map((c) => c.id));
+  const catalogNosOf = (c: { id: number; subjectGroupId: number | null }) =>
+    [c.subjectGroupId, ...(coGroupIds.get(c.id) ?? [])]
+      .map((gid) => (gid == null ? null : groupOf(gid)?.catalogNo ?? null))
+      .filter((n): n is number => n != null);
   const comps = session
-    ? allComps.filter((c) =>
-        canViewCompetition(session, c.createdBy, groupOf(c.subjectGroupId)?.catalogNo ?? null)
-      )
+    ? allComps.filter((c) => canViewCompetition(session, c.createdBy, catalogNosOf(c)))
     : allComps;
 
   // ข้อมูลเสริมสำหรับรายงานสรุป: สถานที่ + จำนวนรับ (ดึงเป็นชุดเดียว)

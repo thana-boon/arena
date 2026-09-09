@@ -10,6 +10,7 @@ import {
   type CompType,
 } from "@/lib/domain";
 import { canSubstitute, substitutionGuard } from "@/lib/permit";
+import { competitionCatalogNos } from "@/lib/competitionGroups";
 import { getRoster, type RosterEntry } from "@/lib/roster";
 import { listCompetitions, type CompListItem } from "@/lib/listings";
 import type { SessionPayload } from "@/lib/auth/session";
@@ -97,7 +98,7 @@ async function substitutableCompetitions(
   yearId: number
 ): Promise<CompListItem[]> {
   const all = await listCompetitions(yearId);
-  return all.filter((c) => canSubstitute(session, c.createdBy, c.groupCatalogNo));
+  return all.filter((c) => canSubstitute(session, c.createdBy, c.groupCatalogNos));
 }
 
 /** จำนวนครั้งที่เปลี่ยนตัวไปแล้ว ต่อรายการแข่งขัน */
@@ -206,12 +207,14 @@ export async function getSubCompetition(
   )[0];
   if (!comp || comp.yearId !== yearId) return null;
 
+  if (!canSubstitute(session, comp.createdBy, await competitionCatalogNos(comp.id, comp.subjectGroupId)))
+    return null;
+
+  // ชื่อหมวดบนหัวหน้าจอ = หมวดหลักของรายการ (หมวดร่วมไม่แสดงตรงนี้)
   const group =
     comp.subjectGroupId == null
       ? null
-      : (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0] ??
-        null;
-  if (!canSubstitute(session, comp.createdBy, group?.catalogNo ?? null)) return null;
+      : (await db.select().from(subjectGroups).where(eq(subjectGroups.id, comp.subjectGroupId)).limit(1))[0] ?? null;
 
   const event = comp.eventId
     ? (await db.select().from(events).where(eq(events.id, comp.eventId)).limit(1))[0] ?? null

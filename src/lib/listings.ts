@@ -12,6 +12,7 @@ import {
 } from "@/lib/domain";
 import { listStudents } from "@/lib/external/student-api";
 import { getVenueLabelsByCompetition } from "@/lib/venues";
+import { getCoGroupIdsByCompetition } from "@/lib/competitionGroups";
 
 export type CompListItem = {
   id: number;
@@ -24,8 +25,17 @@ export type CompListItem = {
    */
   attendanceChecked: boolean;
   subjectGroupId: number | null;
+  /**
+   * เลขหมวดทั้งหมดของรายการ (หมวดหลัก + หมวดร่วม) — ใช้ตัดสินสิทธิ์ทุกจุดที่ถามว่า "หมวดของฉันไหม"
+   * เป็นอาร์เรย์เพราะรายการหนึ่งทำร่วมกันได้หลายกลุ่มสาระ (ดู competition_subject_groups)
+   */
+  groupCatalogNos: number[];
+  /** เลขหมวดหลักอย่างเดียว — ใช้เรียง/ทำปุ่มกรอง (ห้ามใช้ตัดสินสิทธิ์ ให้ใช้ groupCatalogNos) */
   groupCatalogNo: number | null;
+  /** ชื่อหมวดหลัก (ใช้จัดกลุ่ม/เรียง — คำถามที่ต้องมีคำตอบเดียว) */
   groupName: string;
+  /** ชื่อหมวดร่วม (ว่าง = รายการหมวดเดียว) — ใช้แสดงผลเท่านั้น */
+  coGroupNames: string[];
   eventId: number | null;
   eventName: string;
   /** เหตุผลที่ครูแก้/ลบรายการนี้ไม่ได้ตอนนี้ (null = ยังอยู่ในช่วงที่แก้ได้) — admin ไม่ติดข้อนี้ */
@@ -62,6 +72,12 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
     .from(entries)
     .where(and(inArray(entries.competitionId, compIds), eq(entries.status, "active")));
   const venueLabels = await getVenueLabelsByCompetition(compIds);
+  const coGroupIds = await getCoGroupIdsByCompetition(compIds);
+  // เลขหมวดทั้งหมดของรายการ (หลัก + ร่วม) — ครูในหมวดร่วมต้องมีสิทธิ์เท่าครูหมวดเจ้าของ
+  const catalogNos = (c: { id: number; subjectGroupId: number | null }) =>
+    [c.subjectGroupId, ...(coGroupIds.get(c.id) ?? [])]
+      .map((gid) => groupCatalogNo(gid ?? null))
+      .filter((n): n is number => n != null);
 
   const rows = comps.map((c) => {
     const cRows = caps.filter((x) => x.competitionId === c.id);
@@ -72,8 +88,10 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
       noContest: c.noContest,
       attendanceChecked: c.attendanceCheckedAt != null,
       subjectGroupId: c.subjectGroupId,
+      groupCatalogNos: catalogNos(c),
       groupCatalogNo: groupCatalogNo(c.subjectGroupId),
       groupName: groupName(c.subjectGroupId),
+      coGroupNames: (coGroupIds.get(c.id) ?? []).map((gid) => groupName(gid)),
       eventId: c.eventId,
       eventName: eventName(c.eventId),
       compEditReason: editReason(c.eventId),

@@ -7,6 +7,7 @@ import { getActiveYear, getTimeSlots, getVenues } from "@/lib/queries";
 import { getCompetitionVenueIds } from "@/lib/venues";
 import { canEditCompetition, competitionManageGuard } from "@/lib/permit";
 import { canPickGroup } from "@/lib/groupScope";
+import { getCoGroupIds } from "@/lib/competitionGroups";
 import { parseJsonArray, isUnlimited, competitionEditWindow } from "@/lib/domain";
 import type { SessionPayload } from "@/lib/auth/session";
 import { CompetitionForm } from "@/components/CompetitionForm";
@@ -29,8 +30,12 @@ export async function CompetitionEditBody({
 
   const allGroups = await db.select().from(subjectGroups).where(eq(subjectGroups.yearId, year.id));
   // ครูแก้ได้ทั้งรายการของตัวเองและรายการในหมวดเดียวกัน — เทียบด้วยเลขหมวด ไม่ใช่ id รายปี
-  const compGroup = allGroups.find((g) => g.id === comp.subjectGroupId);
-  if (!canEditCompetition(session, comp.createdBy, compGroup?.catalogNo)) redirect(returnTo);
+  // สิทธิ์ยึด "หมวดใดหมวดหนึ่งของรายการ" — หมวดหลัก + หมวดร่วม (ครูหมวดร่วมแก้ได้ด้วย)
+  const coGroupIds = await getCoGroupIds(id);
+  const compGroupNos = [comp.subjectGroupId, ...coGroupIds]
+    .map((gid) => (gid == null ? null : allGroups.find((g) => g.id === gid)?.catalogNo ?? null))
+    .filter((n): n is number => n != null);
+  if (!canEditCompetition(session, comp.createdBy, compGroupNos)) redirect(returnTo);
 
   // ครูทั่วไปเลือกได้เฉพาะหมวดตัวเอง (แต่คงหมวดปัจจุบันของรายการไว้ให้เห็นเสมอ); admin เลือกได้ทุกหมวด
   const isAdmin = session.role === "admin";
@@ -93,6 +98,7 @@ export async function CompetitionEditBody({
       <CompetitionForm
         events={eventList.map((e) => ({ id: e.id, name: e.name, kind: e.kind, eventDate: e.eventDate }))}
         groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+        allGroups={allGroups.map((g) => ({ id: g.id, name: g.name }))}
         slots={slots.map((s) => ({ id: s.id, label: s.label, startTime: s.startTime, endTime: s.endTime }))}
         venues={venues.map((v) => ({ id: v.id, name: v.name, building: v.building }))}
         returnTo={returnTo}
@@ -105,6 +111,7 @@ export async function CompetitionEditBody({
           description: comp.description ?? "",
           eventId: comp.eventId ?? "",
           subjectGroupId: comp.subjectGroupId ?? "",
+          coSubjectGroupIds: coGroupIds,
           type: comp.type as "individual" | "team",
           noContest: comp.noContest,
           visibleToStudents: comp.visibleToStudents,

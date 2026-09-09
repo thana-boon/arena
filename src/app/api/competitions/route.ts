@@ -10,6 +10,7 @@ import { competitionManageGuard } from "@/lib/permit";
 import { logAudit } from "@/lib/audit";
 import { UNLIMITED_CAPACITY } from "@/lib/domain";
 import { findVenueConflicts } from "@/lib/venues";
+import { validGroupIdsInYear, writeCoGroups } from "@/lib/competitionGroups";
 
 // POST: สร้างรายการแข่งขัน (teacher/recorder/admin) — default ไม่เผยแพร่
 export async function POST(req: Request) {
@@ -32,6 +33,11 @@ export async function POST(req: Request) {
     // ครูสร้างได้เฉพาะหมวดของตัวเอง (admin เลือกได้ทุกหมวด) — ตรวจเฉพาะเมื่อระบุหมวด
     if (body.subjectGroupId != null && !(await isGroupAllowed(s, year.id, body.subjectGroupId)))
       return fail("เลือกได้เฉพาะหมวดวิชาของท่านเท่านั้น", 403);
+
+    // หมวดร่วม — เอาเฉพาะหมวดที่มีจริงในปีนี้ และตัดหมวดหลักออก (หมวดหลักไม่ใช่หมวดร่วม)
+    const coGroupIds = (await validGroupIdsInYear(year.id, body.coSubjectGroupIds)).filter(
+      (g) => g !== body.subjectGroupId
+    );
 
     // ช่วงเวลาต้องเป็น slot ของปีปัจจุบัน — เซิร์ฟเวอร์คัดลอกเวลาเริ่ม/สิ้นสุดจาก slot เอง
     const slot = (
@@ -80,6 +86,9 @@ export async function POST(req: Request) {
         })
         .returning({ id: competitions.id });
       const compId = res.id;
+
+      // หมวดร่วม (กลุ่มสาระอื่นที่ทำรายการนี้ด้วยกัน)
+      await writeCoGroups(tx, compId, body.subjectGroupId ?? null, coGroupIds);
 
       // สถานที่ (หลายห้องได้ — sort_order คงลำดับตามฟอร์ม)
       if (venueIds.length) {

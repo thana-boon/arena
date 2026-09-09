@@ -16,7 +16,7 @@ export default async function TeacherCompetitions() {
   const session = await requireStaff();
   const { year, setting } = await getActiveYearWithSettings();
   const all = year ? await listCompetitions(year.id) : [];
-  const comps = all.filter((c) => canViewCompetition(session, c.createdBy, c.groupCatalogNo));
+  const comps = all.filter((c) => canViewCompetition(session, c.createdBy, c.groupCatalogNos));
 
   // ช่วงที่ครูสร้าง/แก้รายการได้ — บอกตั้งแต่เปิดหน้า ไม่ใช่ให้ไปเจอปุ่มหายตอนกดเข้าไป
   const evs = year ? await db.select().from(events).where(eq(events.yearId, year.id)).orderBy(asc(events.name)) : [];

@@ -17,7 +17,7 @@ export function CompetitionsTable({
   role,
   basePath,
   canPublish,
-  defaultEventId = null,
+  defaultEvent = null,
 }: {
   comps: CompListItem[];
   myCode: string;
@@ -26,7 +26,8 @@ export function CompetitionsTable({
   role: Role;
   basePath: string;
   canPublish: boolean;
-  defaultEventId?: number | null;
+  /** "งานเริ่มต้น" จากหน้าตั้งค่า — เลือกไว้ให้ตั้งแต่เปิดหน้า และมีในตัวเลือกเสมอแม้ยังไม่มีรายการ */
+  defaultEvent?: { id: number; name: string } | null;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -35,23 +36,24 @@ export function CompetitionsTable({
   const [groupFilter, setGroupFilter] = useState<number | "all">("all");
 
   // งานที่มีในรายการ (ไม่ซ้ำ) — ใช้ทำ dropdown กรอง เผื่อมีหลายงานในปีเดียวกัน
+  // งานเริ่มต้นต้องอยู่ในตัวเลือกเสมอ แม้ยังไม่มีรายการสักรายการ (เพิ่งสร้างงานใหม่)
   const eventOptions = useMemo(() => {
     const seen = new Map<number, { id: number; name: string }>();
+    if (defaultEvent) seen.set(defaultEvent.id, defaultEvent);
     for (const c of comps) {
       const eid = c.eventId ?? -1;
       if (!seen.has(eid)) seen.set(eid, { id: eid, name: c.eventName || "ไม่ระบุงาน" });
     }
     return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name, "th"));
-  }, [comps]);
-  // ค่าเริ่มต้น = งานเริ่มต้นที่ admin ตั้งไว้ (ถ้ามีรายการในงานนั้น) ไม่งั้นแสดงทุกงาน
-  const [eventFilter, setEventFilter] = useState<number | "all">(() =>
-    defaultEventId != null && comps.some((c) => c.eventId === defaultEventId) ? defaultEventId : "all"
-  );
+  }, [comps, defaultEvent]);
+  // ค่าเริ่มต้น = งานเริ่มต้นที่ admin ตั้งไว้ ไม่งั้นแสดงทุกงาน
+  const [eventFilter, setEventFilter] = useState<number | "all">(() => defaultEvent?.id ?? "all");
 
   // ===== จำตัวกรองไว้ใน sessionStorage =====
   // เข้าไปหน้าแก้ไขแล้วกลับออกมา (router.push/back) component ถูก mount ใหม่ state จึงหายหมด
   // — เก็บไว้ต่อ tab แยกตาม basePath (ครู/แอดมินมีมุมมองคนละชุด)
-  const storageKey = `arena.compFilters.${basePath}`;
+  // ผูก key กับงานเริ่มต้นด้วย — admin เปลี่ยนงานเริ่มต้นเมื่อไร ตัวกรองที่จำไว้ของงานเก่าต้องไม่ย้อนมาทับ
+  const storageKey = `arena.compFilters.${basePath}.${defaultEvent?.id ?? "none"}`;
   // กันเขียนทับค่าที่เก็บไว้ด้วยค่า default ก่อนที่จะได้อ่านของเดิมขึ้นมา
   const [restored, setRestored] = useState(false);
 
@@ -62,7 +64,9 @@ export function CompetitionsTable({
         const saved = JSON.parse(raw) as { event?: number | "all"; group?: number | "all" };
         // ใช้ค่าเดิมเฉพาะเมื่อยังมีรายการที่เข้าเงื่อนไขนั้นอยู่จริง (รายการอาจถูกลบ/ย้ายงานไปแล้ว)
         const ev = saved.event;
-        const evOk = ev === "all" || (typeof ev === "number" && comps.some((c) => (c.eventId ?? -1) === ev));
+        const evOk =
+          ev === "all" ||
+          (typeof ev === "number" && (ev === defaultEvent?.id || comps.some((c) => (c.eventId ?? -1) === ev)));
         if (evOk && ev !== undefined) setEventFilter(ev);
         const gr = saved.group;
         const inEv = evOk && ev !== "all" && ev !== undefined ? comps.filter((c) => (c.eventId ?? -1) === ev) : comps;

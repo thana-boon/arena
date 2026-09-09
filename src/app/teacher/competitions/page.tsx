@@ -21,6 +21,8 @@ export default async function TeacherCompetitions() {
   // ช่วงที่ครูสร้าง/แก้รายการได้ — บอกตั้งแต่เปิดหน้า ไม่ใช่ให้ไปเจอปุ่มหายตอนกดเข้าไป
   const evs = year ? await db.select().from(events).where(eq(events.yearId, year.id)).orderBy(asc(events.name)) : [];
   const canCreate = evs.some((e) => competitionEditWindow(e).open);
+  // งานเริ่มต้นจากหน้าตั้งค่า — เลือกไว้ให้ตั้งแต่เปิดหน้า (แม้งานนั้นยังไม่มีรายการ)
+  const defEv = evs.find((e) => e.id === setting?.defaultEventId);
 
   return (
     <div className="stack">
@@ -56,7 +58,7 @@ export default async function TeacherCompetitions() {
           mySubjectGroupId={session.subjectGroupId}
           role={session.role}
           basePath="/teacher/competitions"
-          defaultEventId={setting?.defaultEventId ?? null}
+          defaultEvent={defEv ? { id: defEv.id, name: defEv.name } : null}
           // ทุกแถวที่แสดงผ่าน canViewCompetition แล้ว = เป็นรายการในหมวดตัวเอง/ของตัวเอง → ประกาศผลได้
           canPublish
         />

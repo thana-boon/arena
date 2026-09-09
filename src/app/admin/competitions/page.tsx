@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/guards";
-import { getActiveYearWithSettings } from "@/lib/queries";
+import { getDefaultEvent } from "@/lib/queries";
 import { listCompetitions, getCompetitionsSummary } from "@/lib/listings";
 import { CompetitionsTable } from "@/components/CompetitionsTable";
 import { CompetitionsSummary } from "@/components/CompetitionsSummary";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminCompetitions() {
   const session = await requireAdmin();
-  const { year, setting } = await getActiveYearWithSettings();
+  const { year, event } = await getDefaultEvent();
   const [comps, summary] = year
     ? await Promise.all([listCompetitions(year.id), getCompetitionsSummary(year.id)])
     : [[], null];
@@ -28,7 +28,7 @@ export default async function AdminCompetitions() {
       ) : (
         <>
           {summary && <CompetitionsSummary summary={summary} />}
-          <CompetitionsTable comps={comps} myCode={session.code} role="admin" basePath="/admin/competitions" canPublish defaultEventId={setting?.defaultEventId ?? null} />
+          <CompetitionsTable comps={comps} myCode={session.code} role="admin" basePath="/admin/competitions" canPublish defaultEvent={event ? { id: event.id, name: event.name } : null} />
         </>
       )}
     </div>

@@ -18,11 +18,12 @@ const STATE_HINT: Record<PublishRow["state"], string> = {
 export function PublishTable({
   rows,
   scoreBasePath,
-  defaultEventId = null,
+  defaultEvent = null,
 }: {
   rows: PublishRow[];
   scoreBasePath: string;
-  defaultEventId?: number | null;
+  /** "งานเริ่มต้น" จากหน้าตั้งค่า — เลือกไว้ให้ตั้งแต่เปิดหน้า และมีในตัวเลือกเสมอแม้ยังไม่มีรายการ */
+  defaultEvent?: { id: number; name: string } | null;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -34,15 +35,14 @@ export function PublishTable({
   // งานที่มีในรายการ (ไม่ซ้ำ) — ค่าเริ่มต้นคืองานที่ admin ตั้งไว้ ถ้ามีรายการอยู่ในงานนั้นจริง
   const eventOptions = useMemo(() => {
     const seen = new Map<number, { id: number; name: string }>();
+    if (defaultEvent) seen.set(defaultEvent.id, defaultEvent);
     for (const r of rows) {
       const eid = r.eventId ?? -1;
       if (!seen.has(eid)) seen.set(eid, { id: eid, name: r.eventName || "ไม่ระบุงาน" });
     }
     return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name, "th"));
-  }, [rows]);
-  const [eventFilter, setEventFilter] = useState<number | "all">(() =>
-    defaultEventId != null && rows.some((r) => r.eventId === defaultEventId) ? defaultEventId : "all"
-  );
+  }, [rows, defaultEvent]);
+  const [eventFilter, setEventFilter] = useState<number | "all">(() => defaultEvent?.id ?? "all");
 
   const inEvent = useMemo(
     () => (eventFilter === "all" ? rows : rows.filter((r) => (r.eventId ?? -1) === eventFilter)),

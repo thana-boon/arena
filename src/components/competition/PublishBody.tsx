@@ -1,5 +1,5 @@
 import { Icon } from "@/components/Icon";
-import { getActiveYearWithSettings } from "@/lib/queries";
+import { getDefaultEvent } from "@/lib/queries";
 import { listPublishBoard } from "@/lib/publishBoard";
 import type { SessionPayload } from "@/lib/auth/session";
 import { PublishTable } from "@/components/competition/PublishTable";
@@ -12,7 +12,7 @@ export async function PublishBody({
   session: SessionPayload;
   scoreBasePath: string;
 }) {
-  const { year, setting } = await getActiveYearWithSettings();
+  const { year, event } = await getDefaultEvent();
   const rows = year ? await listPublishBoard(session, year.id) : [];
   const isAdmin = session.role === "admin" || session.role === "recorder";
 
@@ -38,7 +38,7 @@ export async function PublishBody({
           </p>
         </div>
       ) : (
-        <PublishTable rows={rows} scoreBasePath={scoreBasePath} defaultEventId={setting?.defaultEventId ?? null} />
+        <PublishTable rows={rows} scoreBasePath={scoreBasePath} defaultEvent={event ? { id: event.id, name: event.name } : null} />
       )}
 
       <p className="form-hint">

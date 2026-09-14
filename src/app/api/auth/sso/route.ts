@@ -61,7 +61,7 @@ export async function POST(req: Request) {
       throw e;
     }
 
-    const { user, absoluteEndsAt } = redeemed;
+    const { user, absoluteEndsAt, client } = redeemed;
 
     /**
      * ⚠ ประทับไว้ว่า session ใบนี้ "คัดลอกตัวตนมาจาก session ไหนของ SchoolOS" — ค่าดิบ ห้ามแปลง
@@ -86,7 +86,7 @@ export async function POST(req: Request) {
         return fail("ไม่พบข้อมูลนักเรียนในระบบ กรุณาติดต่อผู้ดูแลระบบ", 403);
       }
       const payload = sessionForStudent(found.profile);
-      await createSession({ ...payload, sso: true, ssoSub }, { absoluteEndsAt });
+      await createSession({ ...payload, sso: true, ssoSub, client }, { absoluteEndsAt });
       ssoSucceeded(ip);
       return ok({ role: payload.role, redirect: ROLE_HOME[payload.role] ?? "/" });
     }
@@ -99,7 +99,7 @@ export async function POST(req: Request) {
       return fail("ไม่พบข้อมูลบุคลากรในระบบ กรุณาติดต่อผู้ดูแลระบบ", 403);
     }
     const payload = await sessionForTeacher(found.profile);
-    await createSession({ ...payload, sso: true, ssoSub }, { absoluteEndsAt });
+    await createSession({ ...payload, sso: true, ssoSub, client }, { absoluteEndsAt });
     ssoSucceeded(ip);
     console.info(
       `[sso] เข้าสู่ระบบด้วย SSO: ${teacherFullName(found.profile)} (${found.profile.teacher_code}) → ${payload.role}`

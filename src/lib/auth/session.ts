@@ -25,6 +25,32 @@ const secret = () => new TextEncoder().encode(env.JWT_SECRET);
 export const IDLE_SECONDS = minutesFromEnv("SESSION_IDLE_MINUTES", 15);
 export const ABSOLUTE_SECONDS = minutesFromEnv("SESSION_ABSOLUTE_MINUTES", 60 * 8);
 
+/**
+ * หน้าต่าง idle ของแอปที่ติดตั้ง ฝั่ง Users (SESSION_PWA_IDLE_DAYS)
+ *
+ * เพดานเดียวกับ IDLE_SECONDS และด้วยเหตุผลเดียวกัน — ของเราต้องไม่อยู่ยาวกว่าของ SchoolOS —
+ * แต่สำหรับ client อีกชนิด · clamp มีไว้กันทางนั้นทางเดียว การตั้งเพดานที่นี่ให้ "สั้นกว่า"
+ * ของแพลตฟอร์มเป็นบั๊กของตัวเอง: มือถือหลุดทั้งที่ SchoolOS ยังล็อกอินอยู่ แล้วไม่มีใคร
+ * ฝั่งไหนอธิบายได้ว่าทำไม
+ */
+export const PLATFORM_PWA_IDLE_DAYS = 30;
+
+/**
+ * หน้าต่าง idle ของ session ใบนี้ — คนละคำตอบสำหรับ client คนละชนิด
+ *
+ * แท็บบนเครื่องส่วนกลางได้ 15 นาที เพราะเครื่องแชร์กันและหน้าจอมีข้อมูลของทั้งงาน
+ * แอปที่ติดตั้งบนมือถือของเจ้าตัวได้เป็นสัปดาห์ เพราะมันถูกปิดแล้วเปิดใหม่ทั้งวัน
+ */
+export function idleSeconds(client?: SessionPayload["client"]): number {
+  if (client !== "pwa") return IDLE_SECONDS;
+  const n = Number(process.env.SESSION_PWA_IDLE_DAYS);
+  const days = Number.isFinite(n) && n > 0 ? Math.min(n, PLATFORM_PWA_IDLE_DAYS) : PLATFORM_PWA_IDLE_DAYS;
+  return Math.round(days * 24 * 3600);
+}
+
+/** เบราว์เซอร์ clamp อายุคุกกี้ไว้ที่ 400 วันอยู่แล้ว — ขอเท่าที่จะได้จริง */
+const MAX_COOKIE_SECONDS = 400 * 24 * 3600;
+
 function minutesFromEnv(name: string, fallbackMinutes: number): number {
   const n = Number(process.env[name]);
   return (Number.isFinite(n) && n > 0 ? n : fallbackMinutes) * 60;
@@ -45,7 +71,11 @@ async function writeCookie(payload: SessionPayload, maxAge: number): Promise<voi
     // เปิดเป็น true เฉพาะเมื่อ deploy หลัง HTTPS จริง (ตั้ง COOKIE_SECURE=true)
     secure: process.env.COOKIE_SECURE === "true",
     path: "/",
-    maxAge,
+    // แอปที่ติดตั้งถูกปิดแล้วเปิดใหม่ทั้งวัน คุกกี้จึงต้องมีอายุยาวเท่าโทเคนข้างใน ไม่งั้นผู้ใช้
+    // กลับมาเจอระบบที่ลืมเขาไปแล้วทั้งที่ SchoolOS ยังล็อกอินอยู่เป็นปกติ — คนถือมือถือไม่ได้
+    // อ่านอาการนั้นว่า "หมดเวลา" เขาอ่านว่า "ระบบเด้งมั่ว" · ไม่เสียความปลอดภัยอะไร เพราะ
+    // นาฬิกาทั้งสองตัวอยู่ใน claims ของโทเคนและถูกเช็คใหม่ทุก request อยู่แล้ว
+    maxAge: Math.min(maxAge, MAX_COOKIE_SECONDS),
   });
 }
 
@@ -55,13 +85,29 @@ async function writeCookie(payload: SessionPayload, maxAge: number): Promise<voi
  */
 export async function createSession(
   payload: SessionPayload,
-  opts?: { absoluteEndsAt?: number }
+  opts?: { absoluteEndsAt?: number | null }
 ): Promise<void> {
   const now = nowSec();
-  const ours = now + ABSOLUTE_SECONDS;
-  const theirs = opts?.absoluteEndsAt ? Math.floor(opts.absoluteEndsAt / 1000) : 0;
-  const abs = theirs > now ? Math.min(ours, theirs) : ours;
-  await writeCookie({ ...payload, abs }, Math.min(IDLE_SECONDS, abs - now));
+  const theirs = typeof opts?.absoluteEndsAt === "number" ? Math.floor(opts.absoluteEndsAt / 1000) : 0;
+
+  /**
+   * เพดานของแพลตฟอร์มมาก่อนเสมอสำหรับแอปที่ติดตั้ง รวมทั้งคำตอบว่า "ไม่มีเพดาน"
+   *
+   * เพดานฝั่ง Users ไม่ใช่ตัวเลขเดียว: 24 ชม.สำหรับบัญชีที่มี users:write, เป็นสัปดาห์สำหรับ
+   * คนอื่น และไม่มีเลยเมื่อโรงเรียนปิดสวิตช์นั้น การเอา 8 ชม.ของเราไป min() ทับ จึงเป็นการ
+   * ตัดมือถือให้สั้นกว่าที่แพลตฟอร์มตั้งใจโดยที่ไม่มีอะไรฝั่งไหนอธิบายได้
+   */
+  const abs =
+    payload.client === "pwa"
+      ? theirs > now
+        ? theirs
+        : null // แพลตฟอร์มบอกว่าไม่มีเพดาน — คนละเรื่องกับ undefined ของโทเคนรุ่นเก่า
+      : theirs > now
+        ? Math.min(now + ABSOLUTE_SECONDS, theirs)
+        : now + ABSOLUTE_SECONDS;
+
+  const idle = idleSeconds(payload.client);
+  await writeCookie({ ...payload, abs }, abs === null ? idle : Math.min(idle, abs - now));
 }
 
 /**
@@ -71,8 +117,10 @@ export async function createSession(
 export async function touchSession(payload: SessionPayload): Promise<number> {
   const now = nowSec();
   // token เก่าที่ออกก่อนมีระบบนี้ ยังไม่มี abs — ให้เริ่มนับเพดานจากตอนนี้
-  const abs = payload.abs ?? now + ABSOLUTE_SECONDS;
-  const remaining = Math.min(IDLE_SECONDS, abs - now);
+  // ⚠ เทียบกับ undefined ตรง ๆ ไม่ใช่ ?? เพราะ null คือคำตอบจริง ("ไม่มีเพดาน") ไม่ใช่ "ไม่รู้"
+  const abs = payload.abs === undefined ? now + ABSOLUTE_SECONDS : payload.abs;
+  const idle = idleSeconds(payload.client);
+  const remaining = abs === null ? idle : Math.min(idle, abs - now);
   if (remaining <= 0) {
     await destroySession();
     return 0;
@@ -95,7 +143,7 @@ export async function getSession(): Promise<SessionPayload | null> {
 
 /** เหลืออีกกี่วินาที session จะหมดอายุ (นับจาก exp ของ token ปัจจุบัน) */
 export function sessionExpiresIn(payload: SessionPayload): number {
-  if (payload.exp == null) return IDLE_SECONDS; // token รุ่นเก่า — เดาเป็นเต็มช่วง idle
+  if (payload.exp == null) return idleSeconds(payload.client); // token รุ่นเก่า — เดาเป็นเต็มช่วง idle
   return Math.max(0, payload.exp - nowSec());
 }
 

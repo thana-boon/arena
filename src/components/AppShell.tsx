@@ -13,7 +13,7 @@ import { bottomNavItems, type NavGroup } from "@/lib/nav";
 import { nameInitial } from "@/lib/initials";
 import { getAnnouncementsFor } from "@/lib/announcements";
 import type { AnnouncementView } from "@/lib/announcementTypes";
-import { IDLE_SECONDS, type SessionPayload, type Role } from "@/lib/auth/session";
+import { idleSeconds, type SessionPayload, type Role } from "@/lib/auth/session";
 
 const ROLE_LABEL: Record<Role, string> = {
   student: "นักเรียน",
@@ -44,7 +44,11 @@ export async function AppShell({
   return (
     <div className="app-shell-nav">
       {/* เตือน + พากลับหน้า login เมื่อไม่มีการใช้งานนานเกินกำหนด */}
-      <SessionTimeout idleSeconds={IDLE_SECONDS} sso={session.sso ?? false} />
+      <SessionTimeout
+        idleSeconds={idleSeconds(session.client)}
+        sso={session.sso ?? false}
+        client={session.client}
+      />
       {/* สลับผู้ใช้ให้ตรงกับคนที่ล็อกอิน SchoolOS อยู่จริง ณ วินาทีนี้ (เครื่องส่วนกลางใช้ต่อกันหลายคน) */}
       <SessionGuard sso={session.sso ?? false} ssoSub={session.ssoSub} />
       <aside className="sidebar">

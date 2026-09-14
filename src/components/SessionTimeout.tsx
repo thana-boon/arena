@@ -57,7 +57,19 @@ type EndReason = "timeout" | "expired" | "sso";
  *
  * @param sso session นี้ผูกกับ SSO ไหม (admin local = false → ไม่แตะ Users เลยทั้งขาต่ออายุและขาออก)
  */
-export function SessionTimeout({ idleSeconds, sso = false }: { idleSeconds: number; sso?: boolean }) {
+export function SessionTimeout({
+  idleSeconds,
+  sso = false,
+  client,
+}: {
+  idleSeconds: number;
+  sso?: boolean;
+  /**
+   * ชุดหน้าต่างเวลาที่ session นี้อยู่ — ใช้ตัดสิน "ปลายทางตอนหมดเวลา" อย่างเดียว
+   * ความยาวนาฬิกาเป็นเรื่องของ server (idleSeconds มาจากที่นั่นแล้ว)
+   */
+  client?: "web" | "pwa";
+}) {
   // เวลาที่ session จะหมดอายุ (ms epoch) — ตั้งใหม่ทุกครั้งที่ต่ออายุสำเร็จ
   const deadlineRef = useRef(Date.now() + idleSeconds * 1000);
   // deadline ของ session แพลตฟอร์ม (0 = ยังไม่รู้ / ไม่ได้ใช้ SSO)
@@ -97,13 +109,30 @@ export function SessionTimeout({ idleSeconds, sso = false }: { idleSeconds: numb
       if (!manual && reason !== "sso") markKickedOut();
       await api.post("/api/auth/logout");
       clearSsoCache();
+
+      /**
+       * แอปที่ติดตั้งไม่ได้ออกทางเดียวกับแท็บบนเครื่องส่วนกลาง
+       *
+       * บนเครื่องส่วนกลาง การหมดเวลาต้องพาออกจากแพลตฟอร์มด้วย ไม่งั้นคนถัดไปที่เปิดเครื่อง
+       * ได้ session ของคนเดิม และ silent SSO จะพากลับเข้ามาเอง = timeout ไม่มีผลจริง
+       *
+       * บนมือถือของเจ้าตัวมันตรงกันข้าม: เครื่องมีล็อกหน้าจอของตัวเอง ไม่มีคนถัดไป และ session
+       * ฝั่งแพลตฟอร์มของเขาวัดกันเป็นสัปดาห์ การลากเขาออกจาก SchoolOS ทั้งระบบเพราะแอปนี้
+       * ถูกวางทิ้งไว้ คือการทำลาย session ของทุกแอปอื่นบนเครื่องนั้นไปด้วย · ให้ไป /login ของเรา
+       * แล้วปล่อย silent SSO พากลับเข้าหน้าที่เขาอยู่เงียบ ๆ (กับดัก 4.21)
+       */
+      const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+      if (client === "pwa") {
+        window.location.assign(`${base}/login`);
+        return;
+      }
+
       const away = await ssoExitUrl(sso);
       // ใช้ location แทน router เพื่อล้าง state ของหน้าทิ้งทั้งหมด
       // window.location ไม่ได้ถูกเติม basePath ให้อัตโนมัติเหมือน <Link> — ต้องเติมเอง
-      const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
       window.location.assign(away ?? `${base}/login?reason=${reason}`);
     },
-    [sso]
+    [sso, client]
   );
 
   const takeSsoDeadline = useCallback((expiresAt: number) => {

@@ -151,7 +151,13 @@ export type SosHandoffUser = {
 export async function sosRedeemHandoff(code: string): Promise<{
   user: SosHandoffUser;
   expiresAt: number;
-  absoluteEndsAt: number;
+  /**
+   * เพดานสัมบูรณ์ของ session ฝั่งแพลตฟอร์ม (epoch ms) · `null` = ไม่มีเพดานเลย ซึ่งเป็นค่า
+   * ปกติของแอปที่ติดตั้ง — ต้องส่งต่อดิบ ๆ ห้าม `|| 0` หรือ `?? null` ระหว่างทาง
+   */
+  absoluteEndsAt: number | null;
+  /** `web` | `pwa` — ชุดหน้าต่างเวลาที่แพลตฟอร์มจัดให้ session นี้ · คัดลอก ห้ามเดา */
+  client?: "web" | "pwa";
 }> {
   let res: Response;
   try {
@@ -181,7 +187,10 @@ export async function sosRedeemHandoff(code: string): Promise<{
     // sub กับ code เป็นค่าเดียวกันตาม contract แต่รับทั้งคู่ไว้เผื่อฝั่ง Users ส่งมาไม่ครบ
     user: { ...data.user, sub: data.user.sub ?? data.user.code } as SosHandoffUser,
     expiresAt: Number(data.expiresAt) || 0,
-    absoluteEndsAt: Number(data.absoluteEndsAt) || 0,
+    // `|| 0` ตรงนี้เคยกลืน null (= ไม่มีเพดาน) ให้กลายเป็น 0 (= อ่านไม่ออก แล้วตกไปใช้ 8 ชม.
+    // ของเรา) ซึ่งเป็นการตัดมือถือให้สั้นกว่าที่แพลตฟอร์มตั้งใจ โดยไม่มีอะไรฟ้อง
+    absoluteEndsAt: typeof data.absoluteEndsAt === "number" ? data.absoluteEndsAt : null,
+    client: data.client === "pwa" || data.client === "web" ? data.client : undefined,
   };
 }
 

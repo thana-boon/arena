@@ -89,3 +89,52 @@ test("token ที่ลายเซ็นไม่ตรง ต้องไม�
   const other = new TextEncoder().encode("secret-คนละใบ-ที่ยาวพอ-32-ไบต์-เหมือนกัน");
   assert.equal(await verifyIdentity(token, other), null);
 });
+
+/**
+ * กับดัก 4.19 — พี่น้องกับ ssoSub ข้างบน แต่แพงกว่า
+ *
+ * `client` กับ `abs` คือตัวที่กำหนดความยาวนาฬิกาของโทเคนใบถัดไป หล่นตัวใดตัวหนึ่งตอนต่ออายุ
+ * session ของมือถือจะถูกมินต์ใหม่เป็น session เดสก์ท็อป 15 นาที — ตัวที่มีไว้ยืดอายุให้เขา
+ * กลายเป็นตัวที่เตะเขาออกเอง ตั้งแต่ navigation แรก และหลังจากทำงานถูกต้องมาพักหนึ่งแล้ว
+ * อาการที่ผู้ใช้เล่าคือ "มือถือใช้ได้อยู่พักหนึ่งแล้วจู่ ๆ ก็หลุดทุก 15 นาที" ซึ่งแทบหาไม่เจอ
+ * ถ้าไม่มีเทสตัวนี้
+ */
+test("แอปที่ติดตั้งยังเป็นแอปที่ติดตั้งหลังต่ออายุ", async () => {
+  const phone: SessionPayload = { ...TEACHER, client: "pwa", abs: null };
+
+  const first = await verifyIdentity(await signIdentity(phone, SECRET, 900), SECRET);
+  assert.ok(first);
+  assert.equal(first.client, "pwa");
+  assert.equal(first.abs, null);
+
+  const renewed = await verifyIdentity(await signIdentity(first, SECRET, 900), SECRET);
+  assert.ok(renewed);
+  assert.equal(renewed.client, "pwa", "session ของ pwa ที่ต่ออายุแล้วต้องไม่กลายเป็น web");
+  assert.equal(renewed.abs, null, "null = แพลตฟอร์มบอกว่าไม่มีเพดาน ต้องไม่ถูกแปลงเป็นเพดานของเรา");
+  assert.equal(renewed.ssoSub, "T00116");
+});
+
+/**
+ * `null` กับ `undefined` เป็นคำตอบคนละอย่างและต้องรอดข้ามการเซ็นโทเคนแยกกัน
+ * · null = แพลตฟอร์มบอกว่า "ไม่มีเพดาน" (ค่าปกติของแอปที่ติดตั้ง)
+ * · undefined = โทเคนรุ่นเก่าที่ไม่เคยมีฟิลด์นี้ → touchSession ต้องตกไปใช้เพดาน 8 ชม.ของเรา
+ */
+test("ไม่มีเพดาน กับ ไม่ได้ตอบ ไม่ใช่เรื่องเดียวกัน", async () => {
+  const uncapped = await verifyIdentity(
+    await signIdentity({ ...TEACHER, client: "pwa", abs: null }, SECRET, 900),
+    SECRET,
+  );
+  assert.ok(uncapped);
+  assert.equal(uncapped.abs, null, "null ต้องรอดไปถึงโทเคน");
+
+  const legacy: SessionPayload = { ...TEACHER };
+  delete legacy.abs;
+  const old = await verifyIdentity(await signIdentity(legacy, SECRET, 900), SECRET);
+  assert.ok(old);
+  assert.equal(old.abs, undefined, "ไม่มีค่า ต้องยังคงไม่มีค่า ไม่ใช่กลายเป็น null");
+});
+
+/** claim ที่หายไปต้องตกไปทางหน้าต่างที่ "สั้นกว่า" เสมอ ไม่ใช่ยาวกว่า */
+test("โทเคนที่ออกก่อนรู้จัก pwa ถูกอ่านเป็นเครื่องส่วนกลาง", () => {
+  assert.equal(identityOf(TEACHER).client, undefined);
+});

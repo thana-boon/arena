@@ -9,8 +9,25 @@ import { markKickedOut, isSigningOut } from "@/lib/auth/clientState";
 const WARN_SECONDS = 120;
 /** ต่ออายุถี่สุดกี่วินาทีต่อครั้ง — กันยิง API รัวตามการใช้งาน */
 const RENEW_EVERY = 5 * 60;
-/** ต่ออายุ session ของ Users อย่างช้าทุกกี่วินาที (ตราบใดที่ยังมีการใช้งานจริง) */
-const SSO_RENEW_EVERY = 10 * 60;
+/**
+ * ต่ออายุ session ของ Users เมื่อ "เส้นตายของมันเอง" เหลือน้อยกว่านี้ — ไม่ใช่ตามนาฬิกาของเรา
+ *
+ * cadence เดิม ("ทุก 10 นาที") นับจากตอน component mount ซึ่งไม่มีความสัมพันธ์อะไรเลยกับ
+ * นาฬิกาที่ฆ่า session จริง ๆ: มาถึงด้วย handoff ไม่ได้แปลว่าเพิ่งเริ่มนับ 15 นาที
+ * (ทั้ง handoff และ GET /api/auth/session จงใจไม่เลื่อน idle window) session จึงอาจ
+ * เหลืออีกสองนาทีตอนหน้าเราโหลดเสร็จ แล้วการต่ออายุครั้งแรกไปตกเอาตอนมันตายไปแล้ว
+ * แย่กว่านั้น ทุกการโหลดหน้าใหม่ = mount ใหม่ = เริ่มนับ 10 นาทีใหม่ คนที่คลิกไปมาทุก ๆ
+ * 9 นาทีจึงไม่เคยต่ออายุ session แพลตฟอร์มเลยสักครั้ง แล้วถูกเด้งออกคามือที่นาทีที่ 15
+ *
+ * หนึ่งในสามของหน้าต่าง 15 นาที เหลือที่ให้ retry อีกสองรอบก่อนจะเสียอะไรไป และยังคงถามเฉพาะ
+ * ตอนที่มีคนอยู่จริงเหมือนเดิม
+ */
+const SSO_RENEW_UNDER = 5 * 60;
+/**
+ * ถ้าอ่านเส้นตายฝั่งแพลตฟอร์มไม่ได้เลย (probe ยิงไม่ถึง) ค่อยตกลงมาใช้ cadence คงที่
+ * และต้องสั้นกว่าหน้าต่างจริงอย่างชัดเจน เพราะตอนที่มองไม่เห็นคือตอนที่ไม่มีโอกาสแก้ตัว
+ */
+const SSO_BLIND_GAP = 5 * 60;
 /** Users ล่มตอน session แพลตฟอร์มหมดพอดี — เลื่อนไปถามใหม่อีกกี่วินาที (ไม่เตะผู้ใช้เพราะเน็ตสะดุด) */
 const SSO_RETRY_SECONDS = 60;
 
@@ -45,9 +62,14 @@ export function SessionTimeout({ idleSeconds, sso = false }: { idleSeconds: numb
   const deadlineRef = useRef(Date.now() + idleSeconds * 1000);
   // deadline ของ session แพลตฟอร์ม (0 = ยังไม่รู้ / ไม่ได้ใช้ SSO)
   const ssoDeadlineRef = useRef(0);
-  // ต่ออายุฝั่ง SSO ครั้งล่าสุดเมื่อไหร่ — เริ่มนับจากตอนเปิดหน้า (session เพิ่งถูกสร้าง/ซิงก์มาสด ๆ)
-  // ไม่งั้นการขยับครั้งแรกหลังโหลดหน้าจะยิง refresh ทิ้งเปล่าทุกครั้ง
-  const ssoRenewedRef = useRef(Date.now());
+  // ต่ออายุฝั่ง SSO ครั้งล่าสุดเมื่อไหร่ — ใช้เป็นพื้นของทางที่ "มองไม่เห็นเส้นตาย" เท่านั้น
+  // และจงใจเริ่มที่ 0 ไม่ใช่ Date.now(): หน้าที่เพิ่งโหลดไม่รู้อะไรเลยเกี่ยวกับนาฬิกาของแพลตฟอร์ม
+  // การเริ่มที่ "ตอนนี้" คือการเดาว่า "ต้องเหลือเต็มหน้าต่างแน่ ๆ" ซึ่งเป็นต้นเหตุของการเด้งหลุด
+  // คามือพอดี — 0 แปลว่า "ถามตั้งแต่ tick แรกที่เห็นว่ามีคนอยู่" ซึ่งเป็นคำตอบที่ซื่อตรงกว่า
+  const ssoRenewedRef = useRef(0);
+  // ครั้งล่าสุดที่ "พยายาม" ต่ออายุฝั่ง SSO (สำเร็จหรือไม่ก็ตาม) — tick ของตัวนี้เดินทุกวินาที
+  // ถ้าไม่มีพื้นตรงนี้ Users ที่กำลังสะดุดจะโดนยิงซ้ำวินาทีละครั้งตลอดเวลาที่มันยังตอบไม่ได้
+  const ssoTriedRef = useRef(0);
   const lastActivityRef = useRef(Date.now());
   const renewingRef = useRef(false);
   const endedRef = useRef(false);
@@ -184,9 +206,22 @@ export function SessionTimeout({ idleSeconds, sso = false }: { idleSeconds: numb
       if (idleFor >= RENEW_EVERY) return;
 
       const arenaDue = idleSeconds - left >= RENEW_EVERY;
-      // Users ไม่บอกความยาวหน้าต่างมาตรง ๆ — ยึด "ต่อทุก 10 นาทีถ้ายังใช้งานอยู่" ตามนโยบาย
-      const ssoDue = sso && (now - ssoRenewedRef.current) / 1000 >= SSO_RENEW_EVERY;
-      if (arenaDue || ssoDue) void renew();
+      // เส้นตายของ Users เอง ซึ่ง sync()/probe เก็บมาให้แล้ว — ต่อเมื่อ "เหลือน้อย" ไม่ใช่เมื่อ
+      // "ครบรอบของเรา" ค่านี้รอดจากการโหลดหน้าใหม่ ต่างจากตัวนับที่รีเซ็ตทุก mount
+      // ssoLeft เป็น Infinity เมื่อยังไม่รู้เส้นตาย (probe ยิงไม่ถึง) จึงต้องมีทางสำรองไว้ด้วย
+      const ssoDue =
+        sso &&
+        (now - ssoTriedRef.current) / 1000 >= SSO_RETRY_SECONDS &&
+        (ssoDeadlineRef.current === 0
+          ? (now - ssoRenewedRef.current) / 1000 >= SSO_BLIND_GAP
+          : ssoLeft <= SSO_RENEW_UNDER);
+      if (arenaDue || ssoDue) {
+        // จดว่า "ลองแล้ว" ก่อนยิง ไม่ใช่หลังสำเร็จ — สองค่านี้คนละหน้าที่กัน: ssoTriedRef คุมความถี่
+        // ของการลอง ส่วน ssoRenewedRef เลื่อนเฉพาะตอนสำเร็จ (ดูใน renew) เพราะครั้งที่ล้มเหลว
+        // ต้องได้ลองใหม่ตอนที่ยังมีเวลาเหลือ ไม่ใช่เสียทั้งช่วงไปเพราะเน็ตกระตุกทีเดียว
+        if (ssoDue) ssoTriedRef.current = now;
+        void renew();
+      }
     }, 1000);
 
     return () => {

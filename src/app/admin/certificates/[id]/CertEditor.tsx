@@ -51,6 +51,46 @@ const MARGIN = 8;
 /** ขนาดตัวอักษรที่ลากมุมได้ (% ของความกว้างหน้า) — ล่างสุดยังพออ่านออก บนสุดคือเต็มหน้ากระดาษพอดี */
 const MIN_FONT = 0.5;
 const MAX_FONT = 20;
+/**
+ * หน่วงก่อนบันทึกอัตโนมัติ — นานพอให้การลากหนึ่งครั้ง/พิมพ์ชื่อหนึ่งคำนับเป็นการแก้ครั้งเดียว
+ * สั้นพอที่กดเปลี่ยนไปแบบอื่นแล้วแทบไม่ต้องรอ
+ */
+const AUTOSAVE_MS = 1200;
+
+/** บอกว่าตอนนี้ของบนจอลงฐานข้อมูลแล้วหรือยัง — แทนปุ่ม "บันทึก" ที่ครูต้องคอยกดเอง */
+function SaveBadge({
+  state,
+  dirty,
+  savedAt,
+  onRetry,
+}: {
+  state: "clean" | "saving" | "error";
+  dirty: boolean;
+  savedAt: number | null;
+  onRetry: () => void;
+}) {
+  if (state === "error")
+    return (
+      <span className="cert-save" data-state="error">
+        <Icon name="warning" size={14} /> บันทึกไม่สำเร็จ
+        <button className="btn btn-sm" onClick={onRetry}>
+          ลองใหม่
+        </button>
+      </span>
+    );
+  if (state === "saving" || dirty)
+    return (
+      <span className="cert-save" data-state="saving">
+        <Icon name="clock" size={14} /> กำลังบันทึก…
+      </span>
+    );
+  return (
+    <span className="cert-save" data-state="clean">
+      บันทึกอัตโนมัติแล้ว
+      {savedAt != null && ` ${new Date(savedAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.`}
+    </span>
+  );
+}
 
 type SigEdit = {
   name: string;
@@ -686,49 +726,127 @@ export function CertEditor(props: {
     setSel(null);
   }
 
-  // ===== บันทึก =====
-
-  /** บันทึกจริง — คืน true เมื่อสำเร็จ (ตอนสำเร็จไม่เด้ง modal เอง ให้ผู้เรียกตัดสินใจ) */
-  async function persist(): Promise<boolean> {
-    setBusy(true);
-    const res = await api.put<{ templateId: number }>(
-      `/api/admin/certificate-events/${eventId}/template`,
-      {
-        templateId: props.templateId ?? undefined,
-        name: tplName.trim(),
-        competitionIds: boundComps,
-        medalFilter: "",
-        backgroundAssetId: backgroundId,
-        orientation,
-        layout,
-        signatures,
-      }
-    );
-    setBusy(false);
-    if (!res.ok) {
-      await alert(res.error, { title: "บันทึกไม่สำเร็จ", danger: true });
-      return false;
-    }
-    savedId.current = res.data.templateId;
-    return true;
-  }
-
-  // ===== แบบเกียรติบัตรของงาน (หลายแบบต่อหนึ่งงาน) =====
+  // ===== บันทึกอัตโนมัติ =====
 
   /** id ของแบบที่เพิ่งบันทึก — งานเก่าที่ยังไม่มีแม่แบบจะได้ id ตอนบันทึกครั้งแรกเท่านั้น */
   const savedId = useRef<number | null>(props.templateId);
+
+  /** สิ่งที่จะส่งไปบันทึก — เก็บแยกจาก json ที่ใช้เทียบ เพราะลำดับรายการที่ติ๊กไม่ถือว่าเป็นการแก้ */
+  const payload = useMemo(
+    () => ({
+      name: tplName.trim(),
+      competitionIds: boundComps,
+      medalFilter: "",
+      backgroundAssetId: backgroundId,
+      orientation,
+      layout,
+      signatures,
+    }),
+    [tplName, boundComps, backgroundId, orientation, layout, signatures]
+  );
+  const payloadJson = useMemo(
+    () => JSON.stringify({ ...payload, competitionIds: [...boundComps].sort((a, b) => a - b) }),
+    [payload, boundComps]
+  );
+
+  /** json ของสิ่งที่อยู่ในฐานข้อมูลตอนนี้ — ต่างจากบนจอเมื่อไหร่ = ยังไม่ได้บันทึก */
+  const savedJson = useRef<string | null>(null);
+  if (savedJson.current === null) savedJson.current = payloadJson; // ของที่โหลดมาถือว่าบันทึกแล้ว
+  const dirty = payloadJson !== savedJson.current;
+  const [saveState, setSaveState] = useState<"clean" | "saving" | "error">("clean");
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  /** รอบที่กำลังคุยกับเซิร์ฟเวอร์อยู่ — ห้ามยิงซ้อน ไม่งั้นสองรอบเขียนทับกันเองโดยไม่รู้ลำดับ */
+  const inflight = useRef<Promise<boolean> | null>(null);
+
+  /** ยิงจริงหนึ่งรอบ */
+  async function putTemplate(silent: boolean): Promise<boolean> {
+    const json = payloadJson;
+    if (!silent) setBusy(true);
+    setSaveState("saving");
+    const res = await api.put<{ templateId: number }>(
+      `/api/admin/certificate-events/${eventId}/template`,
+      { templateId: savedId.current ?? undefined, ...payload }
+    );
+    if (!silent) setBusy(false);
+    if (!res.ok) {
+      setSaveState("error");
+      if (!silent) await alert(res.error, { title: "บันทึกไม่สำเร็จ", danger: true });
+      return false;
+    }
+    savedId.current = res.data.templateId;
+    savedJson.current = json;
+    setSaveState("clean");
+    setSavedAt(Date.now());
+    return true;
+  }
+
+  /**
+   * บันทึก — คืน true เมื่อของบนจอลงฐานข้อมูลแล้ว (silent = บันทึกอัตโนมัติ ไม่เด้ง modal และไม่ล็อกปุ่มทั้งหน้า)
+   * ถ้ามีรอบค้างอยู่ให้รอรอบนั้นจบก่อน แล้วค่อยดูว่ายังมีอะไรใหม่ต้องส่งอีกไหม
+   */
+  async function persist(silent: boolean): Promise<boolean> {
+    const queued = inflight.current;
+    if (queued) {
+      const prev = await queued;
+      if (payloadJson === savedJson.current) return prev;
+    }
+    const p = putTemplate(silent);
+    inflight.current = p;
+    try {
+      return await p;
+    } finally {
+      if (inflight.current === p) inflight.current = null;
+    }
+  }
+
+  /**
+   * บันทึกเดี๋ยวนี้ ไม่รอครบเวลาหน่วง — ใช้ก่อนทุกอย่างที่ไปอ่าน "แบบที่บันทึกไว้" ต่อ
+   * (ลอกไปเป็นแบบใหม่ / เก็บเข้าคลัง / ทดลองพิมพ์ / สลับไปแก้อีกแบบ)
+   * คืน true เมื่อของบนจอกับในฐานข้อมูลตรงกันแล้ว
+   */
+  async function saveNow(silent = false): Promise<boolean> {
+    if (locked) return true; // ล็อกอยู่ = แก้ไม่ได้ ไม่มีอะไรต้องบันทึก
+    if (!dirty && savedId.current != null) return true;
+    return persist(silent);
+  }
+
+  /**
+   * หน่วงสั้น ๆ แล้วบันทึกให้เอง — ครูลากข้อความทีละนิด ไม่ควรยิงทุกพิกเซล
+   * effect ผูกกับ payloadJson: ทุกครั้งที่มีการแก้ ตัวจับเวลารอบเก่าถูกยกเลิกแล้วเริ่มนับใหม่
+   * และผูกกับ saveState ด้วย เพื่อให้การแก้ที่เกิดระหว่างรอเซิร์ฟเวอร์ได้บันทึกในรอบถัดไป
+   */
+  useEffect(() => {
+    if (locked || payloadJson === savedJson.current) return;
+    const t = setTimeout(() => void persist(true), AUTOSAVE_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payloadJson, locked, saveState]);
+
+  /** ปิดแท็บตอนที่ยังบันทึกไม่เสร็จ = งานหาย — เตือนไว้ (เบราว์เซอร์ใช้ข้อความของตัวเอง) */
+  useEffect(() => {
+    if (!dirty && saveState !== "saving") return;
+    const onLeave = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", onLeave);
+    return () => window.removeEventListener("beforeunload", onLeave);
+  }, [dirty, saveState]);
+
+  // ===== แบบเกียรติบัตรของงาน (หลายแบบต่อหนึ่งงาน) =====
   const [newTplName, setNewTplName] = useState("");
   const [newTplFrom, setNewTplFrom] = useState<string>("copy"); // "copy" | "blank" | "preset:<id>"
 
-  /** ไปแก้แบบอื่น — เตือนก่อน เพราะที่ค้างอยู่บนจอยังไม่ได้บันทึก */
+  /** ไปแก้แบบอื่น — เก็บของบนจอลงฐานข้อมูลให้เสร็จก่อนย้าย กดสลับไปมาได้โดยไม่ต้องกดบันทึก */
   async function switchTemplate(id: number) {
     if (id === props.templateId) return;
-    const ok = await confirm({
-      title: "เปลี่ยนไปแก้อีกแบบ",
-      message: "สิ่งที่แก้ไว้แต่ยังไม่ได้กด “บันทึกแม่แบบ” จะหายไป ยืนยันเปลี่ยน?",
-      confirmText: "เปลี่ยน",
-    });
-    if (!ok) return;
+    setBusy(true);
+    const ok = await saveNow(true);
+    setBusy(false);
+    if (!ok) {
+      await alert("บันทึกแบบที่กำลังแก้อยู่ไม่สำเร็จ จึงยังเปลี่ยนไปแบบอื่นไม่ได้ (ลองใหม่อีกครั้ง)", {
+        title: "เปลี่ยนแบบไม่ได้",
+        danger: true,
+      });
+      return;
+    }
     router.push(`/admin/certificates/${eventId}?tpl=${id}`);
   }
 
@@ -739,7 +857,7 @@ export function CertEditor(props: {
       await alert("ตั้งชื่อแบบก่อน เช่น “ใบอบรม” หรือ “ใบรายการแข่งขัน”", { danger: true });
       return;
     }
-    if (newTplFrom === "copy" && !(await persist())) return; // ลอกจากที่บันทึกไว้ ไม่ใช่ที่ค้างบนจอ
+    if (newTplFrom === "copy" && !(await saveNow())) return; // ลอกจากของที่บันทึกแล้ว จึงต้องให้บันทึกเสร็จก่อน
 
     setBusy(true);
     const preset = newTplFrom.startsWith("preset:") ? Number(newTplFrom.slice(7)) : undefined;
@@ -809,7 +927,7 @@ export function CertEditor(props: {
       await alert("ตั้งชื่อแม่แบบก่อน เช่น “ใบมาตรฐานโรงเรียน”", { danger: true });
       return;
     }
-    if (!locked && !(await persist())) return;
+    if (!(await saveNow())) return;
     if (savedId.current == null) {
       await alert("บันทึกแม่แบบก่อนจึงจะเก็บเข้าคลังได้", { danger: true });
       return;
@@ -890,12 +1008,11 @@ export function CertEditor(props: {
   // พื้นหลังไม่ใช่เงื่อนไขของการบันทึก — วางข้อความค้างไว้ก่อนแล้วค่อยหาไฟล์พื้นหลังทีหลังได้
   // (ที่ยังบังคับว่าต้องมีพื้นหลังคือตอน "เผยแพร่" ซึ่งเป็นจุดที่ครูเริ่มออกใบจริง)
   async function saveTemplate() {
-    if (!(await persist())) return;
-    await alert(
+    if (!(await saveNow())) return;
+    toast(
       backgroundId
-        ? "บันทึกแม่แบบเรียบร้อยแล้ว"
-        : "บันทึกแม่แบบเรียบร้อยแล้ว (ยังไม่ได้ใส่พื้นหลัง — ค่อยใส่ทีหลังได้ แต่ต้องมีก่อนกดเผยแพร่)",
-      { title: "บันทึกแล้ว" }
+        ? "บันทึกแม่แบบแล้ว"
+        : "บันทึกแม่แบบแล้ว (ยังไม่ได้ใส่พื้นหลัง — ต้องใส่ก่อนกดเผยแพร่)"
     );
   }
 
@@ -906,7 +1023,7 @@ export function CertEditor(props: {
    */
   async function testPrint() {
     const w = window.open("", "_blank");
-    if (!locked && !(await persist())) {
+    if (!(await saveNow())) {
       w?.close();
       return;
     }
@@ -1143,7 +1260,8 @@ export function CertEditor(props: {
                   </select>
                 </label>
                 <div className="subtitle">
-                  “ลอกแบบที่กำลังแก้อยู่” จะ<strong>บันทึกแบบปัจจุบันให้ก่อน</strong>แล้วค่อยคัดลอก
+                  “ลอกแบบที่กำลังแก้อยู่” จะ<strong>บันทึกแบบปัจจุบันให้ก่อน</strong>แล้วค่อยคัดลอก ·
+                  แบบที่กำลังแก้บันทึกให้อัตโนมัติอยู่แล้ว กดสลับไปมาได้เลย
                 </div>
                 <button className="btn btn-sm btn-primary" onClick={createTemplate} disabled={busy || locked}>
                   <Icon name="plus" size={16} /> สร้างแบบใหม่
@@ -1226,7 +1344,7 @@ export function CertEditor(props: {
               </label>
               <div className="subtitle">
                 ระบบย่อรูปเป็น WebP กว้างสูงสุด 1754px ให้อัตโนมัติก่อนอัปโหลด · รูปสัดส่วนไหนก็เต็มหน้าเสมอ ไม่ยืดบิดเบี้ยว
-                {!backgroundId && " · ยังไม่มีพื้นหลัง — บันทึกงานค้างไว้ก่อนได้ แต่ต้องใส่ก่อนเผยแพร่"}
+                {!backgroundId && " · ยังไม่มีพื้นหลัง — ค้างไว้ก่อนได้ แต่ต้องใส่ก่อนกดเผยแพร่"}
               </div>
               {crop && (
                 <div className="subtitle" style={{ color: "var(--color-warning)" }}>
@@ -1565,11 +1683,11 @@ export function CertEditor(props: {
             </div>
           </details>
 
-          {/* บันทึก + ทดลองพิมพ์ + เผยแพร่ */}
+          {/* สถานะการบันทึก + ทดลองพิมพ์ + เผยแพร่ */}
           <div className="card stack">
-            <button className="btn btn-primary" onClick={saveTemplate} disabled={busy || locked}>
-              <Icon name="pencil" size={16} /> บันทึกแม่แบบ
-            </button>
+            {!locked && (
+              <SaveBadge state={saveState} dirty={dirty} savedAt={savedAt} onRetry={saveTemplate} />
+            )}
             <button className="btn" onClick={testPrint} disabled={busy}>
               <Icon name="printer" size={16} /> ทดลองพิมพ์ 1 ใบ
             </button>
@@ -1675,9 +1793,9 @@ export function CertEditor(props: {
             <button className="btn btn-sm" onClick={autoArrange} disabled={locked}>
               <Icon name="dashboard" size={16} /> จัดอัตโนมัติ
             </button>
-            <button className="btn btn-sm btn-primary" onClick={saveTemplate} disabled={busy || locked}>
-              <Icon name="pencil" size={16} /> บันทึก
-            </button>
+            {!locked && (
+              <SaveBadge state={saveState} dirty={dirty} savedAt={savedAt} onRetry={saveTemplate} />
+            )}
             <button className="btn btn-sm" onClick={testPrint} disabled={busy}>
               <Icon name="printer" size={16} /> ทดลองพิมพ์
             </button>

@@ -4054,6 +4054,22 @@ p {
   padding: 0 6px;
   font-size: var(--text-sm);
 }
+/* แถบสถานะ "บันทึกอัตโนมัติ" — แทนปุ่มบันทึกในหน้าออกแบบเกียรติบัตร */
+.cert-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  color: var(--skdw-muted);
+}
+.cert-save[data-state="saving"] {
+  color: var(--color-warning);
+}
+.cert-save[data-state="error"] {
+  color: var(--color-error);
+  font-weight: 600;
+}
+
 .cert-tool-name {
   color: var(--skdw-purple);
   margin-inline-end: var(--space-2);

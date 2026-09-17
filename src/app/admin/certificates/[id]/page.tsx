@@ -65,7 +65,10 @@ export default async function CertEventEditorPage({
   });
 
   return (
+    // key = แบบที่กำลังแก้ — สลับแบบแล้วต้องเริ่มสถานะใหม่ทั้งชุด
+    // ไม่งั้น React ใช้ instance เดิม ดีไซน์ของแบบเก่าจะค้างอยู่บนจอแล้วถูกบันทึกอัตโนมัติทับแบบใหม่
     <CertEditor
+      key={current?.id ?? "new"}
       event={{ id: ev.id, name: ev.name, eventDate: ev.eventDate, status: ev.status, kind: ev.kind }}
       yearBe={year.yearBe}
       templates={templates.map((t) => ({

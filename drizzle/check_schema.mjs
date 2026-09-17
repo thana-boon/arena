@@ -37,6 +37,7 @@ const CHECKS = [
   { id: "0015", what: "การเปลี่ยนตัวผู้เข้าแข่งขัน", how: async () => (await table("entry_substitutions")) && (await column("events", "sub_open_team")) && (await column("entry_members", "substituted")), fix: "node drizzle/apply_0015.mjs" },
   { id: "0016", what: "เช็คชื่อผู้เข้าร่วม (รายการไม่มีการแข่งขัน)", how: () => column("competitions", "attendance_checked_at"), fix: "node drizzle/apply_0016.mjs" },
   { id: "0017", what: "หมวดร่วมของรายการแข่งขัน", how: () => table("competition_subject_groups"), fix: "node drizzle/apply_0017.mjs" },
+  { id: "0018", what: "แบบเกียรติบัตรหลายแบบต่องาน + คลังแม่แบบ/ลายเซ็น", how: async () => (await column("certificate_templates", "is_default")) && (await table("certificate_template_competitions")) && (await table("certificate_presets")) && (await table("certificate_signature_presets")), fix: "node drizzle/apply_0018.mjs" },
 ];
 
 try {

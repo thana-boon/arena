@@ -123,13 +123,37 @@ function bgCrop(size: { w: number; h: number } | null, orientation: Orientation)
 const sameTarget = (a: Target | null, b: Target) =>
   a != null && (a.kind === "block" && b.kind === "block" ? a.id === b.id : a.kind === "sig" && b.kind === "sig" ? a.i === b.i : false);
 
+/** "แบบ" หนึ่งของงาน เท่าที่แถบเลือกแบบต้องรู้ */
+export type TemplateTab = { id: number; name: string; isDefault: boolean; competitionIds: number[] };
+
+/** ลายเซ็นที่บันทึกไว้ในคลัง (ผอ./รองฯ) — ไม่มีพิกัด ตำแหน่งขึ้นกับใบแต่ละแบบ */
+export type SigPresetOption = {
+  id: number;
+  name: string;
+  roleLabel: string;
+  mode: "image" | "blank";
+  assetId: number | null;
+  color: string;
+  fontSize: number;
+  imageScale: number;
+};
+
 export function CertEditor(props: {
   event: { id: number; name: string; eventDate: string | null; status: string; kind: string };
   yearBe: number;
+  /** ทุกแบบในงานนี้ (แถบเลือกด้านบน) */
+  templates: TemplateTab[];
+  /** แบบที่กำลังแก้อยู่ (null = งานเก่าที่ยังไม่มีแม่แบบเลย — บันทึกครั้งแรกจะสร้างให้) */
+  templateId: number | null;
+  initialName: string;
+  initialIsDefault: boolean;
+  initialCompetitionIds: number[];
   initialLayout: CertLayout;
   initialOrientation: Orientation;
   initialBackgroundId: number | null;
   initialSignatures: SigEdit[];
+  sigPresets: SigPresetOption[];
+  certPresets: { id: number; name: string; isDefault: boolean }[];
   competitions: SampleCompetition[];
   initialVariant: SampleVariant;
   sample: CertRenderData;
@@ -143,6 +167,13 @@ export function CertEditor(props: {
   const locked = props.event.status === "locked";
 
   const [status, setStatus] = useState(props.event.status);
+  /**
+   * แบบที่กำลังแก้ — ชื่อและ "รายการที่ใช้แบบนี้" บันทึกไปพร้อมดีไซน์ในครั้งเดียว
+   * การสลับไปแก้แบบอื่นโหลดหน้าใหม่ (?tpl=) ไม่ได้เก็บดีไซน์ของทุกแบบไว้ในหน่วยความจำพร้อมกัน
+   * — ใบหนึ่งมีทั้ง layout/ผู้ลงนาม/รูป การถือไว้หลายชุดแล้วบันทึกทีเดียวคือทางลัดสู่การเขียนทับกันเอง
+   */
+  const [tplName, setTplName] = useState(props.initialName);
+  const [boundComps, setBoundComps] = useState<number[]>(props.initialCompetitionIds);
   const [orientation, setOrientation] = useState<Orientation>(props.initialOrientation);
   const [backgroundId, setBackgroundId] = useState<number | null>(props.initialBackgroundId);
   const [layout, setLayout] = useState<CertLayout>(props.initialLayout);
@@ -660,19 +691,200 @@ export function CertEditor(props: {
   /** บันทึกจริง — คืน true เมื่อสำเร็จ (ตอนสำเร็จไม่เด้ง modal เอง ให้ผู้เรียกตัดสินใจ) */
   async function persist(): Promise<boolean> {
     setBusy(true);
-    const res = await api.put(`/api/admin/certificate-events/${eventId}/template`, {
-      medalFilter: "",
-      backgroundAssetId: backgroundId,
-      orientation,
-      layout,
-      signatures,
-    });
+    const res = await api.put<{ templateId: number }>(
+      `/api/admin/certificate-events/${eventId}/template`,
+      {
+        templateId: props.templateId ?? undefined,
+        name: tplName.trim(),
+        competitionIds: boundComps,
+        medalFilter: "",
+        backgroundAssetId: backgroundId,
+        orientation,
+        layout,
+        signatures,
+      }
+    );
     setBusy(false);
     if (!res.ok) {
       await alert(res.error, { title: "บันทึกไม่สำเร็จ", danger: true });
       return false;
     }
+    savedId.current = res.data.templateId;
     return true;
+  }
+
+  // ===== แบบเกียรติบัตรของงาน (หลายแบบต่อหนึ่งงาน) =====
+
+  /** id ของแบบที่เพิ่งบันทึก — งานเก่าที่ยังไม่มีแม่แบบจะได้ id ตอนบันทึกครั้งแรกเท่านั้น */
+  const savedId = useRef<number | null>(props.templateId);
+  const [newTplName, setNewTplName] = useState("");
+  const [newTplFrom, setNewTplFrom] = useState<string>("copy"); // "copy" | "blank" | "preset:<id>"
+
+  /** ไปแก้แบบอื่น — เตือนก่อน เพราะที่ค้างอยู่บนจอยังไม่ได้บันทึก */
+  async function switchTemplate(id: number) {
+    if (id === props.templateId) return;
+    const ok = await confirm({
+      title: "เปลี่ยนไปแก้อีกแบบ",
+      message: "สิ่งที่แก้ไว้แต่ยังไม่ได้กด “บันทึกแม่แบบ” จะหายไป ยืนยันเปลี่ยน?",
+      confirmText: "เปลี่ยน",
+    });
+    if (!ok) return;
+    router.push(`/admin/certificates/${eventId}?tpl=${id}`);
+  }
+
+  /** สร้างแบบใหม่ในงานนี้ — ลอกจากแบบที่กำลังดู / จากคลังแม่แบบ / เริ่มใหม่ */
+  async function createTemplate() {
+    const name = newTplName.trim();
+    if (!name) {
+      await alert("ตั้งชื่อแบบก่อน เช่น “ใบอบรม” หรือ “ใบรายการแข่งขัน”", { danger: true });
+      return;
+    }
+    if (newTplFrom === "copy" && !(await persist())) return; // ลอกจากที่บันทึกไว้ ไม่ใช่ที่ค้างบนจอ
+
+    setBusy(true);
+    const preset = newTplFrom.startsWith("preset:") ? Number(newTplFrom.slice(7)) : undefined;
+    const res = await api.post<{ templateId: number }>(
+      `/api/admin/certificate-events/${eventId}/template`,
+      {
+        name,
+        copyFromTemplateId: newTplFrom === "copy" ? savedId.current ?? undefined : undefined,
+        presetId: preset,
+      }
+    );
+    setBusy(false);
+    if (!res.ok) {
+      await alert(res.error, { title: "สร้างแบบไม่สำเร็จ", danger: true });
+      return;
+    }
+    setNewTplName("");
+    router.push(`/admin/certificates/${eventId}?tpl=${res.data.templateId}`);
+  }
+
+  async function deleteTemplate() {
+    if (props.templateId == null) return;
+    const ok = await confirm({
+      title: "ลบแบบนี้",
+      message: `ลบแบบ “${tplName || "ไม่มีชื่อ"}” ออกจากงาน — รายการที่ผูกไว้จะกลับไปใช้แบบหลัก ยืนยัน?`,
+      confirmText: "ลบ",
+      danger: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    const res = await api.del(
+      `/api/admin/certificate-events/${eventId}/template?templateId=${props.templateId}`
+    );
+    setBusy(false);
+    if (!res.ok) {
+      await alert(res.error, { title: "ลบไม่สำเร็จ", danger: true });
+      return;
+    }
+    router.push(`/admin/certificates/${eventId}`);
+  }
+
+  /** ตั้งแบบนี้เป็นแบบหลัก — รายการที่ไม่ได้ผูกกับแบบไหนเลยจะใช้ตัวนี้ */
+  async function makeMain() {
+    if (props.templateId == null) return;
+    setBusy(true);
+    const res = await api.patch(`/api/admin/certificate-events/${eventId}/template`, {
+      templateId: props.templateId,
+    });
+    setBusy(false);
+    if (!res.ok) {
+      await alert(res.error, { title: "ทำรายการไม่สำเร็จ", danger: true });
+      return;
+    }
+    toast("ตั้งเป็นแบบหลักของงานแล้ว");
+    router.refresh();
+  }
+
+  const toggleBound = (id: number) =>
+    setBoundComps((L) => (L.includes(id) ? L.filter((x) => x !== id) : [...L, id]));
+
+  /** เก็บดีไซน์นี้เข้าคลัง เพื่อให้งานหน้าเริ่มจากของที่จัดไว้แล้ว (บันทึกก่อน แล้วค่อยลอกจากที่บันทึก) */
+  const [presetName, setPresetName] = useState("");
+  const [presetDefault, setPresetDefault] = useState(true);
+  async function saveAsPreset() {
+    const name = presetName.trim();
+    if (!name) {
+      await alert("ตั้งชื่อแม่แบบก่อน เช่น “ใบมาตรฐานโรงเรียน”", { danger: true });
+      return;
+    }
+    if (!locked && !(await persist())) return;
+    if (savedId.current == null) {
+      await alert("บันทึกแม่แบบก่อนจึงจะเก็บเข้าคลังได้", { danger: true });
+      return;
+    }
+    setBusy(true);
+    const res = await api.post("/api/admin/cert-presets", {
+      name,
+      fromTemplateId: savedId.current,
+      isDefault: presetDefault,
+    });
+    setBusy(false);
+    if (!res.ok) {
+      await alert(res.error, { title: "บันทึกไม่สำเร็จ", danger: true });
+      return;
+    }
+    setPresetName("");
+    await alert(
+      presetDefault
+        ? "เก็บเข้าคลังแล้ว และตั้งเป็นแม่แบบเริ่มต้น — งานที่สร้างใหม่จะเริ่มจากแบบนี้"
+        : "เก็บเข้าคลังแล้ว — เลือกใช้ได้ตอนสร้างแบบใหม่",
+      { title: "เรียบร้อย" }
+    );
+    router.refresh();
+  }
+
+  // ===== ลายเซ็นที่บันทึกไว้ =====
+
+  /** หยิบคนที่บันทึกไว้มาวางเป็นผู้ลงนามคนใหม่ (ตำแหน่งบนกระดาษใช้จุดตั้งต้นเดียวกับการเพิ่มคนใหม่) */
+  function addSigFromPreset(presetId: number) {
+    const p = props.sigPresets.find((x) => x.id === presetId);
+    if (!p) return;
+    const n = signatures.length;
+    setSignatures((S) => [
+      ...S,
+      {
+        name: p.name,
+        roleLabel: p.roleLabel,
+        mode: p.mode,
+        assetId: p.assetId,
+        x: Math.min(85, 20 + 15 * n),
+        y: round(maxY * 0.72),
+        width: 16,
+        color: p.color,
+        fontSize: p.fontSize,
+        imageScale: p.imageScale,
+      },
+    ]);
+    setSel({ kind: "sig", i: n });
+  }
+
+  /** เก็บผู้ลงนามคนนี้เข้าคลัง — ครั้งหน้าไม่ต้องอัปโหลดรูปและปรับสีใหม่ */
+  async function saveSigPreset(i: number) {
+    const s0 = signatures[i];
+    if (!s0) return;
+    if (!s0.name.trim()) {
+      await alert("ใส่ชื่อผู้ลงนามก่อน จึงจะบันทึกไว้ใช้ซ้ำได้", { danger: true });
+      return;
+    }
+    setBusy(true);
+    const res = await api.post("/api/admin/signature-presets", {
+      name: s0.name.trim(),
+      roleLabel: s0.roleLabel.trim(),
+      mode: s0.mode,
+      assetId: s0.assetId,
+      color: s0.color,
+      fontSize: s0.fontSize,
+      imageScale: s0.imageScale,
+    });
+    setBusy(false);
+    if (!res.ok) {
+      await alert(res.error, { title: "บันทึกไม่สำเร็จ", danger: true });
+      return;
+    }
+    toast(`บันทึก “${s0.name}” ไว้ใช้กับงานอื่นแล้ว`);
+    router.refresh();
   }
 
   // พื้นหลังไม่ใช่เงื่อนไขของการบันทึก — วางข้อความค้างไว้ก่อนแล้วค่อยหาไฟล์พื้นหลังทีหลังได้
@@ -704,6 +916,8 @@ export function CertEditor(props: {
       rank: String(variant.rank),
       team: variant.showTeam ? "1" : "0",
     });
+    // ทดลองพิมพ์ "แบบที่กำลังแก้อยู่" ไม่ใช่แบบหลักของงานเสมอไป (งานหนึ่งมีได้หลายแบบ)
+    if (savedId.current != null) q.set("tpl", String(savedId.current));
     if (variant.competitionId != null) q.set("comp", String(variant.competitionId));
     const url = `${BASE}/certificates/print/sample?${q.toString()}`;
     if (w) w.location.href = url;
@@ -858,33 +1072,136 @@ export function CertEditor(props: {
       <div className="cert-editor-grid">
         {/* ซ้าย: แผงตั้งค่า */}
         <div className="stack">
-          {/* รายการแข่งขันในงานนี้ (อ่านอย่างเดียว — จัดการที่หน้าสร้าง/แก้รายการ) */}
-          <details className="card">
-            <summary>
-              <strong>1. รายการในงานนี้</strong> ({props.competitions.length})
-            </summary>
-            <div className="stack" style={{ marginTop: 12 }}>
-              <div className="subtitle">
-                กำหนดว่ารายการอยู่งานไหน ได้ที่หน้าสร้าง/แก้รายการแข่งขัน · กดชื่อรายการเพื่อดูใบตัวอย่างของรายการนั้น
-              </div>
-              <div style={{ maxHeight: 220, overflowY: "auto" }}>
-                {props.competitions.length === 0 && <div className="subtitle">ยังไม่มีรายการในงานนี้</div>}
-                {props.competitions.map((c) => (
+          {/* แบบเกียรติบัตรของงานนี้ — งานเดียวกันมีได้หลายแบบ (ใบอบรม / ใบรายการแข่งขัน ฯลฯ) */}
+          <div className="card stack">
+            <strong>แบบเกียรติบัตรของงานนี้</strong>
+            {props.templates.length > 1 && (
+              <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+                {props.templates.map((t) => (
                   <button
-                    key={c.id}
-                    className={`btn btn-sm${variant.competitionId === c.id ? " btn-primary" : ""}`}
-                    style={{ width: "100%", justifyContent: "flex-start", gap: 8 }}
-                    onClick={() => pickComp(c.id)}
-                    title="ดูใบตัวอย่างของรายการนี้"
+                    key={t.id}
+                    className={`btn btn-sm${t.id === props.templateId ? " btn-primary" : ""}`}
+                    onClick={() => switchTemplate(t.id)}
+                    disabled={busy}
                   >
-                    <span>{c.name}</span>
-                    {c.noContest && <span className="badge">ไม่มีการแข่งขัน</span>}
-                    {!c.isPublished && !c.noContest && (
-                      <span className="badge" style={{ marginInlineStart: "auto" }}>ยังไม่ประกาศผล</span>
+                    {t.name || "แบบหลัก"}
+                    {t.isDefault && <span className="badge">หลัก</span>}
+                    {t.competitionIds.length > 0 && (
+                      <span className="badge">{t.competitionIds.length} รายการ</span>
                     )}
                   </button>
                 ))}
               </div>
+            )}
+            <label className="field">
+              <span>ชื่อแบบที่กำลังแก้</span>
+              <input
+                value={tplName}
+                onChange={(e) => setTplName(e.target.value)}
+                placeholder="เช่น ใบรายการแข่งขัน"
+                disabled={locked}
+              />
+            </label>
+            <div className="subtitle">
+              รายการที่ไม่ได้เลือกให้ใช้แบบไหนเลย จะใช้ <strong>แบบหลัก</strong> ของงาน ·
+              {props.initialIsDefault ? " แบบนี้คือแบบหลักอยู่แล้ว" : " แบบนี้ยังไม่ใช่แบบหลัก"}
+            </div>
+            {!props.initialIsDefault && props.templateId != null && (
+              <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+                <button className="btn btn-sm" onClick={makeMain} disabled={busy || locked}>
+                  ตั้งเป็นแบบหลัก
+                </button>
+                <button className="btn btn-sm btn-danger" onClick={deleteTemplate} disabled={busy || locked}>
+                  ลบแบบนี้
+                </button>
+              </div>
+            )}
+
+            <details>
+              <summary>+ สร้างแบบใหม่ในงานนี้</summary>
+              <div className="stack" style={{ marginTop: 8, gap: 8 }}>
+                <label className="field">
+                  <span>ชื่อแบบใหม่</span>
+                  <input
+                    value={newTplName}
+                    onChange={(e) => setNewTplName(e.target.value)}
+                    placeholder="เช่น ใบอบรม (ไม่มีเหรียญ/อันดับ)"
+                    disabled={locked}
+                  />
+                </label>
+                <label className="field">
+                  <span>เริ่มจาก</span>
+                  <select value={newTplFrom} onChange={(e) => setNewTplFrom(e.target.value)} disabled={locked}>
+                    <option value="copy">ลอกแบบที่กำลังแก้อยู่ (แล้วแก้นิดหน่อย)</option>
+                    <option value="blank">เริ่มใหม่จากแม่แบบเริ่มต้นของระบบ</option>
+                    {props.certPresets.map((p) => (
+                      <option key={p.id} value={`preset:${p.id}`}>
+                        คลังแม่แบบ: {p.name}
+                        {p.isDefault ? " (ค่าเริ่มต้น)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="subtitle">
+                  “ลอกแบบที่กำลังแก้อยู่” จะ<strong>บันทึกแบบปัจจุบันให้ก่อน</strong>แล้วค่อยคัดลอก
+                </div>
+                <button className="btn btn-sm btn-primary" onClick={createTemplate} disabled={busy || locked}>
+                  <Icon name="plus" size={16} /> สร้างแบบใหม่
+                </button>
+              </div>
+            </details>
+          </div>
+
+          {/* รายการในงานนี้ + เลือกว่ารายการไหนใช้แบบนี้ */}
+          <details className="card" open>
+            <summary>
+              <strong>1. รายการที่ใช้แบบนี้</strong> ({boundComps.length}/{props.competitions.length})
+            </summary>
+            <div className="stack" style={{ marginTop: 12 }}>
+              <div className="subtitle">
+                ติ๊กรายการที่จะใช้ใบแบบนี้ (เช่นติ๊กเฉพาะรายการอบรมไว้กับใบที่ไม่มีเหรียญ/อันดับ) ·
+                ไม่ติ๊กไว้ = ใช้แบบหลักของงาน · รายการหนึ่งใช้ได้แบบเดียว — ติ๊กที่นี่จะย้ายมาจากแบบอื่นให้เอง ·
+                กดที่<strong>ชื่อรายการ</strong>เพื่อดูใบตัวอย่างของรายการนั้น
+              </div>
+              <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setBoundComps(props.competitions.map((c) => c.id))}
+                  disabled={locked}
+                >
+                  เลือกทั้งหมด
+                </button>
+                <button className="btn btn-sm" onClick={() => setBoundComps([])} disabled={locked}>
+                  ล้างการเลือก
+                </button>
+              </div>
+              <div className="stack" style={{ maxHeight: 260, overflowY: "auto", gap: 2 }}>
+                {props.competitions.length === 0 && <div className="subtitle">ยังไม่มีรายการในงานนี้</div>}
+                {props.competitions.map((c) => (
+                  <div key={c.id} className="row" style={{ gap: 8, alignItems: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={boundComps.includes(c.id)}
+                      onChange={() => toggleBound(c.id)}
+                      disabled={locked}
+                      title="ใช้แบบนี้กับรายการนี้"
+                    />
+                    <button
+                      className={`btn btn-sm${variant.competitionId === c.id ? " btn-primary" : ""}`}
+                      style={{ flex: 1, justifyContent: "flex-start", gap: 8 }}
+                      onClick={() => pickComp(c.id)}
+                      title="ดูใบตัวอย่างของรายการนี้"
+                    >
+                      <span>{c.name}</span>
+                      {c.noContest && <span className="badge">ไม่มีการแข่งขัน</span>}
+                      {!c.isPublished && !c.noContest && (
+                        <span className="badge" style={{ marginInlineStart: "auto" }}>ยังไม่ประกาศผล</span>
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="subtitle">กำหนดว่ารายการอยู่ “งาน” ไหน ได้ที่หน้าสร้าง/แก้รายการแข่งขัน</div>
             </div>
           </details>
 
@@ -1107,11 +1424,21 @@ export function CertEditor(props: {
                   style={{ gap: 8, background: "var(--surface-2, #f8fafc)" }}
                   onClick={() => setSel({ kind: "sig", i })}
                 >
-                  <div className="row" style={{ justifyContent: "space-between" }}>
+                  <div className="row" style={{ justifyContent: "space-between", gap: 6 }}>
                     <strong>ผู้ลงนามคนที่ {i + 1}</strong>
-                    <button className="btn btn-sm btn-danger" onClick={() => removeSig(i)} disabled={locked}>
-                      ลบ
-                    </button>
+                    <div className="row" style={{ gap: 6 }}>
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => saveSigPreset(i)}
+                        disabled={busy}
+                        title="เก็บชื่อ/ตำแหน่ง/รูปลายเซ็นไว้ หยิบมาใช้กับงานอื่นได้เลย"
+                      >
+                        บันทึกไว้ใช้ซ้ำ
+                      </button>
+                      <button className="btn btn-sm btn-danger" onClick={() => removeSig(i)} disabled={locked}>
+                        ลบ
+                      </button>
+                    </div>
                   </div>
                   <label className="field">
                     <span>ชื่อ</span>
@@ -1200,10 +1527,41 @@ export function CertEditor(props: {
                 </div>
               ))}
               {signatures.length < 6 && (
-                <button className="btn btn-sm" onClick={addSig} disabled={locked}>
-                  <Icon name="plus" size={16} /> เพิ่มผู้ลงนาม
-                </button>
+                <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+                  <button className="btn btn-sm" onClick={addSig} disabled={locked}>
+                    <Icon name="plus" size={16} /> เพิ่มผู้ลงนาม
+                  </button>
+                  {/* คนเดิม ๆ เซ็นทุกงาน (ผอ./รองฯ) — หยิบจากคลังแล้วไม่ต้องอัปโหลด/ปรับสีรูปใหม่ */}
+                  {props.sigPresets.length > 0 && (
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          addSigFromPreset(Number(e.target.value));
+                          e.target.value = "";
+                        }
+                      }}
+                      disabled={locked}
+                    >
+                      <option value="" disabled>
+                        + จากลายเซ็นที่บันทึกไว้…
+                      </option>
+                      {props.sigPresets.map((sp) => (
+                        <option key={sp.id} value={sp.id}>
+                          {sp.name}
+                          {sp.roleLabel ? ` — ${sp.roleLabel}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               )}
+              <div className="subtitle">
+                จัดการลายเซ็นที่บันทึกไว้ทั้งหมดได้ที่หน้า{" "}
+                <a className="link" href={`${BASE}/admin/cert-presets`}>
+                  แม่แบบเริ่มต้น
+                </a>
+              </div>
             </div>
           </details>
 
@@ -1216,6 +1574,35 @@ export function CertEditor(props: {
               <Icon name="printer" size={16} /> ทดลองพิมพ์ 1 ใบ
             </button>
             <div className="subtitle">ใบทดลองเป็นเลขทะเบียน {props.yearBe}/0000 ซึ่งไม่ใช่เลขของใบจริง</div>
+
+            {/* เก็บดีไซน์นี้ไว้เป็นจุดตั้งต้นของงานถัดไป — ไม่ต้องวางใบใหม่ทุกปี */}
+            <details>
+              <summary>เก็บแบบนี้ไว้เป็นแม่แบบเริ่มต้น</summary>
+              <div className="stack" style={{ marginTop: 8, gap: 8 }}>
+                <label className="field">
+                  <span>ชื่อในคลัง</span>
+                  <input
+                    value={presetName}
+                    onChange={(e) => setPresetName(e.target.value)}
+                    placeholder="เช่น ใบมาตรฐานโรงเรียน 2569"
+                  />
+                </label>
+                <label className="row" style={{ gap: 6, alignItems: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={presetDefault}
+                    onChange={(e) => setPresetDefault(e.target.checked)}
+                  />
+                  <span>ใช้เป็นแบบตั้งต้นของงานที่สร้างใหม่</span>
+                </label>
+                <button className="btn btn-sm" onClick={saveAsPreset} disabled={busy}>
+                  <Icon name="download" size={16} /> เก็บเข้าคลัง
+                </button>
+                <div className="subtitle">
+                  คัดลอกดีไซน์ ณ ตอนกด — แก้แบบของงานนี้ทีหลังไม่กระทบของในคลัง (และกลับกัน)
+                </div>
+              </div>
+            </details>
             {status === "draft" && (
               <button className="btn" onClick={() => changeStatus("publish")} disabled={busy}>
                 เผยแพร่ให้ครูออกได้

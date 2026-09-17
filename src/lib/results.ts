@@ -1,8 +1,17 @@
 import "server-only";
 import { db } from "@/db";
-import { getDefaultEvent } from "@/lib/queries";
-import { competitions, criteria, entries, entryMembers, scores, competitionCapacity } from "@/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { getDefaultEvent, getYearWithSettings } from "@/lib/queries";
+import {
+  academicYears,
+  competitions,
+  criteria,
+  entries,
+  entryMembers,
+  events,
+  scores,
+  competitionCapacity,
+} from "@/db/schema";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import {
   decideMedal,
   scorePercent,
@@ -120,26 +129,95 @@ export function competitionAllowedLevels(comp: typeof competitions.$inferSelect)
   return parseJsonArray(comp.allowedClassLevels);
 }
 
+/** งานหนึ่งในตัวกรอง "ดูผลของงานก่อนหน้า" ที่หน้าสาธารณะ */
+export type PublicEventOption = {
+  id: number;
+  name: string;
+  eventDate: string | null;
+  yearId: number;
+  yearBe: number;
+  /** จำนวนรายการที่ประกาศผลแล้วในงานนั้น */
+  publishedCount: number;
+};
+
 /**
- * ขอบเขตของ "ผลที่ประกาศต่อสาธารณะได้" — ปีที่เปิดอยู่ + งานเริ่มต้นที่ admin ตั้งไว้
+ * งานที่ "มีอะไรให้ดู" ต่อสาธารณะ — มีรายการที่ประกาศผลแล้วอย่างน้อยหนึ่งรายการ
+ * ข้ามปีการศึกษาโดยตั้งใจ: คนที่เข้ามาหาผลของงานปีที่แล้วต้องหาเจอโดยไม่ต้องให้แอดมินสลับปีให้
+ * (รายการที่ยังไม่ประกาศ/ไม่มีการแข่งขัน ไม่ถูกนับ งานที่ไม่เหลืออะไรเลยจึงไม่โผล่ในตัวกรอง)
+ */
+export async function listPublicEvents(): Promise<PublicEventOption[]> {
+  const rows = await db
+    .select({
+      id: events.id,
+      name: events.name,
+      eventDate: events.eventDate,
+      yearId: events.yearId,
+      yearBe: academicYears.yearBe,
+      publishedCount: sql<number>`count(${competitions.id})::int`,
+    })
+    .from(events)
+    .innerJoin(academicYears, eq(academicYears.id, events.yearId))
+    .innerJoin(
+      competitions,
+      and(
+        eq(competitions.eventId, events.id),
+        eq(competitions.isPublished, true),
+        eq(competitions.noContest, false)
+      )
+    )
+    .groupBy(events.id, events.name, events.eventDate, events.yearId, academicYears.yearBe)
+    .orderBy(desc(academicYears.yearBe), desc(events.eventDate), desc(events.id));
+  return rows;
+}
+
+/** งานที่จะแสดง (ตามที่ผู้ชมเลือก ถ้าไม่ได้เลือก/เลือกงานที่ไม่มีผล = งานเริ่มต้นของปีที่เปิดอยู่) */
+export async function resolvePublicEvent(eventId?: number) {
+  if (eventId != null) {
+    const ev = (await db.select().from(events).where(eq(events.id, eventId)).limit(1))[0];
+    if (ev) {
+      const { year, setting } = await getYearWithSettings(ev.yearId);
+      if (year) return { year, setting, event: ev };
+    }
+  }
+  return getDefaultEvent();
+}
+
+/**
+ * ขอบเขตของ "ผลที่ประกาศต่อสาธารณะได้" — งานที่เลือกดู (ไม่ได้เลือก = งานเริ่มต้นของปีที่เปิดอยู่)
  * เผยแพร่แล้วเท่านั้น และตัดรายการที่ไม่มีการแข่งขันออก (ไม่มีผล/อันดับให้ประกาศ)
  * ทั้งหน้า /results และ API ที่กล่องดูผลของหน้าแรกเรียก ต้องใช้กฎชุดนี้ชุดเดียวกัน
- * ส่ง compId มา = ขอเฉพาะรายการนั้น (ได้ [] ถ้ารายการนั้นไม่เข้าเกณฑ์ประกาศ)
+ *
+ * เกณฑ์เหรียญมาจาก "ปีของงานที่กำลังดู" ไม่ใช่ปีที่เปิดใช้งาน — ไม่งั้นการย้อนดูงานปีก่อน
+ * จะถูกตัดเหรียญด้วยเกณฑ์ของปีนี้ แล้วผลที่เห็นไม่ตรงกับใบที่แจกไปจริง
+ *
+ * compId = ขอเฉพาะรายการนั้น (กล่องดูผลของหน้าแรก) — ใช้ปี/งานของรายการนั้นเอง
+ * เพื่อให้กดดูผลของงานที่ย้อนไปเลือกไว้ได้ ไม่ใช่เฉพาะงานเริ่มต้น
  */
-export async function getPublicResultScope(compId?: number) {
-  const { year, setting, event } = await getDefaultEvent();
+export async function getPublicResultScope(opts: { compId?: number; eventId?: number } = {}) {
+  const { compId } = opts;
+
+  // ขอรายการเดียว: ยึดงาน/ปีของรายการนั้น (ยังต้องผ่านเกณฑ์ "ประกาศแล้ว" เหมือนกัน)
+  const target =
+    compId != null
+      ? (await db.select().from(competitions).where(eq(competitions.id, compId)).limit(1))[0] ?? null
+      : null;
+
+  const { year, setting, event } = await resolvePublicEvent(
+    target?.eventId ?? opts.eventId ?? undefined
+  );
   const medalPct = {
     gold: setting?.medalGoldPct ?? 80,
     silver: setting?.medalSilverPct ?? 70,
     bronze: setting?.medalBronzePct ?? 60,
   };
   if (!year) return { year: null, setting, event, medalPct, comps: [] };
+
   const conds = [
     eq(competitions.yearId, year.id),
     eq(competitions.isPublished, true),
     eq(competitions.noContest, false),
   ];
-  if (setting?.defaultEventId != null) conds.push(eq(competitions.eventId, setting.defaultEventId));
+  if (event) conds.push(eq(competitions.eventId, event.id));
   if (compId != null) conds.push(eq(competitions.id, compId));
   const comps = await db.select().from(competitions).where(and(...conds));
   return { year, setting, event, medalPct, comps };

@@ -6,6 +6,7 @@ import {
   events,
   certificateIssues,
   certificateSignatures,
+  certificateTemplateCompetitions,
   certificateTemplates,
   competitions,
   entries,
@@ -16,6 +17,7 @@ import { randomBytes } from "crypto";
 import { headers } from "next/headers";
 import type { PoolClient } from "pg";
 import { formatThaiDate, type CertAward, type Medal } from "@/lib/domain";
+import { resolveTemplate } from "@/lib/certTemplatePick";
 import {
   buildSampleData,
   defaultSampleVariant,
@@ -28,6 +30,8 @@ import {
   formatSerial,
   parseLayout,
 } from "@/lib/certificateLayout";
+
+export { resolveTemplate, mainTemplate } from "@/lib/certTemplatePick";
 
 export {
   BLOCK_KINDS,
@@ -96,6 +100,12 @@ export function validateImageBase64(
 
 export type CertTemplateView = {
   id: number;
+  /** ชื่อแบบที่ผู้ดูแลตั้งเอง ('' = แบบเดิมที่ยังไม่เคยตั้งชื่อ) */
+  name: string;
+  /** แบบหลักของงาน — รายการที่ไม่ได้ผูกแบบไว้ใช้ตัวนี้ */
+  isDefault: boolean;
+  /** รายการแข่งขันที่ผูกไว้กับแบบนี้โดยตรง */
+  competitionIds: number[];
   medalFilter: string;
   orientation: "landscape" | "portrait";
   layout: CertLayout;
@@ -125,8 +135,19 @@ export async function getEventTemplates(eventId: number): Promise<CertTemplateVi
     .select()
     .from(certificateTemplates)
     .where(eq(certificateTemplates.eventId, eventId))
-    .orderBy(asc(certificateTemplates.medalFilter));
+    // แบบหลักมาก่อนเสมอ (หน้าออกแบบเปิดตัวนี้ให้เป็นค่าเริ่มต้น) ที่เหลือเรียงตามลำดับที่สร้าง
+    .orderBy(desc(certificateTemplates.isDefault), asc(certificateTemplates.id));
   if (!tpls.length) return [];
+
+  const links = await db
+    .select()
+    .from(certificateTemplateCompetitions)
+    .where(
+      inArray(
+        certificateTemplateCompetitions.templateId,
+        tpls.map((t) => t.id)
+      )
+    );
 
   const sigs = await db
     .select()
@@ -141,6 +162,9 @@ export async function getEventTemplates(eventId: number): Promise<CertTemplateVi
 
   return tpls.map((t) => ({
     id: t.id,
+    name: t.name,
+    isDefault: t.isDefault,
+    competitionIds: links.filter((l) => l.templateId === t.id).map((l) => l.competitionId),
     medalFilter: t.medalFilter,
     orientation: t.orientation === "portrait" ? "portrait" : "landscape",
     layout: parseLayout(t.layout),
@@ -238,15 +262,6 @@ export async function verifyBaseUrl(): Promise<string> {
   return `${proto}://${host}${base}/verify`;
 }
 
-/**
- * เลือกแม่แบบสำหรับเหรียญหนึ่ง ๆ — หาแม่แบบเฉพาะเหรียญก่อน ไม่เจอค่อยใช้แม่แบบหลัก (medalFilter = "")
- * งานส่วนใหญ่มีแม่แบบเดียว ฟังก์ชันนี้จึงคืนตัวหลักเป็นปกติ
- */
-export function resolveTemplate(tpls: CertTemplateView[], medal: CertAward): CertTemplateView | null {
-  // "activity" ไม่มีแม่แบบเฉพาะ → ตกไปใช้แม่แบบหลักเสมอ (เหมือนงานที่มีแม่แบบเดียว)
-  return tpls.find((t) => t.medalFilter === medal) ?? tpls.find((t) => t.medalFilter === "") ?? null;
-}
-
 // ===== เลขทะเบียน =====
 
 /**
@@ -339,7 +354,7 @@ export async function issueCertificates(params: {
         continue;
       }
 
-      const tpl = resolveTemplate(templates, t.medal);
+      const tpl = resolveTemplate(templates, t.medal, t.competitionId);
       if (!tpl) throw new Error("ยังไม่ได้ตั้งค่าแม่แบบเกียรติบัตรของงานนี้");
 
       const no = await allocateSerialNo(client, yearId);

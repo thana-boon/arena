@@ -1,10 +1,10 @@
 import { db } from "@/db";
-import { events, certificateTemplates } from "@/db/schema";
+import { events } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
 import { certEventInput } from "@/lib/validation";
-import { defaultLayout } from "@/lib/certificates";
+import { insertTemplate, seedDesign } from "@/lib/certPresets";
 import { getActiveYear } from "@/lib/queries";
 import { logAudit } from "@/lib/audit";
 
@@ -23,7 +23,9 @@ export async function GET() {
   });
 }
 
-// POST: สร้างงานใหม่ + แม่แบบหลักเปล่า ๆ (medalFilter = "") ให้พร้อมแก้ทันที
+// POST: สร้างงานใหม่ + แบบหลักของงานให้พร้อมแก้ทันที
+// ดีไซน์ตั้งต้นมาจาก "แม่แบบเริ่มต้น" ที่ตั้งไว้ในคลัง (ไม่ได้ตั้ง = ใบเปล่าแบบเดิม)
+// — งานใหม่ทุกงานจะได้พื้นหลัง/ผู้ลงนามชุดเดิมของโรงเรียนมาให้เลย เหลือแก้แค่ชื่องาน
 export async function POST(req: Request) {
   return handle(async () => {
     const s = await apiRequireRole("admin");
@@ -43,10 +45,11 @@ export async function POST(req: Request) {
       })
       .returning({ id: events.id });
 
-    await db.insert(certificateTemplates).values({
+    await insertTemplate({
       eventId: ev.id,
-      medalFilter: "",
-      layout: JSON.stringify(defaultLayout()),
+      name: "แบบหลัก",
+      isDefault: true,
+      ...(await seedDesign()),
     });
 
     await logAudit(s.code, "create_cert_event", { id: ev.id, name: body.name });

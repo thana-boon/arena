@@ -174,7 +174,12 @@ const certSignatureInput = z.object({
 });
 
 // บันทึกแม่แบบทั้งก้อน (พื้นหลัง + layout + ผู้ลงนาม) ในครั้งเดียว
+// templateId = "แบบ" ที่กำลังแก้อยู่ (ไม่ส่งมา = แบบหลักของงาน — ทางเดิมก่อนมีหลายแบบ)
+// competitionIds = รายการที่ผูกกับแบบนี้ (ไม่ส่งมา = ไม่แตะการผูกของเดิม)
 export const certTemplateInput = z.object({
+  templateId: z.number().int().positive().optional(),
+  name: z.string().max(191).optional(),
+  competitionIds: z.array(z.number().int().positive()).optional(),
   medalFilter: z.enum(["", "gold", "silver", "bronze"]).optional().default(""),
   backgroundAssetId: z.number().int().positive().nullable().optional(),
   orientation: z.enum(["landscape", "portrait"]).optional().default("landscape"),
@@ -182,6 +187,50 @@ export const certTemplateInput = z.object({
   signatures: z.array(certSignatureInput).max(6, "ผู้ลงนามได้ไม่เกิน 6 คน"),
 });
 export type CertTemplateInput = z.infer<typeof certTemplateInput>;
+
+// สร้าง "แบบ" เพิ่มในงาน — ลอกจากแบบที่มีอยู่ (copyFromTemplateId) หรือจากคลังแม่แบบ (presetId)
+// ไม่ระบุทั้งคู่ = เริ่มจากแม่แบบเริ่มต้นที่ตั้งไว้ (ถ้าไม่มีก็ใบเปล่า)
+export const certTemplateCreateInput = z.object({
+  name: z.string().min(1, "ตั้งชื่อแบบด้วย").max(191),
+  copyFromTemplateId: z.number().int().positive().optional(),
+  presetId: z.number().int().positive().optional(),
+  competitionIds: z.array(z.number().int().positive()).optional(),
+});
+
+// คลังแม่แบบเริ่มต้น — บันทึกจากแบบของงานที่ทำไว้แล้ว (fromTemplateId) หรือส่งดีไซน์มาตรง ๆ
+export const certPresetInput = z
+  .object({
+    name: z.string().min(1, "ตั้งชื่อแม่แบบด้วย").max(191),
+    description: z.string().max(255).optional().default(""),
+    isDefault: z.boolean().optional().default(false),
+    fromTemplateId: z.number().int().positive().optional(),
+    orientation: z.enum(["landscape", "portrait"]).optional(),
+    backgroundAssetId: z.number().int().positive().nullable().optional(),
+    layout: z.array(certBlock).optional(),
+    signatures: z.array(certSignatureInput).max(6).optional(),
+  })
+  .refine((v) => v.fromTemplateId != null || v.layout != null, {
+    message: "ต้องเลือกแบบต้นทาง หรือส่งดีไซน์มาด้วย",
+  });
+
+export const certPresetPatchInput = z.object({
+  name: z.string().min(1).max(191).optional(),
+  description: z.string().max(255).optional(),
+  isDefault: z.boolean().optional(),
+});
+
+// ลายเซ็นที่บันทึกไว้ใช้ซ้ำ (ผอ./รองฯ) — เก็บเฉพาะตัวคน ไม่เก็บพิกัดบนใบ
+export const sigPresetInput = z.object({
+  name: z.string().max(191).optional().default(""),
+  roleLabel: z.string().max(191).optional().default(""),
+  mode: z.enum(["image", "blank"]).optional().default("image"),
+  assetId: z.number().int().positive().nullable().optional(),
+  color: z.string().max(32).optional().default("#1f2937"),
+  fontSize: z.number().min(0.3).max(20).optional().default(1.2),
+  imageScale: z.number().min(0.2).max(4).optional().default(1),
+});
+
+export const sigPresetPatchInput = sigPresetInput.partial();
 
 // เลือกรายการแข่งขันเข้างาน
 export const certEventCompetitionsInput = z.object({

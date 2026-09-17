@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { competitions, competitionCapacity, competitionSubjectGroups, competitionVenues, criteria, entries, entryMembers, scores, timeSlots, events } from "@/db/schema";
+import { certificateTemplateCompetitions, competitions, competitionCapacity, competitionSubjectGroups, competitionVenues, criteria, entries, entryMembers, scores, timeSlots, events } from "@/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
@@ -290,6 +290,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
       await tx.delete(competitionCapacity).where(eq(competitionCapacity.competitionId, id));
       await tx.delete(competitionVenues).where(eq(competitionVenues.competitionId, id));
       await tx.delete(competitionSubjectGroups).where(eq(competitionSubjectGroups.competitionId, id));
+      // การผูก "รายการนี้ใช้เกียรติบัตรแบบไหน" ตายไปกับรายการ ไม่งั้นเหลือแถวชี้ไปยังรายการที่ไม่มีแล้ว
+      await tx
+        .delete(certificateTemplateCompetitions)
+        .where(eq(certificateTemplateCompetitions.competitionId, id));
       await tx.delete(competitions).where(eq(competitions.id, id));
     });
     await logAudit(s.code, "delete_competition", { competitionId: id });

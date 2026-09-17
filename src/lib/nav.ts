@@ -36,6 +36,7 @@ export const ADMIN_NAV_GROUPS: NavGroup[] = [
       // ถ้าเป็น path ลูก เมนู "ออกแบบเกียรติบัตร" จะสว่างพร้อมกันทั้งคู่
       { href: "/admin/cert-issue", label: "ออกเกียรติบัตร", icon: "printer" },
       { href: "/admin/cert-registry", label: "ทะเบียนเกียรติบัตร", icon: "search" },
+      { href: "/admin/cert-presets", label: "แม่แบบเริ่มต้น", icon: "package" },
     ],
   },
   {

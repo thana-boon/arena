@@ -4,21 +4,28 @@ import { CompetitionBrowser, type PublicCompSection } from "./CompetitionBrowser
 import { db } from "@/db";
 import { competitions, subjectGroups } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getDefaultEvent } from "@/lib/queries";
-import { competitionAllowedLevels } from "@/lib/results";
+import { competitionAllowedLevels, listPublicEvents, resolvePublicEvent } from "@/lib/results";
+import { PublicEventFilter } from "@/components/PublicEventFilter";
 import { formatThaiDate, formatLevels, minClassLevelIndex } from "@/lib/domain";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
-  const { year, setting, event } = await getDefaultEvent();
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ event?: string }>;
+}) {
+  // ?event= = งานที่ผู้ชมเลือกดูย้อนหลัง (ไม่ระบุ = งานเริ่มต้นที่ admin ตั้งไว้ในหน้าตั้งค่า)
+  const picked = Number((await searchParams).event);
+  const { year, event } = await resolvePublicEvent(Number.isFinite(picked) && picked > 0 ? picked : undefined);
+  const publicEvents = await listPublicEvents();
 
   let comps: (typeof competitions.$inferSelect)[] = [];
   let groups: (typeof subjectGroups.$inferSelect)[] = [];
   if (year) {
-    // ประกาศเฉพาะ "งานเริ่มต้น" ที่ admin เลือกไว้ในหน้าตั้งค่า (ถ้ายังไม่ได้เลือก จะแสดงทุกงานของปีนั้น)
+    // ประกาศเฉพาะงานที่กำลังดูอยู่ (ยังไม่ได้ตั้งงานเริ่มต้น = แสดงทุกงานของปีนั้น)
     const conds = [eq(competitions.yearId, year.id), eq(competitions.isPublished, true)];
-    if (setting?.defaultEventId != null) conds.push(eq(competitions.eventId, setting.defaultEventId));
+    if (event) conds.push(eq(competitions.eventId, event.id));
     comps = await db
       .select()
       .from(competitions)
@@ -81,6 +88,8 @@ export default async function HomePage() {
         </div>
       </div>
 
+      <PublicEventFilter events={publicEvents} currentEventId={event?.id ?? null} />
+
       {!comps.length ? (
         <div className="empty-state card">
           <Icon name="trophy" size={44} className="empty-ico" />
@@ -97,7 +106,7 @@ export default async function HomePage() {
                 ค้นหาชื่อนักเรียนหรือชื่อรายการ เพื่อดูคะแนน อันดับ และเหรียญรางวัลที่ได้รับ
               </p>
             </div>
-            <Link href="/results" className="btn btn-primary">
+            <Link href={event ? `/results?event=${event.id}` : "/results"} className="btn btn-primary">
               <Icon name="trophy" size={16} />
               ดูผลการแข่งขัน
             </Link>

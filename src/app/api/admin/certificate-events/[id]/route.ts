@@ -3,6 +3,7 @@ import {
   events,
   competitions,
   certificateSignatures,
+  certificateTemplateCompetitions,
   certificateTemplates,
   certificateIssues,
 } from "@/db/schema";
@@ -72,6 +73,10 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     if (tpls.length) {
       await db.delete(certificateSignatures).where(
         inArray(certificateSignatures.templateId, tpls.map((t) => t.id))
+      );
+      // การผูกรายการเข้ากับแบบ — งานไม่มีรายการแล้วจึงไม่ควรมีแถวนี้เหลือ
+      await db.delete(certificateTemplateCompetitions).where(
+        inArray(certificateTemplateCompetitions.templateId, tpls.map((t) => t.id))
       );
     }
     await db.delete(certificateTemplates).where(eq(certificateTemplates.eventId, id));

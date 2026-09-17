@@ -11,6 +11,8 @@ type EventRow = {
   visibleToStudents: boolean;
   registrationOpen: boolean;
   competitionCount: number;
+  /** จำนวนแบบเกียรติบัตรในงาน (มากกว่า 1 = แยกใบให้รายการคนละกลุ่ม) */
+  templateCount: number;
   issuedCount: number;
 };
 
@@ -29,7 +31,8 @@ export function CertEventsManager({ events }: { events: EventRow[] }) {
   return (
     <div className="stack">
       <div className="alert alert-info">
-        สร้าง/แก้ไขงานได้ที่เมนู <strong>ตั้งค่า</strong> — หน้านี้ไว้ <strong>ออกแบบเกียรติบัตร</strong> ของแต่ละงาน (พื้นหลัง/ลายเซ็น/ตำแหน่งข้อความ)
+        สร้าง/แก้ไขงานได้ที่เมนู <strong>ตั้งค่า</strong> — หน้านี้ไว้ <strong>ออกแบบเกียรติบัตร</strong> ของแต่ละงาน (พื้นหลัง/ลายเซ็น/ตำแหน่งข้อความ) ·
+        งานเดียวมีได้หลาย <strong>แบบใบ</strong> เช่นใบของรายการอบรม (ไม่มีเหรียญ/อันดับ) แยกจากใบของรายการที่ตัดสินจริง
       </div>
 
       {events.length === 0 ? (
@@ -44,6 +47,7 @@ export function CertEventsManager({ events }: { events: EventRow[] }) {
               <tr>
                 <th>ชื่องาน</th>
                 <th>สถานะ</th>
+                <th style={{ textAlign: "center" }}>แบบใบ</th>
                 <th style={{ textAlign: "center" }}>รายการแข่งขัน</th>
                 <th style={{ textAlign: "center" }}>ออกแล้ว</th>
                 <th></th>
@@ -61,6 +65,7 @@ export function CertEventsManager({ events }: { events: EventRow[] }) {
                     </div>
                   </td>
                   <td><span className={STATUS_CLASS[e.status] ?? "badge"}>{STATUS_LABEL[e.status] ?? e.status}</span></td>
+                  <td style={{ textAlign: "center" }}>{e.templateCount || 1}</td>
                   <td style={{ textAlign: "center" }}>{e.competitionCount}</td>
                   <td style={{ textAlign: "center" }}>{e.issuedCount}</td>
                   <td style={{ textAlign: "right" }}>

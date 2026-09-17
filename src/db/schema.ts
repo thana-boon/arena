@@ -462,14 +462,20 @@ export const events = pgTable(
 );
 
 // ===== เกียรติบัตร: แม่แบบ (พื้นหลัง + ตำแหน่งข้อความ) =====
-// medalFilter = '' คือแม่แบบหลักของงาน; ใส่ 'gold'/'silver'/'bronze' เพื่อ override เฉพาะเหรียญนั้น
-// ใช้ '' แทน null เพราะ Postgres ถือว่า null แต่ละตัวไม่ซ้ำกัน → unique(event_id, medal_filter) จะกันซ้ำไม่ได้
+// 1 งานมีได้หลายแม่แบบ = "แบบเกียรติบัตร" (profile) เช่น งานเดียวกันมีทั้งรายการที่อบรมเฉย ๆ
+// กับรายการที่ตัดสินจริง — คนละใบกัน (ใบอบรมไม่มีเหรียญ/อันดับ) จึงต้องแยกแม่แบบ แล้วผูกว่า
+// รายการไหนใช้แบบไหน (certificate_template_competitions) · รายการที่ไม่ได้ผูก = ใช้แบบหลัก (isDefault)
+// medalFilter = '' คือแม่แบบปกติ; ใส่ 'gold'/'silver'/'bronze' เพื่อ override เฉพาะเหรียญนั้น (ยังไม่มี UI)
 // layout เก็บ json array ของ block (ดู CertLayout ใน lib/certificates.ts) พิกัดเป็น % ของหน้ากระดาษ
 export const certificateTemplates = pgTable(
   "certificate_templates",
   {
     id: serial("id").primaryKey(),
     eventId: integer("event_id").notNull(),
+    // ชื่อแบบที่ครูตั้งเอง เช่น "ใบรายการแข่งขัน" / "ใบอบรม" ('' = แบบหลักของงานที่สร้างมาแต่เดิม)
+    name: varchar("name", { length: 191 }).notNull().default(""),
+    // แบบหลักของงาน — รายการที่ไม่ได้ผูกกับแบบไหนเลยใช้ตัวนี้ (1 งานมีได้ตัวเดียว บังคับที่โค้ด)
+    isDefault: boolean("is_default").notNull().default(false),
     medalFilter: varchar("medal_filter", { length: 16 }).notNull().default(""),
     backgroundAssetId: integer("background_asset_id"),
     orientation: varchar("orientation", { length: 16 }).notNull().default("landscape"),
@@ -480,8 +486,63 @@ export const certificateTemplates = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (t) => [uniqueIndex("cert_tpl_event_medal_uniq").on(t.eventId, t.medalFilter)]
+  // เดิมเป็น unique(event_id, medal_filter) — ถอดออกตอนเปิดให้ 1 งานมีหลายแบบ
+  (t) => [index("cert_tpl_event_idx").on(t.eventId)]
 );
+
+// ===== เกียรติบัตร: รายการที่ใช้แบบนี้ =====
+// unique ต่อ competition_id → รายการหนึ่งใช้ได้แบบเดียว (ไม่งั้นตอนออกใบเลือกไม่ถูกว่าจะใช้ใบไหน)
+// ไม่มีแถว = รายการนั้นใช้แบบหลักของงาน
+export const certificateTemplateCompetitions = pgTable(
+  "certificate_template_competitions",
+  {
+    id: serial("id").primaryKey(),
+    templateId: integer("template_id").notNull(),
+    competitionId: integer("competition_id").notNull(),
+  },
+  (t) => [
+    uniqueIndex("cert_tpl_comp_uniq").on(t.competitionId),
+    index("cert_tpl_comp_tpl_idx").on(t.templateId),
+  ]
+);
+
+// ===== เกียรติบัตร: แม่แบบเริ่มต้น (คลังแบบที่เก็บไว้ใช้ซ้ำข้ามงาน) =====
+// เก็บดีไซน์ทั้งก้อนเป็น snapshot (layout + ผู้ลงนามเป็น json) ไม่ได้อ้างอิงแม่แบบต้นทาง
+// — งานที่ลอกไปแล้วต้องไม่เปลี่ยนตามเมื่อมีคนไปแก้แม่แบบของงานเดิม และลบงานเก่าทิ้งก็ไม่กระทบ
+// isDefault = แบบที่ระบบหยิบมาตั้งต้นให้อัตโนมัติตอนสร้างงานใหม่ (มีได้ตัวเดียว บังคับที่โค้ด)
+export const certificatePresets = pgTable("certificate_presets", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 191 }).notNull(),
+  description: varchar("description", { length: 255 }).notNull().default(""),
+  orientation: varchar("orientation", { length: 16 }).notNull().default("landscape"),
+  backgroundAssetId: integer("background_asset_id"),
+  layout: text("layout").notNull().default("[]"), // json array (CertLayout)
+  signatures: text("signatures").notNull().default("[]"), // json array (ชุดผู้ลงนามพร้อมพิกัด)
+  isDefault: boolean("is_default").notNull().default(false),
+  createdBy: varchar("created_by", { length: 64 }).notNull().default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+// ===== เกียรติบัตร: ลายเซ็นที่บันทึกไว้ =====
+// คนเดิม ๆ เซ็นทุกงาน (ผอ./รองฯ) — เก็บรูปที่ปรับสี/ลบพื้นแล้วไว้หยิบใช้ซ้ำ ไม่ต้องอัปโหลดใหม่ทุกครั้ง
+// เก็บแค่ "ตัวคน" (ชื่อ/ตำแหน่ง/รูป/สี/ขนาด) ไม่เก็บพิกัด เพราะตำแหน่งขึ้นกับใบแต่ละแบบ
+export const certificateSignaturePresets = pgTable("certificate_signature_presets", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 191 }).notNull().default(""),
+  roleLabel: varchar("role_label", { length: 191 }).notNull().default(""),
+  mode: varchar("mode", { length: 16 }).notNull().default("image"),
+  assetId: integer("asset_id"),
+  color: varchar("color", { length: 32 }).notNull().default("#1f2937"),
+  fontSize: numeric("font_size", { precision: 6, scale: 3 }).notNull().default("1.2"),
+  imageScale: numeric("image_scale", { precision: 6, scale: 3 }).notNull().default("1"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdBy: varchar("created_by", { length: 64 }).notNull().default(""),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
 
 // ===== เกียรติบัตร: ผู้ลงนาม =====
 // mode: 'image' = ลายเซ็นดิจิทัล (วางรูปจาก asset) | 'blank' = เว้นเส้นไว้เซ็นสด
@@ -576,6 +637,8 @@ export type Score = typeof scores.$inferSelect;
 export type TeacherRole = typeof teacherRoles.$inferSelect;
 export type CertificateAsset = typeof certificateAssets.$inferSelect;
 export type CertificateTemplate = typeof certificateTemplates.$inferSelect;
+export type CertificatePreset = typeof certificatePresets.$inferSelect;
+export type CertificateSignaturePreset = typeof certificateSignaturePresets.$inferSelect;
 export type CertificateSignature = typeof certificateSignatures.$inferSelect;
 export type CertificateIssue = typeof certificateIssues.$inferSelect;
 export type EventRow = typeof events.$inferSelect;

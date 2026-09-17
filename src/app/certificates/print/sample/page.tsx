@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { getActiveYear } from "@/lib/queries";
 import {
   getEventTemplates,
+  mainTemplate,
   loadTemplatesForPrint,
   parseSampleVariant,
   sampleRenderData,
@@ -28,11 +29,19 @@ export const dynamic = "force-dynamic";
  *
  * comp/award/rank/team = ใบที่หน้าออกแบบกำลังแสดงอยู่ (ไม่ส่งมา = ใบที่ระบบเลือกให้)
  * — กด "ทดลองพิมพ์" แล้วต้องได้ใบเดียวกับที่เห็นบนจอ ไม่ใช่ใบอื่นในงานเดียวกัน
+ * tpl = "แบบ" ที่กำลังแก้อยู่ (งานหนึ่งมีได้หลายแบบ) — ไม่ส่งมา = แบบหลักของงาน
  */
 export default async function CertificateSamplePrintPage({
   searchParams,
 }: {
-  searchParams: Promise<{ eventId?: string; comp?: string; award?: string; rank?: string; team?: string }>;
+  searchParams: Promise<{
+    eventId?: string;
+    tpl?: string;
+    comp?: string;
+    award?: string;
+    rank?: string;
+    team?: string;
+  }>;
 }) {
   await requireAdmin();
 
@@ -46,7 +55,9 @@ export default async function CertificateSamplePrintPage({
   const ev = (await db.select().from(events).where(eq(events.id, eventId)).limit(1))[0];
   if (!ev || ev.yearId !== year.id) notFound();
 
-  const main = (await getEventTemplates(eventId)).find((t) => t.medalFilter === "");
+  const all = await getEventTemplates(eventId);
+  const wanted = Number(q.tpl);
+  const main = all.find((t) => t.id === wanted) ?? mainTemplate(all);
   if (!main) {
     return (
       <div style={{ padding: 40, fontSize: 18 }}>

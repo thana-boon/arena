@@ -212,6 +212,45 @@ export function sigRect(
   return { left: s.x - s.width / 2, top: s.y, w: s.width, h: line + nameH + roleH };
 }
 
+/**
+ * ผู้ลงนาม 1 คนบนใบ — รูปทรงเดียวกันทุกที่: แม่แบบของงาน (ตาราง certificate_signatures),
+ * คลังแม่แบบเริ่มต้น (เก็บเป็น json) และ state ของหน้าออกแบบ
+ */
+export type CertSignature = {
+  name: string;
+  roleLabel: string;
+  mode: "image" | "blank";
+  assetId: number | null;
+  x: number;
+  y: number;
+  width: number;
+  color: string;
+  fontSize: number;
+  imageScale: number;
+};
+
+/** อ่านชุดผู้ลงนามที่เก็บเป็น json (คลังแม่แบบเริ่มต้น) — พังเมื่อไหร่ถือว่าไม่มีผู้ลงนาม */
+export function parseSignatures(raw: string): CertSignature[] {
+  try {
+    const v = JSON.parse(raw);
+    if (!Array.isArray(v)) return [];
+    return v.map((s: Partial<CertSignature>) => ({
+      name: String(s.name ?? ""),
+      roleLabel: String(s.roleLabel ?? ""),
+      mode: s.mode === "image" ? "image" : "blank",
+      assetId: typeof s.assetId === "number" ? s.assetId : null,
+      x: Number(s.x ?? 50),
+      y: Number(s.y ?? 50),
+      width: Number(s.width ?? 16),
+      color: String(s.color ?? "#1f2937"),
+      fontSize: Number(s.fontSize ?? SIG_FONT_DEFAULT),
+      imageScale: clampSigScale(Number(s.imageScale ?? SIG_IMAGE_SCALE_DEFAULT)),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export function parseLayout(raw: string): CertLayout {
   try {
     const v = JSON.parse(raw);

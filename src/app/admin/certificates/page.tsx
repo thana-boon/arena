@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { events, competitions, certificateIssues } from "@/db/schema";
+import { events, competitions, certificateIssues, certificateTemplates } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { getActiveYear } from "@/lib/queries";
 import { Icon } from "@/components/Icon";
@@ -35,6 +35,13 @@ export default async function CertificatesPage() {
     .from(certificateIssues)
     .groupBy(certificateIssues.eventId);
 
+  // จำนวน "แบบเกียรติบัตร" ของแต่ละงาน — งานที่มีทั้งรายการอบรมและรายการแข่งขันมักมีมากกว่าหนึ่งแบบ
+  const tplCounts = await db
+    .select({ eventId: certificateTemplates.eventId, n: sql<number>`count(*)::int` })
+    .from(certificateTemplates)
+    .groupBy(certificateTemplates.eventId);
+  const tplMap = new Map(tplCounts.map((r) => [r.eventId, r.n]));
+
   const compMap = new Map(compCounts.map((r) => [r.eventId, r.n]));
   const issueMap = new Map(issueCounts.map((r) => [r.eventId, r.n]));
 
@@ -47,6 +54,7 @@ export default async function CertificatesPage() {
     visibleToStudents: e.visibleToStudents,
     registrationOpen: e.registrationOpen,
     competitionCount: compMap.get(e.id) ?? 0,
+    templateCount: tplMap.get(e.id) ?? 0,
     issuedCount: issueMap.get(e.id) ?? 0,
   }));
 

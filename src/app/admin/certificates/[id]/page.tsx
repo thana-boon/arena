@@ -8,16 +8,24 @@ import {
   defaultLayout,
   defaultSampleVariant,
   getEventTemplates,
+  mainTemplate,
   sampleCompetitions,
   verifyBaseUrl,
 } from "@/lib/certificates";
+import { listCertPresets, listSignaturePresets } from "@/lib/certPresets";
 import { formatThaiDate } from "@/lib/domain";
 import QRCode from "qrcode";
 import { CertEditor } from "./CertEditor";
 
 export const dynamic = "force-dynamic";
 
-export default async function CertEventEditorPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CertEventEditorPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ tpl?: string }>;
+}) {
   const eventId = Number((await params).id);
   const year = await getActiveYear();
   if (!year) notFound();
@@ -28,14 +36,18 @@ export default async function CertEventEditorPage({ params }: { params: Promise<
   if (!ev || ev.yearId !== year.id) notFound();
 
   const templates = await getEventTemplates(eventId);
-  const main = templates.find((t) => t.medalFilter === "") ?? null;
+  // งานหนึ่งมีได้หลาย "แบบ" — ?tpl= บอกว่ากำลังแก้แบบไหน (ไม่ระบุ/ระบุผิด = แบบหลัก)
+  const wanted = Number((await searchParams).tpl);
+  const current = templates.find((t) => t.id === wanted) ?? mainTemplate(templates);
 
   // รายการในงานนี้ + คนตัวอย่างของแต่ละรายการ (source of truth = competitions.event_id)
   // ส่งไปทั้งชุด เพื่อให้หน้าออกแบบสลับดูใบของรายการ/รางวัลอื่นได้เองโดยไม่ต้องโหลดหน้าใหม่
   const compsInEvent = await sampleCompetitions(eventId);
 
   // ตัวอย่างชุดเดียวกับที่ใบทดลองพิมพ์ใช้ — ที่เห็นบนจอกับที่ออกจากเครื่องพิมพ์จะได้ตรงกัน
-  const initialVariant = defaultSampleVariant(compsInEvent, ev.kind);
+  // ถ้าแบบนี้ผูกกับรายการไว้ ให้เปิดมาที่ใบของรายการแรกที่ผูก — กำลังออกแบบใบของรายการพวกนั้นอยู่
+  const bound = compsInEvent.filter((c) => current?.competitionIds.includes(c.id));
+  const initialVariant = defaultSampleVariant(bound.length ? bound : compsInEvent, ev.kind);
   const sample = buildSampleData({
     comps: compsInEvent,
     eventName: ev.name,
@@ -56,11 +68,21 @@ export default async function CertEventEditorPage({ params }: { params: Promise<
     <CertEditor
       event={{ id: ev.id, name: ev.name, eventDate: ev.eventDate, status: ev.status, kind: ev.kind }}
       yearBe={year.yearBe}
-      initialLayout={main?.layout ?? defaultLayout()}
-      initialOrientation={main?.orientation ?? "landscape"}
-      initialBackgroundId={main?.backgroundAssetId ?? null}
+      templates={templates.map((t) => ({
+        id: t.id,
+        name: t.name,
+        isDefault: t.isDefault,
+        competitionIds: t.competitionIds,
+      }))}
+      templateId={current?.id ?? null}
+      initialName={current?.name ?? ""}
+      initialIsDefault={current?.isDefault ?? true}
+      initialCompetitionIds={current?.competitionIds ?? []}
+      initialLayout={current?.layout ?? defaultLayout()}
+      initialOrientation={current?.orientation ?? "landscape"}
+      initialBackgroundId={current?.backgroundAssetId ?? null}
       initialSignatures={
-        main?.signatures.map((s) => ({
+        current?.signatures.map((s) => ({
           name: s.name,
           roleLabel: s.roleLabel,
           mode: s.mode,
@@ -73,6 +95,12 @@ export default async function CertEventEditorPage({ params }: { params: Promise<
           imageScale: s.imageScale,
         })) ?? []
       }
+      sigPresets={await listSignaturePresets()}
+      certPresets={(await listCertPresets()).map((p) => ({
+        id: p.id,
+        name: p.name,
+        isDefault: p.isDefault,
+      }))}
       competitions={compsInEvent}
       initialVariant={initialVariant}
       sample={sample}

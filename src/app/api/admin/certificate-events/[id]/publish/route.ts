@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { events, certificateTemplates } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { ok, fail, handle } from "@/lib/api";
 import { apiRequireRole } from "@/lib/auth/guards";
 import { z } from "zod";
@@ -9,7 +9,7 @@ import { logAudit } from "@/lib/audit";
 const bodyInput = z.object({ action: z.enum(["publish", "unpublish", "unlock"]) });
 
 // POST: เปลี่ยนสถานะงาน
-//  publish   draft → published (ครูเริ่ม export ได้) ต้องมีแม่แบบหลักพร้อมพื้นหลังก่อน
+//  publish   draft → published (ครูเริ่ม export ได้) ทุกแบบในงานต้องมีพื้นหลังก่อน
 //  unpublish published → draft (ยังไม่มีใครออกใบ)
 //  unlock    locked → published (ยอมแก้ดีไซน์หลังออกใบไปแล้ว — ผู้ใช้ยืนยันผลกระทบเองที่ฝั่ง UI)
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -23,13 +23,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     if (action === "publish") {
       if (ev.status === "locked") return fail("งานนี้ออกใบไปแล้ว");
-      const main = await db
-        .select({ id: certificateTemplates.id, bg: certificateTemplates.backgroundAssetId })
+      // ทุกแบบในงานต้องมีพื้นหลัง ไม่ใช่แค่แบบหลัก — ครูที่ออกใบของรายการซึ่งผูกกับแบบอื่น
+      // จะได้ใบพื้นขาวไปเลยโดยไม่มีใครทันสังเกต
+      const tpls = await db
+        .select({
+          id: certificateTemplates.id,
+          name: certificateTemplates.name,
+          bg: certificateTemplates.backgroundAssetId,
+        })
         .from(certificateTemplates)
-        .where(and(eq(certificateTemplates.eventId, id), eq(certificateTemplates.medalFilter, "")))
-        .limit(1);
-      if (!main.length || !main[0].bg)
-        return fail("กรุณาตั้งค่าพื้นหลังของแม่แบบก่อนเผยแพร่");
+        .where(eq(certificateTemplates.eventId, id));
+      if (!tpls.length) return fail("งานนี้ยังไม่มีแม่แบบเกียรติบัตร");
+      const naked = tpls.filter((t) => !t.bg);
+      if (naked.length)
+        return fail(
+          tpls.length === 1
+            ? "กรุณาตั้งค่าพื้นหลังของแม่แบบก่อนเผยแพร่"
+            : `ยังไม่ได้ใส่พื้นหลังของแบบ: ${naked.map((t) => t.name || "แบบหลัก").join(", ")}`
+        );
       await db.update(events).set({ status: "published" }).where(eq(events.id, id));
     } else if (action === "unpublish") {
       if (ev.status === "locked") return fail("งานนี้ออกใบไปแล้ว ยกเลิกเผยแพร่ไม่ได้");

@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { certIssueGate, CERT_GATE_FIX, type CertGateComp, type CertGateEvent } from "./domain";
+import { certIssueGate, certScored, CERT_GATE_FIX, type CertGateComp, type CertGateEvent } from "./domain";
 
 const ev = (over: Partial<CertGateEvent> = {}): CertGateEvent => ({
   kind: "competition",
@@ -88,4 +88,26 @@ test("ทุกรหัสสาเหตุมีข้อความบอ�
   for (const code of ["no_event", "event_draft", "not_published", "attendance_pending"] as const) {
     assert.ok(CERT_GATE_FIX[code].length > 0, `ขาดข้อความของ ${code}`);
   }
+});
+
+// ===== ใบนี้ตัดเหรียญจากคะแนน หรือเป็นใบ "เข้าร่วม" =====
+// แยกจาก certIssueGate ตั้งใจ: gate ตอบว่า "กดออกได้ไหม" ส่วน certScored ตอบว่า "ออกมาแล้วหน้าตาแบบไหน"
+
+test("งานแข่งขัน → ตัดเหรียญจากคะแนนเสมอ", () => {
+  assert.equal(certScored(ev(), { noContest: false, isPublished: true }), true);
+});
+
+test("งานอบรมที่ลงคะแนนแล้วประกาศผล → ตัดเหรียญเหมือนรายการแข่งขัน", () => {
+  // เคสจริงที่พลาดมา: งานกิจกรรมถูกตั้งเป็น "อบรม" แต่มีการประกวดแทรกอยู่และตัดสินจริง
+  // ถ้ายึดประเภทงานอย่างเดียว ทุกคนจะได้ใบ "เข้าร่วม" ทั้งที่ประกาศผลเหรียญทองไปแล้ว
+  assert.equal(certScored(ev({ kind: "training" }), { noContest: false, isPublished: true }), true);
+});
+
+test("งานอบรมที่ยังไม่ประกาศผลรายการนั้น → ใบ 'เข้าร่วม' ตามเดิม", () => {
+  assert.equal(certScored(ev({ kind: "training" }), { noContest: false, isPublished: false }), false);
+});
+
+test("ติ๊ก 'ไม่มีการแข่งขัน' ชนะทุกกรณี แม้จะเผลอประกาศผลไว้", () => {
+  assert.equal(certScored(ev(), { noContest: true, isPublished: true }), false);
+  assert.equal(certScored(ev({ kind: "training" }), { noContest: true, isPublished: true }), false);
 });

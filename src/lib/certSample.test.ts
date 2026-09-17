@@ -55,9 +55,21 @@ test("รายการไม่มีการแข่งขัน → เข
   assert.equal(d.rank, 0);
 });
 
-test("งานอบรมทั้งงาน → ทุกใบเป็น 'เข้าร่วม' ไม่มีอันดับ (ตรงกับที่ตอนออกใบจริงทำ)", () => {
-  const v = variantForComp(comps[0], "training");
+test("งานอบรม + รายการยังไม่ประกาศผล → 'เข้าร่วม' ไม่มีอันดับ (ตรงกับที่ตอนออกใบจริงทำ)", () => {
+  const v = variantForComp(comp({ isPublished: false }), "training");
   assert.equal(v.award, "none");
+  assert.equal(v.rank, 0);
+});
+
+test("งานอบรมแต่รายการประกาศผลแล้ว → ตัดสินจริง ใบเป็นเหรียญ/มีอันดับ", () => {
+  const v = variantForComp(comps[0], "training");
+  assert.equal(v.award, "gold");
+  assert.equal(v.rank, 1);
+});
+
+test("ติ๊กไม่มีการแข่งขันชนะเสมอ แม้รายการจะถูกประกาศผลไว้", () => {
+  const v = variantForComp(comp({ noContest: true, isPublished: true }), "competition");
+  assert.equal(v.award, "activity");
   assert.equal(v.rank, 0);
 });
 

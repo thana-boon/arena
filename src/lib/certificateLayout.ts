@@ -4,7 +4,7 @@
  * ทุกพิกัด/ขนาดฟอนต์เป็น % ของหน้ากระดาษ
  */
 
-import type { CertAward } from "@/lib/domain";
+import { certScored, type CertAward } from "@/lib/domain";
 
 export const BLOCK_KINDS = [
   "student_name",
@@ -276,11 +276,13 @@ export function pickSampleComp(
 
 /**
  * ใบจริงของรายการนี้จะได้รางวัล/อันดับแบบไหน — กติกาเดียวกับที่ /api/certificates/issue ใช้ออกใบจริง
- * งานอบรมทั้งงาน = "เข้าร่วม" · รายการที่ตั้งว่าไม่มีการแข่งขัน = "เข้าร่วมกิจกรรม" (ทั้งสองแบบไม่มีอันดับ)
- * ที่เหลือเป็นการแข่งขัน — ตัวอย่างเริ่มที่เหรียญทอง/ชนะเลิศ แล้วผู้ใช้กดเปลี่ยนดูแบบอื่นได้
+ * (domain.certScored) งานอบรมที่ยังไม่ประกาศผลรายการนี้ = "เข้าร่วม" ·
+ * รายการที่ตั้งว่าไม่มีการแข่งขัน = "เข้าร่วมกิจกรรม" (ทั้งสองแบบไม่มีอันดับ)
+ * ที่เหลือเป็นการตัดสินจริง — ตัวอย่างเริ่มที่เหรียญทอง/ชนะเลิศ แล้วผู้ใช้กดเปลี่ยนดูแบบอื่นได้
  */
 export function variantForComp(c: SampleCompetition | null, eventKind: string): SampleVariant {
-  const scored = eventKind !== "training" && !c?.noContest;
+  // ยังไม่ได้เลือกรายการ (งานที่ยังไม่มีรายการเลย) — ตอบด้วยประเภทงานไปก่อน
+  const scored = c ? certScored({ kind: eventKind }, c) : eventKind !== "training";
   return {
     competitionId: c?.id ?? null,
     award: c?.noContest ? "activity" : scored ? "gold" : "none",

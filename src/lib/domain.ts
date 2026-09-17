@@ -95,6 +95,25 @@ export const AWARD_LABEL: Record<CertAward, string> = {
   activity: "เข้าร่วมกิจกรรม",
 };
 
+/** ข้อมูลเท่าที่ต้องรู้เพื่อตอบว่า "ใบของรายการนี้ตัดเหรียญจากคะแนนไหม" */
+export type CertScoredComp = { noContest: boolean; isPublished: boolean };
+
+/**
+ * ใบของรายการนี้เป็นแบบ "มีเหรียญ/มีอันดับ" หรือแบบ "เข้าร่วม" — กติกาเดียวของทั้งระบบ
+ * (ตอนออกใบจริง, ใบตัวอย่างในหน้าออกแบบ, และป้ายอธิบายในหน้าออกแบบ ต้องตอบตรงกัน)
+ *
+ * ตัดสินที่ "รายการ" ไม่ใช่ที่ "ประเภทงาน": งานอบรมก็มีรายการที่ตัดสินจริงได้
+ * (เช่น งานกิจกรรมที่มีการประกวดแทรกอยู่) — ถ้าครูลงคะแนนแล้วกดประกาศผล
+ * แปลว่ามีการตัดสินเกิดขึ้นจริง ใบจึงต้องเป็นเหรียญ ไม่ใช่ "เข้าร่วม" ยกเข่ง
+ *
+ * ลำดับมีความหมาย: noContest ชนะเสมอ — ติ๊กไว้ว่าไม่มีการแข่งขันก็คือไม่มีผลให้ตัดสิน
+ */
+export function certScored(ev: { kind: string }, comp: CertScoredComp): boolean {
+  if (comp.noContest) return false;
+  if (ev.kind !== "training") return true;
+  return comp.isPublished;
+}
+
 /**
  * ป้ายรางวัลตามอันดับ (ใช้บนเกียรติบัตร) — อันดับ 1-3 เป็นชื่อรางวัล, อันดับอื่นใช้ "อันดับที่ N"
  * 1 = ชนะเลิศ · 2 = รองชนะเลิศอันดับ 1 · 3 = รองชนะเลิศอันดับ 2
@@ -164,9 +183,10 @@ export function certIssueGate(
   | { ready: false; code: Exclude<CertGateCode, "ok">; reason: string } {
   if (!ev) return { ready: false, code: "no_event", reason: "ยังไม่ถูกจัดเข้างาน" };
   if (ev.status === "draft") return { ready: false, code: "event_draft", reason: "ผู้ดูแลยังตั้งค่าไม่เสร็จ" };
-  // ไม่มีคะแนน = งานอบรมทั้งงาน หรือรายการที่ติ๊ก "ไม่มีการแข่งขัน" → ไม่มีผลให้ประกาศ
-  const noScoring = ev.kind === "training" || comp.noContest;
-  if (!noScoring && !comp.isPublished)
+  // งานแข่งขันต้องประกาศผลก่อนเสมอ ส่วนงานอบรม/รายการที่ไม่มีการแข่งขันออกใบ "เข้าร่วม" ได้เลย
+  // (งานอบรมที่ครูลงคะแนนแล้วประกาศผล จะได้ใบแบบมีเหรียญเอง — ดู certScored)
+  const requiresPublish = ev.kind !== "training" && !comp.noContest;
+  if (requiresPublish && !comp.isPublished)
     return { ready: false, code: "not_published", reason: "ยังไม่ประกาศผล" };
   // รายการที่ไม่มีการแข่งขันใช้การเช็คชื่อผู้เข้าร่วมแทนการประกาศผล — ไม่เช็คชื่อ = ไม่รู้ว่าใครมา
   // (ถ้าปล่อยผ่าน ครูที่ลืมเช็คชื่อจะออกใบให้ทุกคนที่ลงทะเบียนไว้ รวมคนที่ไม่ได้มา)

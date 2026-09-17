@@ -18,7 +18,7 @@ import {
   type IssueTarget,
 } from "@/lib/certificates";
 import { logAudit } from "@/lib/audit";
-import { certIssueGate, CERT_GATE_FIX } from "@/lib/domain";
+import { certIssueGate, certScored, CERT_GATE_FIX } from "@/lib/domain";
 import type { SessionPayload } from "@/lib/auth/session";
 
 /**
@@ -61,8 +61,9 @@ export async function POST(req: Request) {
     });
     if (!gate.ready) return fail(CERT_GATE_FIX[gate.code]);
 
-    // ไม่มีคะแนน = งานอบรม (ทั้งงาน) หรือรายการที่ติ๊ก "ไม่มีการแข่งขัน" (รายการเดียว)
-    const noScoring = event.kind === "training" || comp.noContest;
+    // ไม่มีคะแนน = รายการที่ติ๊ก "ไม่มีการแข่งขัน" หรืองานอบรมที่ยังไม่ได้ประกาศผลรายการนี้
+    // (งานอบรมที่ครูลงคะแนนแล้วกดประกาศผล = มีการตัดสินจริง → ออกใบแบบมีเหรียญ/อันดับ)
+    const noScoring = !certScored(event, comp);
 
     // ปีและเกณฑ์เหรียญต้องมาจาก "ปีของรายการแข่งขัน" ไม่ใช่ปีที่เปิดใช้งานอยู่
     // ไม่งั้นการออกใบย้อนหลังจะได้เลขทะเบียน/ปี พ.ศ. บนใบเป็นปีปัจจุบัน (งานปี 2567 ได้เลข 2569/xxxx)

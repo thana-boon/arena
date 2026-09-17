@@ -37,7 +37,7 @@ import {
   type SampleCompetition,
   type SampleVariant,
 } from "@/lib/certificateLayout";
-import { AWARD_LABEL, certRankLabel, rankAwardLabel, type CertAward } from "@/lib/domain";
+import { AWARD_LABEL, certRankLabel, certScored, rankAwardLabel, type CertAward } from "@/lib/domain";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 const assetUrl = (id: number | null) => (id == null ? null : `${BASE}/api/admin/certificate-assets/${id}`);
@@ -181,7 +181,7 @@ export function CertEditor(props: {
    */
   const pickComp = (id: number | null) =>
     setVariant((v) => {
-      const scored = (c: SampleCompetition | null) => props.event.kind !== "training" && c != null && !c.noContest;
+      const scored = (c: SampleCompetition | null) => c != null && certScored(props.event, c);
       const next = props.competitions.find((c) => c.id === id) ?? null;
       const fresh = variantForComp(next, props.event.kind);
       const keepAward = scored(next) && scored(props.competitions.find((c) => c.id === v.competitionId) ?? null);
@@ -1540,7 +1540,7 @@ function SampleBar({
   const cur = comps.find((c) => c.id === variant.competitionId) ?? null;
   // ใบจริงของรายการแบบนี้ได้รางวัลเดียวกันทุกใบหรือไม่ — ถ้าใช่ ค่อยบอกว่าจะเป็นอะไร
   // (รายการแข่งขันปกติแล้วแต่คะแนนของแต่ละคน จะบอกว่า "ใบจริงจะเป็นแบบนี้" ไม่ได้)
-  const fixed = eventKind === "training" || cur?.noContest === true;
+  const fixed = cur ? !certScored({ kind: eventKind }, cur) : eventKind === "training";
   const real = variantForComp(cur, eventKind);
 
   // เรียกตรง ๆ ไม่ใช่คอมโพเนนต์ย่อย — ไม่งั้น React ถอด/ใส่ <select> ใหม่ทุกครั้งที่ render แล้วโฟกัสหลุด
@@ -1632,7 +1632,11 @@ function SampleBar({
         ชื่อ ชั้น และชื่อทีม หยิบจากผู้สมัครจริงของรายการที่เลือก (คนที่ชื่อยาวที่สุด — จะได้เห็นก่อนว่าล้นกรอบไหม)
         {fixed && (
           <>
-            {" "}· {eventKind === "training" ? "งานนี้เป็นงานอบรม" : "รายการนี้ตั้งไว้ว่าไม่มีการแข่งขัน"} ใบจริงทุกใบจึงเป็น
+            {" "}·{" "}
+            {cur?.noContest
+              ? "รายการนี้ตั้งไว้ว่าไม่มีการแข่งขัน"
+              : "งานนี้เป็นงานอบรมและยังไม่ได้ประกาศผลรายการนี้"}{" "}
+            ใบจริงทุกใบจึงเป็น
             “{AWARD_LABEL[real.award]}” และไม่มีอันดับ
           </>
         )}{" "}

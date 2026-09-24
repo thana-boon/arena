@@ -1538,7 +1538,7 @@ export function CertEditor(props: {
               {signatures.map((s, i) => (
                 <div
                   key={i}
-                  className={`card stack${sel?.kind === "sig" && sel.i === i ? " cert-sig-active" : ""}`}
+                  className={`card stack cert-sig-card${sel?.kind === "sig" && sel.i === i ? " cert-sig-active" : ""}`}
                   style={{ gap: 8, background: "var(--surface-2, #f8fafc)" }}
                   onClick={() => setSel({ kind: "sig", i })}
                 >

@@ -131,6 +131,25 @@ body {
   margin: 0;
   padding: 0;
 }
+
+/* อะไรที่กดได้ต้องขึ้นรูปมือ — :where() ไม่มี specificity คลาสไหนตั้ง cursor เองก็ยังชนะ */
+:where(
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  [role="switch"],
+  [role="checkbox"],
+  [role="radio"],
+  summary,
+  select,
+  input:is([type="checkbox"], [type="radio"], [type="file"], [type="color"], [type="submit"], [type="button"], [type="reset"]),
+  label:has(input:is([type="checkbox"], [type="radio"]):not(:disabled))
+):where(:not(:disabled, [aria-disabled="true"])) {
+  cursor: pointer;
+}
+
 /* พื้นหลัง canvas ต้องอยู่ที่ <html> ด้วย — ไม่งั้นเวลาเลื่อนเลยขอบ (overscroll/แถบเลื่อนแนวนอน
    บนจอแคบ) จะโผล่พื้นขาวของเบราว์เซอร์ออกมาแทนที่จะเป็นสีพื้นของเรา */
 html {
@@ -3882,6 +3901,9 @@ p {
   position: sticky;
   top: var(--space-3);
   align-self: flex-start;
+}
+.cert-sig-card {
+  cursor: pointer;
 }
 .cert-sig-active {
   outline: 2px solid var(--skdw-purple);

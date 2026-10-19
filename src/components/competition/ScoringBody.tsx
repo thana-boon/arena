@@ -91,6 +91,14 @@ export async function ScoringBody({
           initialCodes={pickedCodes}
           checkedAtText={comp.attendanceCheckedAt ? formatThaiDateTime(comp.attendanceCheckedAt) : null}
           loadError={loadError}
+          // ปุ่ม "ไปออกเกียรติบัตร" ในกล่องผลการบันทึก — คงบริบท /admin หรือ /teacher ตามหน้าที่เข้ามา
+          certHref={
+            comp.eventId == null
+              ? null
+              : backHref.startsWith("/admin")
+                ? `/admin/cert-issue/${comp.eventId}`
+                : `/teacher/certificates/${comp.eventId}`
+          }
         />
       </div>
     );

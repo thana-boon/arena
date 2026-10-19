@@ -234,10 +234,14 @@ export function CompetitionsTable({
                   {[c.groupName, ...c.coGroupNames].filter(Boolean).join(" + ")}
                 </td>
                 <td data-label="ประเภท">
-                  <span>
-                    <span className="badge">{c.type === "team" ? "ทีม" : "เดี่ยว"}</span>
-                    {c.noContest && <span className="badge badge-purple" style={{ marginLeft: 4 }}>ไม่มีการแข่งขัน</span>}
-                  </span>
+                  {c.participantType === "teacher" ? (
+                    <span className="badge badge-purple">กิจกรรมของครู</span>
+                  ) : (
+                    <span>
+                      <span className="badge">{c.type === "team" ? "ทีม" : "เดี่ยว"}</span>
+                      {c.noContest && <span className="badge badge-purple" style={{ marginLeft: 4 }}>ไม่มีการแข่งขัน</span>}
+                    </span>
+                  )}
                 </td>
                 <td className="num" data-label="รับ/สมัคร">{isUnlimited(c.capacity) ? "ไม่จำกัด" : c.capacity} / {c.registered}</td>
                 <td data-label="สถานะ">
@@ -246,11 +250,11 @@ export function CompetitionsTable({
                     {c.noContest
                       ? c.attendanceChecked
                         ? <span className="badge badge-success">เช็คชื่อแล้ว</span>
-                        : <span className="badge badge-warning">ยังไม่เช็คชื่อ</span>
+                        : <span className="badge badge-warning">{c.participantType === "teacher" ? "ยังไม่ติ๊กรายชื่อ" : "ยังไม่เช็คชื่อ"}</span>
                       : c.isPublished
                         ? <span className="badge badge-success">ประกาศผลแล้ว</span>
                         : <span className="badge badge-warning">ยังไม่ประกาศ</span>}
-                    {!c.visibleToStudents && <span className="badge">ซ่อนจากนักเรียน</span>}
+                    {!c.visibleToStudents && c.participantType === "student" && <span className="badge">ซ่อนจากนักเรียน</span>}
                     {/* บอกให้เห็นว่าทำไมปุ่มแก้ไข/ลบหายไป — ไม่ใช่ปุ่มหายเฉย ๆ โดยไม่มีเหตุผล */}
                     {c.compEditReason && (
                       <span className="badge badge-warning" title={c.compEditReason}>

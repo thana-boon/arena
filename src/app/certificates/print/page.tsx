@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireAuth } from "@/lib/auth/guards";
 import { isStaff } from "@/lib/auth/session";
-import { getIssuesByIds, loadTemplatesForPrint, verifyBaseUrl, type CertRenderData } from "@/lib/certificates";
+import { getIssuesByIds, teacherCompetitionIds, loadTemplatesForPrint, verifyBaseUrl, type CertRenderData } from "@/lib/certificates";
 import { CertificateCanvas } from "@/components/certificate/CertificateCanvas";
 import { formatThaiDate } from "@/lib/domain";
 import type { CertAward } from "@/lib/domain";
@@ -23,9 +23,12 @@ export default async function CertificatePrintPage({
 
   const all = await getIssuesByIds(ids);
   // นักเรียนพิมพ์ได้เฉพาะใบของตัวเองที่ยังไม่ถูกยกเลิก — id ในลิงก์เดาได้ จึงต้องกรองที่นี่ ไม่ใช่แค่ที่หน้ารายการ
+  // (ใบของกิจกรรมครูเก็บรหัสครูในช่องเดียวกัน รหัสที่บังเอิญตรงกันต้องไม่ทำให้เด็กพิมพ์ใบของครูได้)
+  const teacherComps =
+    session.role === "student" ? await teacherCompetitionIds(all.map((i) => i.competitionId)) : new Set<number>();
   const issues =
     session.role === "student"
-      ? all.filter((i) => i.studentCode === session.code && i.revokedAt == null)
+      ? all.filter((i) => i.studentCode === session.code && i.revokedAt == null && !teacherComps.has(i.competitionId))
       : all;
   const templates = await loadTemplatesForPrint(issues.map((i) => i.templateId));
   const verifyBase = await verifyBaseUrl();

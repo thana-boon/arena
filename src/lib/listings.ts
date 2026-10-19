@@ -19,6 +19,8 @@ export type CompListItem = {
   name: string;
   type: "individual" | "team";
   noContest: boolean; // true = ไม่มีการแข่งขัน (ไม่มีคะแนน/อันดับ/รางวัล)
+  /** ผู้เข้าร่วมเป็นใคร — "teacher" = กิจกรรมของครู (ติ๊กรายชื่อครู แทนการสมัคร/เช็คชื่อนักเรียน) */
+  participantType: "student" | "teacher";
   /**
    * เช็คชื่อผู้เข้าร่วมแล้วหรือยัง — ใช้เฉพาะรายการที่ noContest (รายการแข่งขันปกติเป็น false เสมอ)
    * false = ยังไม่มีใครยืนยันว่าใครมา จึงยังออกเกียรติบัตรไม่ได้
@@ -86,6 +88,7 @@ export async function listCompetitions(yearId: number): Promise<CompListItem[]> 
       name: c.name,
       type: c.type as "individual" | "team",
       noContest: c.noContest,
+      participantType: c.participantType === "teacher" ? ("teacher" as const) : ("student" as const),
       attendanceChecked: c.attendanceCheckedAt != null,
       subjectGroupId: c.subjectGroupId,
       groupCatalogNos: catalogNos(c),

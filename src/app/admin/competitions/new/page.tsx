@@ -42,6 +42,7 @@ export default async function AdminNewCompetition() {
           coSubjectGroupIds: [],
           type: "individual",
           noContest: false,
+          participantType: "student",
           visibleToStudents: true,
           teamSizeMin: "",
           teamSizeMax: "",

@@ -68,6 +68,9 @@ export async function registerEntry(args: RegisterArgs): Promise<RegisterResult>
   const comp = (await db.select().from(competitions).where(eq(competitions.id, args.competitionId)).limit(1))[0];
   if (!comp) throw new RegistrationError("ไม่พบรายการแข่งขัน", 404);
   if (comp.yearId !== year.id) throw new RegistrationError("รายการนี้ไม่ได้อยู่ในปีการศึกษาปัจจุบัน");
+  // กิจกรรมของครูลงชื่อนักเรียนไม่ได้ — รายชื่อครูติ๊กที่หน้า "ติ๊กรายชื่อครู" เท่านั้น
+  if (comp.participantType === "teacher")
+    throw new RegistrationError("รายการนี้เป็นกิจกรรมของครู — ลงชื่อนักเรียนไม่ได้");
 
   // งานที่รายการสังกัด — เป็นเจ้าของช่วงรับสมัคร/การมองเห็น
   const event = comp.eventId
@@ -145,7 +148,11 @@ export async function registerEntry(args: RegisterArgs): Promise<RegisterResult>
   }
 
   // ดึง active entries ของสมาชิกเหล่านี้ในปีนี้ (ใช้ตรวจกติกา 3,4 และกันลงซ้ำ)
-  const compsThisYear = await db.select().from(competitions).where(eq(competitions.yearId, year.id));
+  // เฉพาะรายการของนักเรียน — กิจกรรมของครูเก็บรหัสครูในช่องเดียวกัน ห้ามนับเป็นโควตา/เวลาชนของเด็ก
+  const compsThisYear = await db
+    .select()
+    .from(competitions)
+    .where(and(eq(competitions.yearId, year.id), eq(competitions.participantType, "student")));
   const compIds = compsThisYear.map((c) => c.id);
   const compById = new Map(compsThisYear.map((c) => [c.id, c]));
 

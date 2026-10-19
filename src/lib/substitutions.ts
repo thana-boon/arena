@@ -98,7 +98,8 @@ async function substitutableCompetitions(
   yearId: number
 ): Promise<CompListItem[]> {
   const all = await listCompetitions(yearId);
-  return all.filter((c) => canSubstitute(session, c.createdBy, c.groupCatalogNos));
+  // กิจกรรมของครูไม่มีการเปลี่ยนตัว (แก้รายชื่อที่หน้า "ติ๊กรายชื่อครู" ได้เลย)
+  return all.filter((c) => c.participantType === "student" && canSubstitute(session, c.createdBy, c.groupCatalogNos));
 }
 
 /** จำนวนครั้งที่เปลี่ยนตัวไปแล้ว ต่อรายการแข่งขัน */

@@ -46,7 +46,11 @@ export async function getStudentEntries(studentCode: string, yearId: number): Pr
   const venueLabels = await getVenueLabelsByCompetition(compIds);
 
   return entRows
-    .filter((e) => compById.get(e.competitionId)?.yearId === yearId)
+    // กิจกรรมของครูเก็บรหัสครูไว้ในช่องเดียวกัน — รหัสที่บังเอิญตรงกันต้องไม่กลายเป็นรายการของเด็ก
+    .filter((e) => {
+      const c = compById.get(e.competitionId);
+      return c?.yearId === yearId && c.participantType !== "teacher";
+    })
     .map((e) => {
       const c = compById.get(e.competitionId)!;
       return {

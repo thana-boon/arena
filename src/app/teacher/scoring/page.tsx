@@ -33,8 +33,14 @@ export default async function ScoringList() {
                   <td className="td-title" style={{ fontWeight: 500 }}>{c.name}</td>
                   <td className="text-sm" data-label="หมวด">{c.groupName}</td>
                   <td data-label="ประเภท">
-                    <span className="badge">{c.type === "team" ? "ทีม" : "เดี่ยว"}</span>
-                    {c.noContest && <span className="badge badge-purple" style={{ marginLeft: 4 }}>ไม่มีการแข่งขัน</span>}
+                    {c.participantType === "teacher" ? (
+                      <span className="badge badge-purple">กิจกรรมของครู</span>
+                    ) : (
+                      <>
+                        <span className="badge">{c.type === "team" ? "ทีม" : "เดี่ยว"}</span>
+                        {c.noContest && <span className="badge badge-purple" style={{ marginLeft: 4 }}>ไม่มีการแข่งขัน</span>}
+                      </>
+                    )}
                   </td>
                   <td className="num" data-label="ผู้เข้าแข่ง">{c.activeEntries}</td>
                   {/* ไม่มีการแข่งขัน = ไม่มีผลให้ประกาศ สถานะที่ครูต้องรู้คือ "เช็คชื่อแล้วหรือยัง" */}
@@ -42,7 +48,7 @@ export default async function ScoringList() {
                     {c.noContest
                       ? c.attendanceChecked
                         ? <span className="badge badge-success">เช็คชื่อแล้ว</span>
-                        : <span className="badge badge-warning">ยังไม่เช็คชื่อ</span>
+                        : <span className="badge badge-warning">{c.participantType === "teacher" ? "ยังไม่ติ๊กรายชื่อ" : "ยังไม่เช็คชื่อ"}</span>
                       : c.isPublished
                         ? <span className="badge badge-success">ประกาศแล้ว</span>
                         : <span className="badge badge-warning">ยังไม่ประกาศ</span>}
@@ -50,7 +56,7 @@ export default async function ScoringList() {
                   <td className="num td-actions">
                     <div className="row" style={{ justifyContent: "flex-end" }}>
                       <Link href={`/teacher/scoring/${c.id}`} className="btn btn-primary btn-sm">
-                        {c.noContest ? "เช็คชื่อ" : "บันทึกผล"}
+                        {c.participantType === "teacher" ? "ติ๊กรายชื่อครู" : c.noContest ? "เช็คชื่อ" : "บันทึกผล"}
                       </Link>
                     </div>
                   </td>

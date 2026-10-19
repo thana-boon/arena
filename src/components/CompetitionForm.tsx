@@ -21,6 +21,11 @@ export type CompFormInitial = {
   /** กลุ่มสาระร่วม — หมวดอื่นที่ทำรายการนี้ด้วยกัน (ไม่รวมหมวดหลักข้างบน) */
   coSubjectGroupIds: number[];
   type: "individual" | "team";
+  /**
+   * ผู้เข้าร่วมเป็นใคร — "teacher" = กิจกรรมของครู: ติ๊กรายชื่อครูที่หน้าเช็คชื่อแล้วออกเกียรติบัตร
+   * (เซิร์ฟเวอร์บังคับเป็นเดี่ยว + ไม่มีการแข่งขัน + ซ่อนจากนักเรียนเอง ฟอร์มแค่ซ่อนช่องที่ไม่เกี่ยว)
+   */
+  participantType: "student" | "teacher";
   /** ไม่มีการแข่งขัน — ลงทะเบียนรายชื่อ + ออกเกียรติบัตรอย่างเดียว (ไม่มีคะแนน/อันดับ/รางวัล) */
   noContest: boolean;
   /** นักเรียนเห็นรายการนี้ในหน้าสมัครหรือไม่ (false = ครูลงให้อย่างเดียว) */
@@ -156,8 +161,9 @@ export function CompetitionForm({
     () => events.find((ev) => ev.id === Number(f.eventId))?.kind === "training",
     [events, f.eventId]
   );
-  // รายการที่ติ๊ก "ไม่มีการแข่งขัน" ก็ไม่มีคะแนนเช่นกัน — ซ่อนส่วนเกณฑ์ไปเลย
-  const noScoring = isTraining || f.noContest;
+  const forTeachers = f.participantType === "teacher";
+  // รายการที่ติ๊ก "ไม่มีการแข่งขัน" ก็ไม่มีคะแนนเช่นกัน — ซ่อนส่วนเกณฑ์ไปเลย (กิจกรรมของครูก็เช่นกัน)
+  const noScoring = isTraining || f.noContest || forTeachers;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -167,7 +173,7 @@ export function CompetitionForm({
 
     // เกณฑ์การให้คะแนน: ตัดแถวว่างทิ้ง, ทุกแถวที่มีข้อมูลต้องมีทั้งชื่อและคะแนน > 0
     // รายการที่ไม่มีการแข่งขัน = ไม่มีเกณฑ์เลย (ทิ้งของที่เคยกรอกไว้)
-    const filledCriteria = f.noContest
+    const filledCriteria = f.noContest || forTeachers
       ? []
       : f.criteria.filter((c) => c.name.trim() !== "" || c.maxScore !== "");
     for (const c of filledCriteria) {
@@ -197,6 +203,7 @@ export function CompetitionForm({
       // หมวดร่วม — ตัดหมวดหลักออก (เซิร์ฟเวอร์ตัดซ้ำอีกชั้น)
       coSubjectGroupIds: f.coSubjectGroupIds.filter((g) => g !== Number(f.subjectGroupId)),
       type: f.type,
+      participantType: f.participantType,
       noContest: f.noContest,
       visibleToStudents: f.visibleToStudents,
       teamSizeMin: f.type === "team" && f.teamSizeMin !== "" ? Number(f.teamSizeMin) : null,
@@ -280,9 +287,32 @@ export function CompetitionForm({
           </div>
         </div>
         <div className="form-section-body">
+          {/* ผู้เข้าร่วม — สลับได้เฉพาะตอนยังไม่มีรายชื่อ (แถวที่ลงไว้เป็นรหัสของอีกฝั่ง) */}
           <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">ชื่อรายการแข่งขัน</label>
-            <input className="form-input" value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="เช่น คัดลายมือ ระดับ ม.ต้น" />
+            <label className="form-label">ผู้เข้าร่วม</label>
+            <div className="seg" role="group" aria-label="ผู้เข้าร่วม">
+              <button type="button" className={`seg-btn${!forTeachers ? " on" : ""}`} disabled={hasEntries} onClick={() => set("participantType", "student")}>
+                นักเรียน
+              </button>
+              <button type="button" className={`seg-btn${forTeachers ? " on" : ""}`} disabled={hasEntries} onClick={() => set("participantType", "teacher")}>
+                ครู
+              </button>
+            </div>
+            <span className="form-hint">
+              {forTeachers
+                ? "กิจกรรมของครู เช่น อบรม/ประชุม — หลังสร้างแล้ว ติ๊กรายชื่อครูที่เข้าร่วมได้ที่ปุ่ม “ติ๊กรายชื่อครู” แล้วออกเกียรติบัตรให้ได้เลย (นักเรียนมองไม่เห็นรายการนี้)"
+                : "รายการสำหรับนักเรียน — สมัคร/ลงชื่อ บันทึกผล และออกเกียรติบัตรตามปกติ"}
+              {hasEntries && " · เปลี่ยนไม่ได้แล้วเพราะมีรายชื่อในรายการนี้"}
+            </span>
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">{forTeachers ? "ชื่อกิจกรรม" : "ชื่อรายการแข่งขัน"}</label>
+            <input
+              className="form-input"
+              value={f.name}
+              onChange={(e) => set("name", e.target.value)}
+              placeholder={forTeachers ? "เช่น อบรมการใช้ AI ในการจัดการเรียนรู้" : "เช่น คัดลายมือ ระดับ ม.ต้น"}
+            />
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">รายละเอียด</label>
@@ -294,7 +324,7 @@ export function CompetitionForm({
               onChange={(e) => set("description", e.target.value)}
               placeholder="เช่น กติกา อุปกรณ์ที่ต้องเตรียม เกณฑ์การตัดสิน (ไม่บังคับ)"
             />
-            <span className="form-hint">แสดงให้นักเรียนเห็นในหน้าสมัคร · ไม่เกิน 2000 ตัวอักษร</span>
+            <span className="form-hint">{forTeachers ? "ไม่เกิน 2000 ตัวอักษร" : "แสดงให้นักเรียนเห็นในหน้าสมัคร · ไม่เกิน 2000 ตัวอักษร"}</span>
           </div>
           <div className="grid-2">
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -343,6 +373,8 @@ export function CompetitionForm({
             </span>
           </div>
 
+          {!forTeachers && (
+          <>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">ประเภทการแข่งขัน</label>
             <div className="seg" role="group" aria-label="ประเภทการแข่งขัน">
@@ -416,10 +448,23 @@ export function CompetitionForm({
               </span>
             </span>
           </label>
+          </>
+          )}
         </div>
       </section>
 
-      {/* ── ส่วนที่ 2: ผู้เข้าแข่งขันและจำนวนรับ ── */}
+      {/* ── ส่วนที่ 2: ผู้เข้าแข่งขันและจำนวนรับ (กิจกรรมของครูไม่มีระดับชั้น/โควตา) ── */}
+      {forTeachers ? (
+        <section className="card form-section">
+          <div className="form-section-head">
+            <span className="ico"><Icon name="user" size={20} /></span>
+            <div>
+              <h3>ผู้เข้าร่วม</h3>
+              <div className="hint">ครู — ไม่จำกัดจำนวน · ติ๊กรายชื่อได้หลังสร้างรายการ ที่ปุ่ม “ติ๊กรายชื่อครู”</div>
+            </div>
+          </div>
+        </section>
+      ) : (
       <section className="card form-section">
         <div className="form-section-head">
           <span className="ico"><Icon name="user" size={20} /></span>
@@ -493,6 +538,7 @@ export function CompetitionForm({
           </div>
         </div>
       </section>
+      )}
 
       {/* ── ส่วนที่ 3: วัน เวลา และสถานที่ ── */}
       <section className="card form-section">
@@ -562,13 +608,17 @@ export function CompetitionForm({
       </section>
 
       {/* ── ส่วนที่ 4: เกณฑ์การให้คะแนน (รายการที่ไม่มีการแข่งขันไม่มีส่วนนี้) ── */}
-      {f.noContest ? (
+      {f.noContest || forTeachers ? (
         <section className="card form-section">
           <div className="form-section-head">
             <span className="ico"><Icon name="chart" size={20} /></span>
             <div>
               <h3>เกณฑ์การให้คะแนน</h3>
-              <div className="hint">รายการนี้ตั้งเป็น “ไม่มีการแข่งขัน” — ไม่ต้องกำหนดเกณฑ์คะแนน</div>
+              <div className="hint">
+                {forTeachers
+                  ? "กิจกรรมของครูไม่มีคะแนน — ครูที่ติ๊กรายชื่อได้เกียรติบัตร “เข้าร่วมกิจกรรม”"
+                  : "รายการนี้ตั้งเป็น “ไม่มีการแข่งขัน” — ไม่ต้องกำหนดเกณฑ์คะแนน"}
+              </div>
             </div>
           </div>
         </section>

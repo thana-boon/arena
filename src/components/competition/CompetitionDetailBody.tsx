@@ -5,7 +5,7 @@ import { competitions, criteria, events, subjectGroups } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { parseJsonArray, formatThaiDate, formatSeats, registrationWindow } from "@/lib/domain";
 import { canScore, canViewCompetition, canEditCompetition, competitionManageGuard } from "@/lib/permit";
-import { getRoster, getCapacityRows } from "@/lib/roster";
+import { getRoster, getCapacityRows, type RosterMember } from "@/lib/roster";
 import { getCoGroupIds } from "@/lib/competitionGroups";
 import type { SessionPayload } from "@/lib/auth/session";
 import { RosterManager } from "@/app/teacher/competitions/[id]/RosterManager";
@@ -58,6 +58,8 @@ export async function CompetitionDetailBody({
   const canEdit =
     canEditCompetition(session, comp.createdBy, groupNos) &&
     competitionManageGuard(session, event).allowed;
+  const forTeachers = comp.participantType === "teacher";
+  const scoreLabel = forTeachers ? "ติ๊กรายชื่อครู" : comp.noContest ? "เช็คชื่อผู้เข้าร่วม" : "บันทึกผล";
 
   return (
     <div className="stack">
@@ -68,11 +70,14 @@ export async function CompetitionDetailBody({
         <div className="page-header" style={{ marginBottom: 0 }}>
           <h1>{comp.name}</h1>
           <div className="subtitle">
-            {[group?.name, ...coGroupNames].filter(Boolean).join(" + ")} ·{" "}
-            {comp.type === "team"
+            {[group?.name, ...coGroupNames].filter(Boolean).join(" + ")}
+            {[group?.name, ...coGroupNames].some(Boolean) && " · "}
+            {forTeachers
+              ? "กิจกรรมของครู"
+              : comp.type === "team"
               ? `ทีม ${comp.teamSizeMin}-${comp.teamSizeMax} คน (${comp.allowCrossClass ? "ข้ามห้องได้" : "ห้ามข้ามห้อง"})`
               : "เดี่ยว"}
-            {comp.noContest ? " · ไม่มีการแข่งขัน" : ` · คะแนนเต็ม ${fullScore}`}
+            {forTeachers ? "" : comp.noContest ? " · ไม่มีการแข่งขัน" : ` · คะแนนเต็ม ${fullScore}`}
             {eventDateTh && ` · ${eventDateTh}${comp.startTime ? ` ${comp.startTime.slice(0, 5)}–${comp.endTime?.slice(0, 5)} น.` : ""}`}
           </div>
         </div>
@@ -82,13 +87,13 @@ export async function CompetitionDetailBody({
           {/* ไม่มีการแข่งขัน = ไม่มีคะแนนให้กรอก แต่ยังต้องเช็คชื่อว่าใครมาร่วม (ปลายทางเดียวกัน) */}
           {canScore(session, comp.createdBy, groupNos) && (
             <Link href={`${scoreBasePath}/${id}`} className="btn btn-primary">
-              {comp.noContest ? "เช็คชื่อผู้เข้าร่วม" : "บันทึกผล"}
+              {scoreLabel}
             </Link>
           )}
         </div>
       </div>
 
-      {!comp.visibleToStudents && (
+      {!comp.visibleToStudents && !forTeachers && (
         <div className="alert alert-warning">
           รายการนี้ซ่อนจากนักเรียน — นักเรียนมองไม่เห็นและสมัครเองไม่ได้ และไม่ขึ้นในหน้า “การสมัครรายห้อง”
           ของครูประจำชั้น ลงชื่อให้ได้เฉพาะครูเจ้าของรายการ ครูในหมวดเดียวกัน หรือผู้ดูแลระบบ
@@ -102,6 +107,13 @@ export async function CompetitionDetailBody({
         </div>
       )}
 
+      {forTeachers ? (
+        <TeacherRoster
+          members={roster.flatMap((e) => e.members).filter((m) => !m.absent)}
+          pickHref={canScore(session, comp.createdBy, groupNos) ? `${scoreBasePath}/${id}` : null}
+        />
+      ) : (
+      <>
       <div className="card">
         <div className="card-header" style={{ padding: 0, border: "none", marginBottom: 12 }}>ที่นั่ง</div>
         <div className="row">
@@ -143,6 +155,48 @@ export async function CompetitionDetailBody({
         regClosedReason={regClosedReason}
         hasEvent={!!event}
       />
+      </>
+      )}
+    </div>
+  );
+}
+
+/** รายชื่อครูที่ติ๊กไว้ของกิจกรรมของครู — ดูอย่างเดียว การเพิ่ม/ลดทำที่หน้า "ติ๊กรายชื่อครู" */
+function TeacherRoster({ members, pickHref }: { members: RosterMember[]; pickHref: string | null }) {
+  return (
+    <div className="card">
+      <div className="row between" style={{ marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+        <div className="card-header" style={{ padding: 0, border: "none", margin: 0 }}>
+          ครูที่เข้าร่วม ({members.length} คน)
+        </div>
+        {pickHref && (
+          <Link href={pickHref} className="btn btn-secondary btn-sm">ติ๊กรายชื่อครู</Link>
+        )}
+      </div>
+      {members.length ? (
+        <div className="table-wrap table-cards">
+          <table className="table">
+            <thead>
+              <tr>
+                <th style={{ width: 60 }}>ที่</th>
+                <th>ชื่อ - นามสกุล</th>
+                <th>รหัสครู</th>
+              </tr>
+            </thead>
+            <tbody>
+              {members.map((m, i) => (
+                <tr key={m.memberId}>
+                  <td data-label="ที่">{i + 1}</td>
+                  <td className="td-title">{m.name}</td>
+                  <td className="text-sm" data-label="รหัสครู">{m.studentCode}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="muted" style={{ margin: 0 }}>ยังไม่ได้ติ๊กรายชื่อครู</p>
+      )}
     </div>
   );
 }

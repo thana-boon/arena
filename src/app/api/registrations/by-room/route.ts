@@ -116,7 +116,8 @@ export async function GET(req: Request) {
             and(
               inArray(entryMembers.studentCode, codes),
               eq(entries.status, "active"),
-              eq(competitions.yearId, year.id)
+              eq(competitions.yearId, year.id),
+              eq(competitions.participantType, "student") // กิจกรรมของครูเก็บรหัสครูในช่องเดียวกัน
             )
           )
       : [];

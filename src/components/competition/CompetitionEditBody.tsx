@@ -48,7 +48,9 @@ export async function CompetitionEditBody({
   const entRows = await db.select({ id: entries.id, status: entries.status }).from(entries).where(eq(entries.competitionId, id));
   const locked = entRows.length > 0;
   // เวลาแข่งขันล็อกเมื่อยังมีคนลงทะเบียนอยู่จริง (ที่ถอนแล้วไม่นับ) — กฎเดียวกับที่ API ตรวจซ้ำ
-  const scheduleLocked = !isAdmin && entRows.some((e) => e.status === "active");
+  // กิจกรรมของครูไม่ล็อกเวลา (ล็อกไว้กันเวลาชนกับรายการอื่นที่นักเรียนลงไว้ ซึ่งครูไม่มี)
+  const scheduleLocked =
+    !isAdmin && comp.participantType === "student" && entRows.some((e) => e.status === "active");
   const slots = await getTimeSlots(year.id);
   const venues = await getVenues();
   const venueIds = await getCompetitionVenueIds(id);
@@ -114,6 +116,7 @@ export async function CompetitionEditBody({
           coSubjectGroupIds: coGroupIds,
           type: comp.type as "individual" | "team",
           noContest: comp.noContest,
+          participantType: comp.participantType === "teacher" ? "teacher" : "student",
           visibleToStudents: comp.visibleToStudents,
           teamSizeMin: comp.teamSizeMin ?? "",
           teamSizeMax: comp.teamSizeMax ?? "",

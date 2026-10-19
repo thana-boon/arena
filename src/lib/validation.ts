@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CLASS_LEVELS } from "@/lib/domain";
+import { CLASS_LEVELS, UNLIMITED_CAPACITY } from "@/lib/domain";
 
 export const criterionInput = z.object({
   name: z.string().min(1, "กรุณากรอกชื่อเกณฑ์"),
@@ -18,6 +18,8 @@ export const competitionInput = z
     // ครูในหมวดร่วมได้สิทธิ์เท่าครูหมวดเจ้าของ ; เซิร์ฟเวอร์ตัดหมวดหลัก/ตัวซ้ำออกให้เอง
     coSubjectGroupIds: z.array(z.number().int().positive()).optional().default([]),
     type: z.enum(["individual", "team"]),
+    // ผู้เข้าร่วมเป็นใคร — 'teacher' = กิจกรรมของครู (ติ๊กรายชื่อครูแล้วออกเกียรติบัตร) ; ไม่ส่งมา = นักเรียน
+    participantType: z.enum(["student", "teacher"]).optional().default("student"),
     // ไม่มีการแข่งขัน — ลงทะเบียนรายชื่อ + ออกเกียรติบัตรอย่างเดียว (ไม่มีคะแนน/อันดับ/รางวัล)
     noContest: z.boolean().optional().default(false),
     // นักเรียนเห็นรายการนี้ในหน้าสมัครหรือไม่ (false = ครูลงให้อย่างเดียว)
@@ -26,7 +28,8 @@ export const competitionInput = z
     teamSizeMax: z.number().int().positive().nullable().optional(),
     // ทีมข้ามห้อง — ไม่ส่งมา = false (ทีมต้องเป็นนักเรียนห้องเดียวกัน)
     allowCrossClass: z.boolean().optional().default(false),
-    allowedClassLevels: z.array(z.enum(CLASS_LEVELS)).min(1, "เลือกระดับชั้นอย่างน้อย 1 ระดับ"),
+    // บังคับอย่างน้อย 1 ระดับเฉพาะรายการของนักเรียน (ตรวจใน superRefine) — กิจกรรมของครูไม่มีระดับชั้น
+    allowedClassLevels: z.array(z.enum(CLASS_LEVELS)).optional().default([]),
     // ช่วงเวลาแข่งขัน — บังคับเลือกจาก time_slots (เซิร์ฟเวอร์ resolve เป็น start/end time เอง)
     timeSlotId: z.number().int().positive("กรุณาเลือกช่วงเวลาแข่งขัน"),
     // สถานที่แข่งขัน (optional, เลือกได้หลายห้อง) + flag ยืนยันใช้ห้องเดียวกันเมื่อชนกับรายการอื่น
@@ -43,6 +46,9 @@ export const competitionInput = z
     criteria: z.array(criterionInput).optional().default([]),
   })
   .superRefine((v, ctx) => {
+    if (v.participantType === "teacher") return; // ถูกจัดรูปใหม่ทั้งก้อนใน transform ข้างล่าง
+    if (!v.allowedClassLevels.length)
+      ctx.addIssue({ code: "custom", message: "เลือกระดับชั้นอย่างน้อย 1 ระดับ", path: ["allowedClassLevels"] });
     if (v.type === "team") {
       if (!v.teamSizeMin || !v.teamSizeMax)
         ctx.addIssue({ code: "custom", message: "กรุณากรอกจำนวนสมาชิกทีม (ต่ำสุด-สูงสุด)", path: ["teamSizeMin"] });
@@ -53,6 +59,23 @@ export const competitionInput = z
   // ทีมที่กำหนดสมาชิกสูงสุด = 1 คน ก็คือแข่งเดี่ยว → แปลงเป็น individual ให้อัตโนมัติ
   // (โควตา "จำนวนทีม" กลายเป็นโควตารวมทุกระดับชั้น เพราะ 1 ทีม = 1 คน)
   .transform((v) => {
+    // กิจกรรมของครู: ครูติ๊กรายชื่อครูทีละคน → เดี่ยว, ไม่มีการแข่งขัน (เช็คชื่อแทนคะแนน),
+    // นักเรียนมองไม่เห็นเด็ดขาด, ไม่มีระดับชั้น/โควตา/เกณฑ์ — บังคับที่นี่ที่เดียว ไม่ไว้ใจค่าจากฟอร์ม
+    if (v.participantType === "teacher") {
+      return {
+        ...v,
+        type: "individual" as const,
+        noContest: true,
+        visibleToStudents: false,
+        teamSizeMin: null,
+        teamSizeMax: null,
+        allowCrossClass: false,
+        allowedClassLevels: [],
+        capacityMode: "combined" as const,
+        combinedCapacity: UNLIMITED_CAPACITY,
+        criteria: [],
+      };
+    }
     if (v.type === "team" && v.teamSizeMax === 1) {
       return {
         ...v,

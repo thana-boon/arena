@@ -106,6 +106,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const body = competitionInput.parse(await req.json());
 
+    // สลับนักเรียน ↔ ครูได้เฉพาะตอนยังไม่มีรายชื่อ — แถวที่ลงไว้เป็นรหัสของอีกฝั่ง สลับแล้วจะกลายเป็นข้อมูลผิดคน
+    if (body.participantType !== comp.participantType && (await hasEntries(id)))
+      return fail("เปลี่ยนผู้เข้าร่วม (นักเรียน/ครู) ไม่ได้ เพราะรายการนี้มีรายชื่อแล้ว");
+
     // งานต้องเป็นงานของปีเดียวกับรายการ
     const event = (
       await db.select().from(events).where(and(eq(events.id, body.eventId), eq(events.yearId, comp.yearId))).limit(1)
@@ -144,9 +148,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     // มีคนลงทะเบียนอยู่ = เลื่อนวัน/เวลาไม่ได้ (เวลาที่ลงไว้ผ่านการตรวจว่าไม่ชนมาแล้ว ห้ามให้เปลี่ยนทีหลังลอย ๆ)
     // ตรวจก่อนด่านสถานที่ชนกัน เพื่อให้ครูเจอเหตุผลจริงทันที ไม่ใช่ไปติดกล่องยืนยันเรื่องห้องก่อน
+    // กิจกรรมของครูไม่ล็อกเวลา: เหตุผลของการล็อกคือเวลาใหม่อาจชนรายการอื่นที่นักเรียนลงไว้ ซึ่งครูไม่มี
     const sched = scheduleChangeGuard(
       s,
-      await hasActiveEntries(id),
+      comp.participantType === "student" && (await hasActiveEntries(id)),
       { timeSlotId: comp.timeSlotId, eventDate: comp.eventDate },
       { timeSlotId: slot.id, eventDate: body.eventDate || null }
     );
@@ -188,6 +193,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           endTime: slot.endTime,
           // ไม่มีการแข่งขัน — แก้ได้เสมอ (มีผลกับการออกเกียรติบัตร/การแสดงผล ไม่แตะข้อมูลที่ลงไว้แล้ว)
           noContest: body.noContest,
+          participantType: body.participantType,
           // ทีมข้ามห้อง — แก้ได้เสมอ (ไม่กระทบทีมที่ลงไปแล้ว มีผลกับการลงทะเบียนครั้งต่อไปเท่านั้น)
           // ประเภทถูกล็อกเมื่อมีคนลงแล้ว จึงยึด comp.type เดิมในกรณีนั้น
           allowCrossClass: (locked ? comp.type : body.type) === "team" ? body.allowCrossClass : false,

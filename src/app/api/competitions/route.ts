@@ -70,6 +70,7 @@ export async function POST(req: Request) {
           description: body.description.trim(),
           type: body.type,
           noContest: body.noContest,
+          participantType: body.participantType,
           capacityMode: body.type === "individual" ? body.capacityMode ?? "per_level" : "per_level",
           teamSizeMin: body.type === "team" ? body.teamSizeMin ?? null : null,
           teamSizeMax: body.type === "team" ? body.teamSizeMax ?? null : null,

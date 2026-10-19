@@ -40,6 +40,7 @@ export async function GET(req: Request) {
         and(
           eq(entries.status, "active"),
           eq(competitions.yearId, year.id),
+          eq(competitions.participantType, "student"), // กิจกรรมของครูเก็บรหัสครูในช่องเดียวกัน
           ...(eventId != null ? [eq(competitions.eventId, eventId)] : [])
         )
       );

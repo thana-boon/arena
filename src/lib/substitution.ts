@@ -84,6 +84,8 @@ export async function substituteMember(args: SubstituteArgs): Promise<Substitute
   if (!comp) throw new SubstitutionError("ไม่พบรายการแข่งขัน", 404);
   if (comp.yearId !== year.id)
     throw new SubstitutionError("รายการนี้ไม่ได้อยู่ในปีการศึกษาปัจจุบัน");
+  if (comp.participantType === "teacher")
+    throw new SubstitutionError("กิจกรรมของครูไม่มีการเปลี่ยนตัว — แก้รายชื่อที่หน้า “ติ๊กรายชื่อครู”");
 
   // ===== ใคร =====
   // เลขหมวดทั้งหมด (หลัก + ร่วม) — ครูในหมวดร่วมเปลี่ยนตัวได้เหมือนหมวดเจ้าของ

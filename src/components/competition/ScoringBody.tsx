@@ -10,6 +10,9 @@ import { formatThaiDateTime } from "@/lib/domain";
 import type { SessionPayload } from "@/lib/auth/session";
 import { ScoringGrid } from "@/app/teacher/scoring/[id]/ScoringGrid";
 import { AttendanceGrid } from "@/app/teacher/scoring/[id]/AttendanceGrid";
+import { TeacherPicker, type TeacherOption } from "@/app/teacher/scoring/[id]/TeacherPicker";
+import { fetchAllTeachers, normalizeTeacherCode, teacherFullName } from "@/lib/external/teacher-api";
+import { getSubjectGroupMap, subjectGroupLabel } from "@/lib/subjectGroups";
 
 /**
  * เนื้อหาหน้าบันทึกผล — ใช้ร่วมกันทั้ง /teacher และ /admin (ต่างกันแค่ปลายทาง backHref)
@@ -47,6 +50,51 @@ export async function ScoringBody({
   const groupNos = await competitionCatalogNos(comp.id, comp.subjectGroupId);
   if (!canScore(session, comp.createdBy, groupNos))
     return withBack(<div className="alert alert-error">บันทึกคะแนนได้เฉพาะรายการในหมวดของท่าน</div>);
+  // กิจกรรมของครู: ไม่มีใครสมัครเอง — ติ๊กจากรายชื่อครูทั้งโรงเรียน (ลงทะเบียน + เช็คชื่อในขั้นเดียว)
+  if (comp.participantType === "teacher") {
+    const roster = await getRoster(id);
+    const members = roster.flatMap((e) => e.members);
+    const pickedCodes = members.filter((m) => !m.absent).map((m) => normalizeTeacherCode(m.studentCode));
+    let teachers: TeacherOption[] = [];
+    let loadError = false;
+    try {
+      const [list, groupMap] = await Promise.all([fetchAllTeachers(), getSubjectGroupMap()]);
+      teachers = list.map((t) => ({
+        code: normalizeTeacherCode(t.teacher_code),
+        name: teacherFullName(t),
+        group: t.subject_group == null ? "" : subjectGroupLabel(Number(t.subject_group), groupMap),
+      }));
+    } catch {
+      loadError = true; // SchoolOS ล่ม — ยังโชว์คนที่ติ๊กไว้แล้วได้ (เอาติ๊กออกได้ แต่เพิ่มใหม่ไม่ได้)
+    }
+    // คนที่เคยติ๊กไว้แต่ไม่อยู่ในรายชื่อปัจจุบันแล้ว (ลาออก/ย้าย) — ต้องยังเห็นและเอาติ๊กออกได้
+    const known = new Set(teachers.map((t) => t.code));
+    for (const m of members) {
+      const code = normalizeTeacherCode(m.studentCode);
+      if (!known.has(code)) {
+        teachers.push({ code, name: m.name, group: "", inactive: !loadError });
+        known.add(code);
+      }
+    }
+    teachers.sort((a, b) => a.group.localeCompare(b.group, "th") || a.name.localeCompare(b.name, "th"));
+    return (
+      <div className="stack">
+        {back}
+        <div className="page-header">
+          <h1>ติ๊กรายชื่อครู: {comp.name}</h1>
+          <div className="subtitle">กิจกรรมของครู · ไม่มีคะแนน/อันดับ/รางวัล</div>
+        </div>
+        <TeacherPicker
+          competitionId={id}
+          teachers={teachers}
+          initialCodes={pickedCodes}
+          checkedAtText={comp.attendanceCheckedAt ? formatThaiDateTime(comp.attendanceCheckedAt) : null}
+          loadError={loadError}
+        />
+      </div>
+    );
+  }
+
   // ไม่มีการแข่งขัน = ไม่มีคะแนนให้กรอก เหลือแค่ "มาร่วมกิจกรรมจริงไหม" → เช็คชื่อรายคน
   if (comp.noContest) {
     const roster = await getRoster(id);

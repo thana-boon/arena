@@ -12,7 +12,7 @@ import {
   entries,
   entryMembers,
 } from "@/db/schema";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { headers } from "next/headers";
 import type { PoolClient } from "pg";
@@ -583,6 +583,16 @@ export async function getIssuesByIds(ids: number[]) {
   return rows.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
 }
 
+/** id ของรายการที่เป็นกิจกรรมของครู (จากชุด id ที่ให้มา) — ใช้กันใบของครูออกจากมุมนักเรียน */
+export async function teacherCompetitionIds(compIds: number[]): Promise<Set<number>> {
+  if (!compIds.length) return new Set();
+  const rows = await db
+    .select({ id: competitions.id })
+    .from(competitions)
+    .where(and(inArray(competitions.id, [...new Set(compIds)]), eq(competitions.participantType, "teacher")));
+  return new Set(rows.map((r) => r.id));
+}
+
 // ===== เกียรติบัตรของนักเรียนเอง =====
 
 export type MyCertificate = {
@@ -612,7 +622,13 @@ export async function getMyCertificates(studentCode: string): Promise<MyCertific
   const rows = await db
     .select()
     .from(certificateIssues)
-    .where(eq(certificateIssues.studentCode, studentCode))
+    .where(
+      and(
+        eq(certificateIssues.studentCode, studentCode),
+        // ใบของกิจกรรมครูเก็บรหัสครูในช่องเดียวกัน — รหัสที่บังเอิญตรงกันต้องไม่ไปโผล่ในใบของเด็ก
+        sql`NOT EXISTS (SELECT 1 FROM ${competitions} WHERE ${competitions.id} = ${certificateIssues.competitionId} AND ${competitions.participantType} = 'teacher')`
+      )
+    )
     .orderBy(desc(certificateIssues.yearBeSnapshot), desc(certificateIssues.issuedAt));
 
   return rows.map((r) => ({

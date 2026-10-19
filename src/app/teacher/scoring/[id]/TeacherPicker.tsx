@@ -7,6 +7,8 @@ import { Icon } from "@/components/Icon";
 import { nameInitial } from "@/lib/initials";
 
 type SortKey = "group" | "code" | "name";
+type ViewMode = "grid" | "list";
+const VIEW_KEY = "arena.teacherPicker.view";
 
 export type TeacherOption = {
   code: string;
@@ -74,6 +76,23 @@ export function TeacherPicker({
   const [group, setGroup] = useState("");
   const [onlyPicked, setOnlyPicked] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("group");
+  // การ์ด (ค่าเริ่มต้น) หรือรายการแถวเดียวแน่น ๆ — จำไว้ในเบราว์เซอร์ คนที่ถนัดแบบไหนไม่ต้องกดใหม่ทุกครั้ง
+  const [view, setView] = useState<ViewMode>("grid");
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(VIEW_KEY) === "list") setView("list");
+    } catch {
+      // ปิด storage ไว้ (โหมดส่วนตัว) — ใช้ค่าเริ่มต้นไป
+    }
+  }, []);
+  const chooseView = (v: ViewMode) => {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      // จำไม่ได้ก็ไม่เป็นไร
+    }
+  };
   // ชื่อที่พิมพ์เพิ่มแต่ยังไม่ได้บันทึก — บันทึกแล้วจะกลับมาเป็นแถวปกติ (manual) จากเซิร์ฟเวอร์
   const [pending, setPending] = useState<string[]>([]);
   const [manualName, setManualName] = useState("");
@@ -254,6 +273,14 @@ export function TeacherPicker({
                 </button>
               ))}
             </div>
+            <div className="seg" role="group" aria-label="รูปแบบการแสดง">
+              <button type="button" className={`seg-btn${view === "grid" ? " on" : ""}`} onClick={() => chooseView("grid")}>
+                การ์ด
+              </button>
+              <button type="button" className={`seg-btn${view === "list" ? " on" : ""}`} onClick={() => chooseView("list")}>
+                รายการ
+              </button>
+            </div>
           </div>
           <div className="tp-bulk">
             <button type="button" className={`group-chip${onlyPicked ? " on" : ""}`} onClick={() => setOnlyPicked((v) => !v)}>
@@ -269,8 +296,42 @@ export function TeacherPicker({
         </div>
       </div>
 
-      {/* ── รายชื่อ (แตะทั้งการ์ดเพื่อเลือก) ── */}
-      {shown.length ? (
+      {/* ── รายชื่อ (แตะทั้งแถว/ทั้งการ์ดเพื่อเลือก) ── */}
+      {shown.length && view === "list" ? (
+        <div className="tp-list" role="list">
+          <div className="tp-list-head" aria-hidden>
+            <span />
+            <span>รหัส</span>
+            <span>ชื่อ - นามสกุล</span>
+            <span>กลุ่มสาระ</span>
+          </div>
+          {shown.map((t) => {
+            const on = picked.has(t.code);
+            return (
+              <button
+                key={t.code}
+                type="button"
+                role="listitem"
+                className={`tp-row${on ? " on" : ""}`}
+                onClick={() => toggle(t.code)}
+                aria-pressed={on}
+              >
+                <span className="tp-check" aria-hidden>
+                  {on && <CheckMark />}
+                </span>
+                <span className="tp-row-code">
+                  {t.manual ? <span className="tp-tag tp-tag-purple">เพิ่มเอง</span> : t.code}
+                </span>
+                <span className="tp-row-name">
+                  {t.name}
+                  {t.inactive && <span className="tp-tag" style={{ marginLeft: 6 }}>ไม่อยู่ในรายชื่อปัจจุบัน</span>}
+                </span>
+                <span className="tp-row-group">{t.group || "-"}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : shown.length ? (
         <div className="tp-grid">
           {shown.map((t) => {
             const on = picked.has(t.code);

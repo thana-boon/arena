@@ -4884,3 +4884,84 @@ p {
   }
   .tp-savebtn { min-width: 0; padding: 0 var(--space-6); }
 }
+
+/* มุมมอง "รายการ" ของหน้าติ๊กรายชื่อครู — แถวเดียวแน่น ๆ ไล่ตาลงทีละคน (สลับกับการ์ดได้) */
+.tp-list {
+  background: #fff;
+  border: 1px solid var(--skdw-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.tp-list-head,
+.tp-row {
+  display: grid;
+  grid-template-columns: 26px 110px minmax(0, 1fr) minmax(0, 220px);
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+}
+.tp-list-head {
+  min-height: 40px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--skdw-muted);
+  background: var(--skdw-bg);
+  border-bottom: 1px solid var(--skdw-border);
+}
+.tp-row {
+  width: 100%;
+  min-height: 52px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: #fff;
+  border: none;
+  border-bottom: 1px solid var(--skdw-border);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+.tp-row:last-child { border-bottom: none; }
+.tp-row:hover { background: var(--skdw-bg); }
+.tp-row:focus-visible { outline: none; box-shadow: inset var(--shadow-focus); }
+.tp-row.on { background: var(--skdw-purple-pale); }
+.tp-row.on .tp-check {
+  background: var(--skdw-purple);
+  border-color: var(--skdw-purple);
+  animation: tpPop 0.18s ease;
+}
+.tp-row-code {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--skdw-muted);
+}
+.tp-row-name {
+  font-weight: 500;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.tp-row.on .tp-row-name { color: var(--skdw-purple); font-weight: 600; }
+.tp-row-group {
+  font-size: var(--text-sm);
+  color: var(--skdw-muted);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 768px) {
+  .tp-list-head { display: none; }
+  /* มือถือ: ชื่อเต็มบรรทัด รหัส · กลุ่มสาระ ลงไปบรรทัดล่าง */
+  .tp-row {
+    grid-template-columns: 26px minmax(0, 1fr);
+    grid-template-areas:
+      "check name"
+      "check meta";
+    row-gap: 0;
+    padding: var(--space-2) var(--space-4);
+  }
+  .tp-row .tp-check { grid-area: check; }
+  .tp-row-name { grid-area: name; }
+  .tp-row-code,
+  .tp-row-group { font-size: var(--text-sm); }
+  .tp-row-code { grid-area: meta; }
+  .tp-row-group { grid-area: meta; justify-self: end; }
+}

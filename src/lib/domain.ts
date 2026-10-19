@@ -326,6 +326,12 @@ export function formatThaiDateTime(input: string | Date | null | undefined): str
 /** ค่า capacity ที่ถือว่า "ไม่จำกัดจำนวน" (เป็นค่า default ตอนสร้างรายการ) */
 export const UNLIMITED_CAPACITY = -1;
 
+/**
+ * รหัสภายในของครูที่ "พิมพ์ชื่อเพิ่มเอง" ในกิจกรรมของครู (ไม่มีในรายชื่อ SchoolOS)
+ * เก็บใน entry_members.student_code แทนรหัสครูจริง — หน้าจอใช้ prefix นี้แยกว่าเป็นชื่อที่เพิ่มเอง
+ */
+export const MANUAL_TEACHER_PREFIX = "EXT-";
+
 /** true = ที่นั่งไม่จำกัดจำนวน */
 export function isUnlimited(capacity: number | null | undefined): boolean {
   return capacity != null && capacity < 0;

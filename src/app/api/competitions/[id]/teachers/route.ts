@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomBytes } from "crypto";
 import { db } from "@/db";
 import { certificateIssues, competitionCapacity, competitions, entries, entryMembers } from "@/db/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -7,6 +8,7 @@ import { apiRequireRole } from "@/lib/auth/guards";
 import { canScore } from "@/lib/permit";
 import { competitionCatalogNos } from "@/lib/competitionGroups";
 import { fetchAllTeachers, normalizeTeacherCode, teacherFullName } from "@/lib/external/teacher-api";
+import { MANUAL_TEACHER_PREFIX } from "@/lib/domain";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -15,6 +17,11 @@ const schema = z.object({
    * ส่งอาเรย์ว่างได้ = ไม่มีครูเข้าร่วมเลย
    */
   teacherCodes: z.array(z.string().trim().min(1).max(64)).max(2000),
+  /**
+   * ชื่อที่พิมพ์เพิ่มเอง (ครูที่ไม่มีในรายชื่อ SchoolOS เช่น วิทยากร/ครูอัตราจ้าง/ครูต่างโรงเรียน)
+   * ได้รหัสภายใน EXT-xxxxxxxx — ครั้งถัดไปติ๊กคงไว้ด้วยรหัสนั้นใน teacherCodes เหมือนครูทั่วไป
+   */
+  manualNames: z.array(z.string().trim().min(1, "กรุณาพิมพ์ชื่อ").max(191)).max(200).optional().default([]),
 });
 
 /**
@@ -41,7 +48,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (comp.participantType !== "teacher") return fail("รายการนี้ผู้เข้าร่วมเป็นนักเรียน — ใช้หน้าลงชื่อ/เช็คชื่อตามปกติ");
 
     const body = schema.parse(await req.json());
-    const wanted = new Set(body.teacherCodes.map(normalizeTeacherCode));
+    const manual = body.manualNames.map((name) => ({
+      code: `${MANUAL_TEACHER_PREFIX}${randomBytes(4).toString("hex").toUpperCase()}`,
+      name,
+    }));
+    const wanted = new Set([...body.teacherCodes.map(normalizeTeacherCode), ...manual.map((m) => m.code)]);
 
     // รายชื่อที่ติ๊กไว้แล้ว (รวมคนที่เคยเอาติ๊กออกแต่ค้างไว้เพราะออกใบไปแล้ว)
     const entRows = await db
@@ -54,8 +65,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const existingCodes = new Set(members.map((m) => normalizeTeacherCode(m.studentCode)));
 
     // คนที่เพิ่งติ๊กใหม่ต้องเป็นครูที่ยังทำงานอยู่จริง — ชื่อบนเกียรติบัตรมาจาก SchoolOS ไม่ใช่จากเบราว์เซอร์
-    const added = [...wanted].filter((c) => !existingCodes.has(c));
-    const newMembers: { code: string; name: string }[] = [];
+    // ชื่อที่พิมพ์เอง: ไม่ต้องไปถาม SchoolOS ; รหัส EXT- ที่ไม่ได้มาจากแถวเดิมของรายการนี้ = ปลอม → ไม่รับ
+    const manualCodes = new Set(manual.map((m) => m.code));
+    const added = [...wanted].filter((c) => !existingCodes.has(c) && !manualCodes.has(c));
+    const newMembers: { code: string; name: string }[] = [...manual];
     if (added.length) {
       let teachers;
       try {
@@ -65,7 +78,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       }
       const byCode = new Map(teachers.map((t) => [normalizeTeacherCode(t.teacher_code), t]));
       for (const code of added) {
-        const t = byCode.get(code);
+        const t = code.startsWith(MANUAL_TEACHER_PREFIX) ? undefined : byCode.get(code);
         if (!t) return fail(`ไม่พบครูรหัส ${code} ในรายชื่อครูที่ยังทำงานอยู่`);
         newMembers.push({ code: t.teacher_code, name: teacherFullName(t) });
       }

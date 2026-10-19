@@ -3,7 +3,7 @@ import { Icon } from "@/components/Icon";
 import { db } from "@/db";
 import { competitions, criteria, events, subjectGroups } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
-import { parseJsonArray, formatThaiDate, formatSeats, registrationWindow } from "@/lib/domain";
+import { parseJsonArray, formatThaiDate, formatSeats, registrationWindow, MANUAL_TEACHER_PREFIX } from "@/lib/domain";
 import { canScore, canViewCompetition, canEditCompetition, competitionManageGuard } from "@/lib/permit";
 import { getRoster, getCapacityRows, type RosterMember } from "@/lib/roster";
 import { getCoGroupIds } from "@/lib/competitionGroups";
@@ -188,7 +188,9 @@ function TeacherRoster({ members, pickHref }: { members: RosterMember[]; pickHre
                 <tr key={m.memberId}>
                   <td data-label="ที่">{i + 1}</td>
                   <td className="td-title">{m.name}</td>
-                  <td className="text-sm" data-label="รหัสครู">{m.studentCode}</td>
+                  <td className="text-sm" data-label="รหัสครู">
+                    {m.studentCode.startsWith(MANUAL_TEACHER_PREFIX) ? <span className="muted">เพิ่มเอง</span> : m.studentCode}
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -5,6 +5,8 @@ import { api } from "@/lib/client";
 import { Icon } from "@/components/Icon";
 import { useToast } from "@/components/Toast";
 
+type SortKey = "group" | "code" | "name";
+
 export type TeacherOption = {
   code: string;
   name: string;
@@ -12,7 +14,16 @@ export type TeacherOption = {
   group: string;
   /** ไม่อยู่ในรายชื่อครูที่ยังทำงานอยู่แล้ว (ลาออก/ย้าย) แต่ถูกติ๊กไว้ก่อนหน้า */
   inactive?: boolean;
+  /** ชื่อที่พิมพ์เพิ่มเอง (ไม่มีใน SchoolOS) — code เป็นรหัสภายใน EXT-xxx ไม่ต้องโชว์ */
+  manual?: boolean;
 };
+
+/** เรียงรหัสครูแบบตัวเลขในข้อความ ("T2" มาก่อน "T10") ; ชื่อที่พิมพ์เองไปอยู่ท้ายสุด */
+const byCode = (a: TeacherOption, b: TeacherOption) =>
+  Number(!!a.manual) - Number(!!b.manual) || a.code.localeCompare(b.code, "th", { numeric: true });
+
+/** เทียบชื่อโดยไม่สนช่องว่าง — "นายสมชาย  ใจดี" กับ "นายสมชาย ใจดี" คือคนเดียวกัน */
+const sameName = (a: string, b: string) => a.replace(/\s+/g, "") === b.replace(/\s+/g, "");
 
 /**
  * ติ๊กรายชื่อครูที่เข้าร่วมกิจกรรมของครู — ใช้แทนตารางเช็คชื่อนักเรียน
@@ -42,6 +53,10 @@ export function TeacherPicker({
   const [q, setQ] = useState("");
   const [group, setGroup] = useState("");
   const [onlyPicked, setOnlyPicked] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("group");
+  // ชื่อที่พิมพ์เพิ่มแต่ยังไม่ได้บันทึก — บันทึกแล้วจะกลับมาเป็นแถวปกติ (manual) จากเซิร์ฟเวอร์
+  const [pending, setPending] = useState<string[]>([]);
+  const [manualName, setManualName] = useState("");
   const [busy, setBusy] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(checkedAtText);
 
@@ -52,13 +67,26 @@ export function TeacherPicker({
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return teachers.filter(
+    const list = teachers.filter(
       (t) =>
         (!group || t.group === group) &&
         (!onlyPicked || picked.has(t.code)) &&
-        (!needle || t.name.toLowerCase().includes(needle) || t.code.toLowerCase().includes(needle))
+        (!needle || t.name.toLowerCase().includes(needle) || (!t.manual && t.code.toLowerCase().includes(needle)))
     );
-  }, [teachers, q, group, onlyPicked, picked]);
+    // teachers มาจากเซิร์ฟเวอร์เรียงตามกลุ่มสาระ → ชื่อ อยู่แล้ว
+    if (sortKey === "code") return [...list].sort(byCode);
+    if (sortKey === "name") return [...list].sort((a, b) => a.name.localeCompare(b.name, "th"));
+    return list;
+  }, [teachers, q, group, onlyPicked, picked, sortKey]);
+
+  function addManual() {
+    const name = manualName.trim().replace(/\s+/g, " ");
+    if (!name) return;
+    if ([...pending, ...teachers.map((t) => t.name)].some((n) => sameName(n, name)))
+      return toast(`มีชื่อ “${name}” อยู่ในรายชื่อแล้ว — ค้นหาแล้วติ๊กแทน`, "error");
+    setPending((p) => [...p, name]);
+    setManualName("");
+  }
 
   const toggle = (code: string, on: boolean) =>
     setPicked((prev) => {
@@ -83,10 +111,11 @@ export function TeacherPicker({
     setBusy(true);
     const res = await api.post<{ present: number; keptForCertificates: number }>(
       `/api/competitions/${competitionId}/teachers`,
-      { teacherCodes: [...picked] }
+      { teacherCodes: [...picked], manualNames: pending }
     );
     setBusy(false);
     if (!res.ok) return toast(res.error, "error");
+    setPending([]);
     setSavedAt("เมื่อสักครู่");
     toast(
       `บันทึกรายชื่อแล้ว · ครูเข้าร่วม ${res.data.present} คน` +
@@ -130,9 +159,23 @@ export function TeacherPicker({
             ))}
           </select>
         </div>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span className="text-sm muted">เรียงตาม</span>
+          <div className="seg" role="group" aria-label="เรียงตาม">
+            {([
+              ["group", "กลุ่มสาระ"],
+              ["code", "รหัสครู"],
+              ["name", "ชื่อ"],
+            ] as const).map(([k, label]) => (
+              <button key={k} type="button" className={`seg-btn${sortKey === k ? " on" : ""}`} onClick={() => setSortKey(k)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="row between" style={{ flexWrap: "wrap", gap: 8 }}>
           <div className="text-sm">
-            ติ๊กแล้ว <strong>{picked.size}</strong> คน
+            ติ๊กแล้ว <strong>{picked.size + pending.length}</strong> คน
             {savedAt && <span className="muted"> · บันทึกล่าสุด {savedAt}</span>}
           </div>
           <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
@@ -178,7 +221,11 @@ export function TeacherPicker({
                     </td>
                     <td className="td-title" style={on ? undefined : { opacity: 0.7 }}>
                       {t.name}
-                      <span className="muted text-sm"> · {t.code}</span>
+                      {t.manual ? (
+                        <span className="badge badge-purple" style={{ marginLeft: 6 }}>เพิ่มเอง</span>
+                      ) : (
+                        <span className="muted text-sm"> · {t.code}</span>
+                      )}
                       {t.inactive && (
                         <span className="badge" style={{ marginLeft: 6 }}>ไม่อยู่ในรายชื่อปัจจุบัน</span>
                       )}
@@ -199,9 +246,52 @@ export function TeacherPicker({
         </div>
       )}
 
+      {/* ครูที่ไม่มีในรายชื่อ SchoolOS (วิทยากร/อัตราจ้าง/ต่างโรงเรียน) — พิมพ์ชื่อตามที่จะขึ้นบนเกียรติบัตร */}
+      <div className="card stack" style={{ gap: 10 }}>
+        <div className="card-header" style={{ padding: 0, border: "none", margin: 0 }}>เพิ่มชื่อที่ไม่มีในรายชื่อ</div>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+          <input
+            className="form-input"
+            style={{ flex: "1 1 240px" }}
+            placeholder="คำนำหน้า ชื่อ นามสกุล เช่น นางสาวสมใจ ใจดี"
+            value={manualName}
+            maxLength={191}
+            onChange={(e) => setManualName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addManual();
+              }
+            }}
+          />
+          <button type="button" className="btn btn-secondary" onClick={addManual} disabled={!manualName.trim()}>
+            + เพิ่ม
+          </button>
+        </div>
+        <span className="form-hint">ชื่อนี้จะพิมพ์ลงเกียรติบัตรตามที่พิมพ์ทุกตัวอักษร — ตรวจคำนำหน้าและตัวสะกดให้ถูกก่อนบันทึก</span>
+        {pending.length > 0 && (
+          <div className="chip-wrap">
+            {pending.map((n) => (
+              <span key={n} className="level-chip on">
+                <span>{n}</span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  aria-label={`เอา ${n} ออก`}
+                  onClick={() => setPending((p) => p.filter((x) => x !== n))}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            <span className="form-hint">ยังไม่ได้บันทึก — กด “บันทึกรายชื่อ” ด้านล่าง</span>
+          </div>
+        )}
+      </div>
+
       <div className="form-actions">
         <button className="btn btn-primary" onClick={save} disabled={busy}>
-          {busy ? "กำลังบันทึก…" : `บันทึกรายชื่อ (${picked.size} คน)`}
+          {busy ? "กำลังบันทึก…" : `บันทึกรายชื่อ (${picked.size + pending.length} คน)`}
         </button>
       </div>
       <p className="form-hint">

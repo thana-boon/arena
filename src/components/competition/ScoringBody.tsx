@@ -6,7 +6,7 @@ import { getActiveYearWithSettings } from "@/lib/queries";
 import { getRoster } from "@/lib/roster";
 import { canScore } from "@/lib/permit";
 import { competitionCatalogNos } from "@/lib/competitionGroups";
-import { formatThaiDateTime } from "@/lib/domain";
+import { formatThaiDateTime, MANUAL_TEACHER_PREFIX } from "@/lib/domain";
 import type { SessionPayload } from "@/lib/auth/session";
 import { ScoringGrid } from "@/app/teacher/scoring/[id]/ScoringGrid";
 import { AttendanceGrid } from "@/app/teacher/scoring/[id]/AttendanceGrid";
@@ -72,7 +72,8 @@ export async function ScoringBody({
     for (const m of members) {
       const code = normalizeTeacherCode(m.studentCode);
       if (!known.has(code)) {
-        teachers.push({ code, name: m.name, group: "", inactive: !loadError });
+        const manual = code.startsWith(MANUAL_TEACHER_PREFIX);
+        teachers.push({ code, name: m.name, group: "", manual, inactive: !manual && !loadError });
         known.add(code);
       }
     }

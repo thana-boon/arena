@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { verifyToken, SESSION_COOKIE, type Role } from "@/lib/auth/session";
+import { verifyToken, applyViewAs, SESSION_COOKIE, VIEW_AS_COOKIE_NAME, type Role } from "@/lib/auth/session";
 
 // route prefix → allowed roles
 const RULES: { prefix: string; roles: Role[] }[] = [
@@ -14,7 +14,8 @@ export async function middleware(req: NextRequest) {
   if (!rule) return NextResponse.next();
 
   const token = req.cookies.get(SESSION_COOKIE)?.value;
-  const session = token ? await verifyToken(token) : null;
+  const raw = token ? await verifyToken(token) : null;
+  const session = raw ? applyViewAs(raw, req.cookies.get(VIEW_AS_COOKIE_NAME)?.value) : null;
 
   if (!session) {
     const url = req.nextUrl.clone();
@@ -25,7 +26,8 @@ export async function middleware(req: NextRequest) {
 
   if (!rule.roles.includes(session.role)) {
     const url = req.nextUrl.clone();
-    url.pathname = "/";
+    // admin ที่อยู่ในโหมดครูแล้วเปิดลิงก์ /admin ค้างไว้ → พาไปมุมครู ไม่ใช่หน้าแรกสาธารณะ
+    url.pathname = session.realRole ? "/teacher" : "/";
     return NextResponse.redirect(url);
   }
 

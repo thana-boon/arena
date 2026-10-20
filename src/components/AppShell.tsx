@@ -9,11 +9,12 @@ import { UserMenu } from "./UserMenu";
 import { SessionTimeout } from "./SessionTimeout";
 import { SessionGuard } from "./SessionGuard";
 import { AnnouncementBanner } from "./AnnouncementBanner";
+import { ViewAsToggle } from "./ViewAsToggle";
 import { bottomNavItems, type NavGroup } from "@/lib/nav";
 import { nameInitial } from "@/lib/initials";
 import { getAnnouncementsFor } from "@/lib/announcements";
 import type { AnnouncementView } from "@/lib/announcementTypes";
-import { idleSeconds, type SessionPayload, type Role } from "@/lib/auth/session";
+import { idleSeconds, type Session, type Role } from "@/lib/auth/session";
 
 const ROLE_LABEL: Record<Role, string> = {
   student: "นักเรียน",
@@ -27,13 +28,17 @@ export async function AppShell({
   groups,
   children,
 }: {
-  session: SessionPayload;
+  session: Session;
   groups: NavGroup[];
   children: React.ReactNode;
 }) {
   const initial = nameInitial(session.name, session.firstName);
   const hasPhoto = Boolean(session.photo);
   const bottom = bottomNavItems(groups);
+  // ผู้ดูแลระบบสลับไปใช้งานแบบครูทั่วไปได้ (ดู setViewAs) — ตัดสินจากบทบาทจริง ไม่ใช่บทบาทที่กำลังใช้
+  const asTeacher = session.realRole === "admin";
+  const viewAs = asTeacher || session.role === "admin" ? { asTeacher } : undefined;
+  const roleLabel = asTeacher ? "ครู (โหมดของผู้ดูแลระบบ)" : ROLE_LABEL[session.role];
   // ประกาศจาก admin — DB ล่ม/ตารางยังไม่มี ต้องไม่ทำให้ทั้งเว็บพัง (แถบประกาศไม่ใช่ของจำเป็นต่อการทำงาน)
   let announcements: AnnouncementView[] = [];
   try {
@@ -61,7 +66,7 @@ export async function AppShell({
           <Avatar initial={initial} hasPhoto={hasPhoto} owner={session.code} />
           <span className="who">
             <span className="nm">{session.name}</span>
-            <span className="rl">{ROLE_LABEL[session.role]}</span>
+            <span className="rl">{roleLabel}</span>
           </span>
         </div>
       </aside>
@@ -74,17 +79,25 @@ export async function AppShell({
             {/* กดรูปโปรไฟล์ = เมนูผู้ใช้ (ชื่อ/บทบาท + ออกจากระบบ) ใช้ได้เหมือนกันทั้งมือถือและจอใหญ่ */}
             <UserMenu
               name={session.name}
-              roleLabel={ROLE_LABEL[session.role]}
+              roleLabel={roleLabel}
               initial={initial}
               hasPhoto={hasPhoto}
               code={session.code}
               sso={session.sso ?? false}
+              viewAs={viewAs}
             />
           </div>
         </header>
         <main className="main-content">
           {/* ประกาศอยู่นอก RouteTransition — ค้างอยู่กับที่ตอนสลับหน้า ไม่กะพริบตามเนื้อหา */}
           <AnnouncementBanner items={announcements} />
+          {/* เตือนตลอดว่ากำลังอยู่ในโหมดครู — ไม่งั้นลืมแล้วนึกว่าสิทธิ์ admin หาย */}
+          {asTeacher && (
+            <div className="viewas-bar" role="status">
+              <span>กำลังใช้งานแบบครูทั่วไป · เห็นและทำได้เท่าที่ครูในหมวดทำได้</span>
+              <ViewAsToggle asTeacher />
+            </div>
+          )}
           <RouteTransition>{children}</RouteTransition>
         </main>
       </div>
@@ -94,7 +107,7 @@ export async function AppShell({
           <Avatar initial={initial} hasPhoto={hasPhoto} owner={session.code} />
           <span className="who">
             <span className="nm">{session.name}</span>
-            <span className="rl">{ROLE_LABEL[session.role]}</span>
+            <span className="rl">{roleLabel}</span>
           </span>
           <LogoutButton sso={session.sso ?? false} />
         </div>

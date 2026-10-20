@@ -5,9 +5,21 @@ import { signIdentity, verifyIdentity, type Role, type SessionPayload } from "./
 
 // นิยามตัวตน + การเซ็น/ตรวจ token อยู่ที่ identity.ts (ไฟล์บริสุทธิ์ที่เทสได้) — ไฟล์นี้ดูแลคุกกี้กับอายุ
 export type { Role, SessionPayload };
+
+/**
+ * session ที่หน้าเว็บ/API ใช้ตัดสินสิทธิ์ — role คือ "บทบาทที่กำลังใช้อยู่"
+ * realRole มีค่าเฉพาะตอนที่ admin สลับมาใช้งานแบบครู (role = teacher, realRole = admin)
+ */
+export type Session = SessionPayload & { realRole?: Role };
 export { identityOf } from "./identity";
 
 const COOKIE = "arena_session";
+/**
+ * โหมด "ใช้งานแบบครูธรรมดา" ของผู้ดูแลระบบ — แยกเป็นคุกกี้ของตัวเอง ไม่เขียนลง token
+ * เพราะ token ถูกต่ออายุทุกครั้งที่ขยับ ถ้าเก็บ role ที่ลดแล้วลงไป admin จะเสียสิทธิ์ถาวร
+ * คุกกี้นี้มีผลเฉพาะกับ token ที่ role = admin จริงเท่านั้น (คนอื่นตั้งเองก็ไม่ได้อะไร)
+ */
+const VIEW_AS_COOKIE = "arena_view_as";
 const secret = () => new TextEncoder().encode(env.JWT_SECRET);
 
 /**
@@ -108,13 +120,18 @@ export async function createSession(
 
   const idle = idleSeconds(payload.client);
   await writeCookie({ ...payload, abs }, abs === null ? idle : Math.min(idle, abs - now));
+  // ล็อกอินใหม่ = เริ่มจากบทบาทจริงเสมอ (โหมดครูของ admin คนก่อนบนเครื่องเดียวกันต้องไม่ติดมา)
+  (await cookies()).delete(VIEW_AS_COOKIE);
 }
 
 /**
  * ต่ออายุ session ของผู้ใช้ที่ยังใช้งานอยู่ — คืนจำนวนวินาทีที่เหลือก่อนหลุด
  * คืน 0 เมื่อชนเพดานสัมบูรณ์แล้ว (ลบ cookie ทิ้งเลย ให้ไป login ใหม่)
  */
-export async function touchSession(payload: SessionPayload): Promise<number> {
+export async function touchSession(session: Session): Promise<number> {
+  // ⚠ ต่ออายุจากตัวตนจริงเสมอ — ไม่งั้น admin ที่อยู่ในโหมดครูจะถูกเซ็น token ใหม่เป็นครูถาวร
+  const { realRole, ...rest } = session;
+  const payload: SessionPayload = realRole ? { ...rest, role: realRole } : rest;
   const now = nowSec();
   // token เก่าที่ออกก่อนมีระบบนี้ ยังไม่มี abs — ให้เริ่มนับเพดานจากตอนนี้
   // ⚠ เทียบกับ undefined ตรง ๆ ไม่ใช่ ?? เพราะ null คือคำตอบจริง ("ไม่มีเพดาน") ไม่ใช่ "ไม่รู้"
@@ -132,13 +149,38 @@ export async function touchSession(payload: SessionPayload): Promise<number> {
 export async function destroySession(): Promise<void> {
   const jar = await cookies();
   jar.delete(COOKIE);
+  jar.delete(VIEW_AS_COOKIE);
 }
 
-export async function getSession(): Promise<SessionPayload | null> {
+export async function getSession(): Promise<Session | null> {
   const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
   if (!token) return null;
-  return verifyIdentity(token, secret());
+  const payload = await verifyIdentity(token, secret());
+  if (!payload) return null;
+  return applyViewAs(payload, jar.get(VIEW_AS_COOKIE)?.value);
+}
+
+/** บทบาทที่ใช้งานอยู่จริง — ใช้ร่วมกันระหว่าง getSession กับ middleware (edge) */
+export function applyViewAs(payload: SessionPayload, viewAs: string | undefined): Session {
+  if (payload.role === "admin" && viewAs === "teacher") return { ...payload, role: "teacher", realRole: "admin" };
+  return payload;
+}
+
+/** admin สลับไปใช้งานแบบครูธรรมดา (teacher) หรือกลับมาเป็นผู้ดูแลระบบ (admin) */
+export async function setViewAs(mode: "teacher" | "admin"): Promise<void> {
+  const jar = await cookies();
+  if (mode === "admin") {
+    jar.delete(VIEW_AS_COOKIE);
+    return;
+  }
+  // ไม่มี maxAge = คุกกี้ของรอบเบราว์เซอร์ ปิดเบราว์เซอร์แล้วกลับมาเป็น admin ตามปกติ
+  jar.set(VIEW_AS_COOKIE, "teacher", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.COOKIE_SECURE === "true",
+    path: "/",
+  });
 }
 
 /** เหลืออีกกี่วินาที session จะหมดอายุ (นับจาก exp ของ token ปัจจุบัน) */
@@ -153,6 +195,7 @@ export async function verifyToken(token: string): Promise<SessionPayload | null>
 }
 
 export const SESSION_COOKIE = COOKIE;
+export const VIEW_AS_COOKIE_NAME = VIEW_AS_COOKIE;
 
 // ===== role helpers =====
 export function isStaff(role?: Role): boolean {

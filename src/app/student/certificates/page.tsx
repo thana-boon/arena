@@ -1,6 +1,6 @@
 import { requireRole } from "@/lib/auth/guards";
 import { getMyCertificates } from "@/lib/certificates";
-import { MyCertificates } from "./MyCertificates";
+import { MyCertificates } from "@/components/certificate/MyCertificates";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function StudentCertificatesPage() {
   const session = await requireRole("student");
-  const certs = await getMyCertificates(session.code);
+  const certs = await getMyCertificates(session.code, "student");
 
   return (
     <div className="stack">
@@ -23,6 +23,7 @@ export default async function StudentCertificatesPage() {
       </div>
       <MyCertificates
         rows={certs.map((c) => ({ ...c, issuedAt: c.issuedAt.toISOString() }))}
+        emptyHint="เมื่อครูออกเกียรติบัตรของรายการที่ร่วมแข่งขัน/เข้าร่วม ใบของท่านจะมาอยู่ที่นี่"
       />
     </div>
   );

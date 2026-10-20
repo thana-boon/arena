@@ -27,15 +27,17 @@ const openPrint = (ids: number[]) => {
 const awardClass = (award: CertAward) =>
   award === "activity" ? "badge" : MEDAL_BADGE_CLASS[award] ?? "badge";
 
-export function MyCertificates({ rows }: { rows: Row[] }) {
+/**
+ * รายการเกียรติบัตรของผู้ใช้เอง — ใช้ร่วมกันทั้งนักเรียน (/student/certificates) และครู (/teacher/my-certificates)
+ * @param emptyHint ข้อความใต้ "ยังไม่มีเกียรติบัตร" (คนละความหมายระหว่างนักเรียนกับครู)
+ */
+export function MyCertificates({ rows, emptyHint }: { rows: Row[]; emptyHint: string }) {
   if (!rows.length) {
     return (
       <div className="empty-state card">
         <Icon name="trophy" size={44} className="empty-ico" />
         <p>ยังไม่มีเกียรติบัตร</p>
-        <div className="subtitle">
-          เมื่อครูออกเกียรติบัตรของรายการที่ร่วมแข่งขัน/เข้าร่วม ใบของท่านจะมาอยู่ที่นี่
-        </div>
+        <div className="subtitle">{emptyHint}</div>
       </div>
     );
   }

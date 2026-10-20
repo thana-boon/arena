@@ -66,6 +66,8 @@ export const TEACHER_NAV_GROUPS: NavGroup[] = [
       { href: "/teacher/reports", label: "ออกรายงาน", icon: "printer", short: "รายงาน" },
       { href: "/teacher/certificates", label: "เกียรติบัตร", icon: "file" },
       { href: "/teacher/cert-registry", label: "ทะเบียนเกียรติบัตร", icon: "search", short: "ทะเบียน" },
+      // ใบของครูเองจากกิจกรรมของครู — แบบเดียวกับ "เกียรติบัตรของฉัน" ของนักเรียน
+      { href: "/teacher/my-certificates", label: "เกียรติบัตรของฉัน", icon: "trophy", short: "ของฉัน" },
     ],
   },
 ];

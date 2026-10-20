@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar } from "./Avatar";
 import { Icon } from "./Icon";
 import { LogoutButton } from "./LogoutButton";
+import { ViewAsToggle } from "./ViewAsToggle";
 
 /**
  * รูปโปรไฟล์บนแถบบน = ปุ่มเปิดเมนูผู้ใช้ (ชื่อ/บทบาท + ออกจากระบบ)
@@ -16,6 +17,7 @@ export function UserMenu({
   hasPhoto,
   code,
   sso,
+  viewAs,
 }: {
   name: string;
   roleLabel: string;
@@ -23,6 +25,8 @@ export function UserMenu({
   hasPhoto: boolean;
   code: string;
   sso: boolean;
+  /** ผู้ดูแลระบบสลับโหมดได้ — undefined = ไม่ใช่ admin ไม่ต้องโชว์ปุ่ม · ค่า = อยู่ในโหมดครูหรือไม่ */
+  viewAs?: { asTeacher: boolean };
 }) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -67,6 +71,7 @@ export function UserMenu({
             <span className="rl">{roleLabel}</span>
           </div>
           <div className="um-sep" />
+          {viewAs && <ViewAsToggle asTeacher={viewAs.asTeacher} variant="menu" />}
           <LogoutButton sso={sso} variant="menu" />
         </div>
       )}

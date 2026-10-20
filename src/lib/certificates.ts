@@ -593,7 +593,7 @@ export async function teacherCompetitionIds(compIds: number[]): Promise<Set<numb
   return new Set(rows.map((r) => r.id));
 }
 
-// ===== เกียรติบัตรของนักเรียนเอง =====
+// ===== เกียรติบัตรของตัวเอง (นักเรียน / ครู) =====
 
 export type MyCertificate = {
   id: number;
@@ -611,24 +611,21 @@ export type MyCertificate = {
 };
 
 /**
- * ใบทั้งหมดของนักเรียนคนหนึ่ง ทุกปีการศึกษา — สำหรับหน้า "เกียรติบัตรของฉัน"
+ * ใบทั้งหมดของผู้ใช้คนหนึ่ง (นักเรียน หรือครูจากกิจกรรมของครู) ทุกปีการศึกษา — สำหรับหน้า "เกียรติบัตรของฉัน"
  *
  * อ่านจากทะเบียนของเราเองล้วน (snapshot ครบทุกอย่างที่พิมพ์ลงกระดาษ) จึงไม่ต้องแตะ SchoolOS
  * ส่วน "นักเรียนที่จบ/ลาออกแล้วต้องดูของตัวเองไม่ได้" ถูกกั้นตั้งแต่ชั้นล็อกอิน:
  * SchoolOS ไม่ยืนยันตัวตนให้คนที่ไม่ได้เรียนอยู่ (ดู studentLogin / fetchActiveStudent)
  * ศิษย์เก่าที่มาขอใบย้อนหลังจึงต้องให้ครู export ให้จากหน้าทะเบียนเกียรติบัตรแทน
  */
-export async function getMyCertificates(studentCode: string): Promise<MyCertificate[]> {
+export async function getMyCertificates(code: string, kind: "student" | "teacher"): Promise<MyCertificate[]> {
+  // ใบของกิจกรรมครูเก็บรหัสครูในช่องเดียวกับรหัสนักเรียน — รหัสที่บังเอิญตรงกันต้องไม่ข้ามฝั่งกัน
+  // ครูเห็นเฉพาะใบจากรายการ participant_type = teacher · นักเรียนเห็นเฉพาะรายการที่ไม่ใช่
+  const teacherComp = sql`EXISTS (SELECT 1 FROM ${competitions} WHERE ${competitions.id} = ${certificateIssues.competitionId} AND ${competitions.participantType} = 'teacher')`;
   const rows = await db
     .select()
     .from(certificateIssues)
-    .where(
-      and(
-        eq(certificateIssues.studentCode, studentCode),
-        // ใบของกิจกรรมครูเก็บรหัสครูในช่องเดียวกัน — รหัสที่บังเอิญตรงกันต้องไม่ไปโผล่ในใบของเด็ก
-        sql`NOT EXISTS (SELECT 1 FROM ${competitions} WHERE ${competitions.id} = ${certificateIssues.competitionId} AND ${competitions.participantType} = 'teacher')`
-      )
-    )
+    .where(and(eq(certificateIssues.studentCode, code), kind === "teacher" ? teacherComp : sql`NOT ${teacherComp}`))
     .orderBy(desc(certificateIssues.yearBeSnapshot), desc(certificateIssues.issuedAt));
 
   return rows.map((r) => ({
